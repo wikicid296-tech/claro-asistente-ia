@@ -1,5 +1,5 @@
 /// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-const API_URL = 'http://localhost:8000'; // Ajusta según tu configuración
+const API_URL = 'http://localhost:10000'; // Ajusta según tu configuración
 
 // Estado global de la aplicación
 const appState = {
@@ -429,3 +429,4 @@ window.addEventListener('resize', function() {
 console.log('%c🚀 Claro GenAI Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cReady to chat!', 'color: #28a745;');
+
