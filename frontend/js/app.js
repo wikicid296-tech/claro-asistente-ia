@@ -1,6 +1,6 @@
 /// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
 // URL CORREGIDA para producción - ESTA ES LA CLAVE
-const API_URL = 'https://telecom-copilot.onrender.com';
+const API_URL = 'https://claro-asistente-ia.onrender.com';
 
 // Estado global de la aplicación
 const appState = {
@@ -501,4 +501,5 @@ window.addEventListener('load', function() {
 console.log('%c🚀 Telecom Copilot Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cPara probar conexión ejecuta: testConnection()', 'color: #ff9800;');
+
 
