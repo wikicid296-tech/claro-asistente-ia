@@ -1,5 +1,5 @@
 /// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-// URL CORREGIDA para producción - ESTA ES LA CLAVE
+// URL CORREGIDA para producción
 const API_URL = 'https://claro-asistente-ia.onrender.com';
 
 // Estado global de la aplicación
@@ -46,22 +46,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Iniciando aplicación en:', API_URL);
     initializeEventListeners();
     loadFromLocalStorage();
-    
-    // Mostrar URL actual para debug
-    showDebugInfo();
 });
-
-function showDebugInfo() {
-    console.log('🔗 URL de API:', API_URL);
-    console.log('📱 Navegador:', navigator.userAgent);
-    
-    // Crear mensaje de debug en la interfaz (oculto)
-    const debugDiv = document.createElement('div');
-    debugDiv.style.cssText = 'position:fixed; top:10px; right:10px; background:#ff9800; color:white; padding:5px; border-radius:5px; font-size:10px; z-index:9999;';
-    debugDiv.innerHTML = `API: ${API_URL}`;
-    debugDiv.id = 'debug-info';
-    document.body.appendChild(debugDiv);
-}
 
 function initializeEventListeners() {
     // Toggle sidebar (móvil)
@@ -480,26 +465,7 @@ window.addEventListener('resize', function() {
     }
 });
 
-// ==================== DIAGNÓSTICO AUTOMÁTICO ====================
-// Probar conexión automáticamente al cargar
-window.addEventListener('load', function() {
-    setTimeout(() => {
-        fetch(`${API_URL}/health`)
-            .then(response => response.json())
-            .then(data => {
-                console.log('🏥 Health check exitoso:', data);
-                document.getElementById('debug-info').innerHTML += ' | ✅ Conectado';
-            })
-            .catch(error => {
-                console.error('🏥 Health check falló:', error);
-                document.getElementById('debug-info').innerHTML += ' | ❌ Sin conexión';
-            });
-    }, 1000);
-});
-
 // ==================== CONSOLE INFO ====================
-console.log('%c🚀 Telecom Copilot Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
+console.log('%c🚀 Claro Asistente IA Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
-console.log('%cPara probar conexión ejecuta: testConnection()', 'color: #ff9800;');
-
-
+console.log('%cReady to chat!', 'color: #28a745;');
