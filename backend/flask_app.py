@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 from dotenv import load_dotenv
@@ -194,6 +194,12 @@ def call_groq_api_directly(messages):
     response.raise_for_status()
     return response.json()
 
+# ==================== FUNCIONES PARA SERVIR ARCHIVOS ESTÁTICOS ====================
+def get_frontend_path():
+    """Obtener la ruta absoluta al frontend"""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(current_dir, '../frontend')
+
 # ==================== ENDPOINTS ====================
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -261,36 +267,74 @@ def chat():
             "error": str(e)
         }), 500
 
-# ==================== SERVIR FRONTEND ====================
+# ==================== SERVIR FRONTEND - VERSIÓN MEJORADA ====================
 @app.route('/')
 def serve_frontend():
     """Servir el frontend HTML"""
     try:
-        with open('../frontend/index.html', 'r', encoding='utf-8') as f:
-            return f.read()
+        frontend_path = get_frontend_path()
+        return send_from_directory(frontend_path, 'index.html')
     except Exception as e:
-        return f"Error cargando frontend: {str(e)}", 500
+        logger.error(f"Error sirviendo index.html: {str(e)}")
+        return f"""
+        <html>
+            <body>
+                <h1>Telecom Copilot</h1>
+                <p>Error cargando la interfaz: {str(e)}</p>
+                <p>El backend está funcionando. Prueba <a href="/health">/health</a></p>
+            </body>
+        </html>
+        """, 500
 
 @app.route('/<path:path>')
 def serve_static(path):
     """Servir archivos estáticos"""
     try:
-        # Intentar servir desde frontend/styles/
-        if path.startswith('styles/'):
-            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
-                return f.read(), 200, {'Content-Type': 'text/css'}
+        frontend_path = get_frontend_path()
         
-        # Intentar servir desde frontend/js/
-        elif path.startswith('js/'):
-            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
-                return f.read(), 200, {'Content-Type': 'application/javascript'}
+        # Determinar content-type basado en extensión
+        content_type = 'text/plain'
+        if path.endswith('.css'):
+            content_type = 'text/css'
+        elif path.endswith('.js'):
+            content_type = 'application/javascript'
+        elif path.endswith('.png'):
+            content_type = 'image/png'
+        elif path.endswith('.jpg') or path.endswith('.jpeg'):
+            content_type = 'image/jpeg'
+        elif path.endswith('.ico'):
+            content_type = 'image/x-icon'
         
-        # Por defecto, intentar servir el archivo
-        with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
-            return f.read()
+        response = send_from_directory(frontend_path, path)
+        response.headers['Content-Type'] = content_type
+        return response
             
     except Exception as e:
+        logger.error(f"Error sirviendo archivo estático {path}: {str(e)}")
         return f"Archivo no encontrado: {path}", 404
+
+# ==================== ENDPOINT DE DIAGNÓSTICO ====================
+@app.route('/debug')
+def debug_info():
+    """Endpoint de diagnóstico"""
+    frontend_path = get_frontend_path()
+    
+    info = {
+        "frontend_path": frontend_path,
+        "frontend_exists": os.path.exists(frontend_path),
+        "index_html_exists": os.path.exists(os.path.join(frontend_path, 'index.html')),
+        "files_in_frontend": os.listdir(frontend_path) if os.path.exists(frontend_path) else []
+    }
+    
+    return jsonify(info)
+
+# ==================== CONFIGURACIÓN CORS PARA MÓVILES ====================
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # ==================== EJECUCIÓN ====================
 if __name__ == '__main__':
