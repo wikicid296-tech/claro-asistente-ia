@@ -1,6 +1,6 @@
 /// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-
-const API_URL = window.location.origin;
+// URL CORREGIDA para producción - ESTA ES LA CLAVE
+const API_URL = 'https://telecom-copilot.onrender.com';
 
 // Estado global de la aplicación
 const appState = {
@@ -43,9 +43,25 @@ const elements = {
 
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Iniciando aplicación en:', API_URL);
     initializeEventListeners();
     loadFromLocalStorage();
+    
+    // Mostrar URL actual para debug
+    showDebugInfo();
 });
+
+function showDebugInfo() {
+    console.log('🔗 URL de API:', API_URL);
+    console.log('📱 Navegador:', navigator.userAgent);
+    
+    // Crear mensaje de debug en la interfaz (oculto)
+    const debugDiv = document.createElement('div');
+    debugDiv.style.cssText = 'position:fixed; top:10px; right:10px; background:#ff9800; color:white; padding:5px; border-radius:5px; font-size:10px; z-index:9999;';
+    debugDiv.innerHTML = `API: ${API_URL}`;
+    debugDiv.id = 'debug-info';
+    document.body.appendChild(debugDiv);
+}
 
 function initializeEventListeners() {
     // Toggle sidebar (móvil)
@@ -191,7 +207,7 @@ function sendMessage(text) {
     // Mostrar loading
     showLoading();
     
-    // Llamar a la API
+    // Llamar a la API con mejor manejo de errores
     callAPI(text)
         .then(response => {
             addMessage('bot', response);
@@ -202,8 +218,18 @@ function sendMessage(text) {
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            addMessage('bot', '❌ Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.');
+            console.error('Error en sendMessage:', error);
+            let errorMessage = '❌ Lo siento, hubo un error al procesar tu mensaje. ';
+            
+            if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
+                errorMessage += 'Problema de conexión. Verifica tu internet.';
+            } else if (error.message.includes('Timeout')) {
+                errorMessage += 'El servidor tardó demasiado. Intenta nuevamente.';
+            } else {
+                errorMessage += 'Por favor, intenta de nuevo.';
+            }
+            
+            addMessage('bot', errorMessage);
         })
         .finally(() => {
             hideLoading();
@@ -237,7 +263,13 @@ function addMessage(type, content) {
 
 // ==================== API CALLS ====================
 async function callAPI(message) {
+    console.log('📡 Enviando mensaje a:', `${API_URL}/chat`);
+    
     try {
+        // Configuración mejorada para móviles
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
+        
         const response = await fetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: {
@@ -246,23 +278,45 @@ async function callAPI(message) {
             body: JSON.stringify({
                 message: message,
                 action: appState.currentMode
-            })
+            }),
+            signal: controller.signal,
+            mode: 'cors',
+            credentials: 'omit'
         });
         
+        clearTimeout(timeoutId);
+        
+        console.log('📡 Status de respuesta:', response.status);
+        
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            let errorText = 'Error del servidor';
+            try {
+                errorText = await response.text();
+            } catch (e) {
+                // No se pudo leer el cuerpo de la respuesta
+            }
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
         }
         
         const data = await response.json();
+        console.log('✅ Respuesta recibida:', data);
         
         if (data.success) {
             return data.response;
         } else {
-            throw new Error(data.error || 'Error desconocido');
+            throw new Error(data.error || 'Error desconocido del servidor');
         }
+        
     } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+        console.error('❌ Error en callAPI:', error);
+        
+        if (error.name === 'AbortError') {
+            throw new Error('Timeout: La petición tardó demasiado. Intenta nuevamente.');
+        } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            throw new Error('Error de conexión. No se pudo conectar al servidor.');
+        } else {
+            throw error;
+        }
     }
 }
 
@@ -426,9 +480,25 @@ window.addEventListener('resize', function() {
     }
 });
 
-// ==================== CONSOLE INFO ====================
-console.log('%c🚀 Claro GenAI Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
-console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
-console.log('%cReady to chat!', 'color: #28a745;');
+// ==================== DIAGNÓSTICO AUTOMÁTICO ====================
+// Probar conexión automáticamente al cargar
+window.addEventListener('load', function() {
+    setTimeout(() => {
+        fetch(`${API_URL}/health`)
+            .then(response => response.json())
+            .then(data => {
+                console.log('🏥 Health check exitoso:', data);
+                document.getElementById('debug-info').innerHTML += ' | ✅ Conectado';
+            })
+            .catch(error => {
+                console.error('🏥 Health check falló:', error);
+                document.getElementById('debug-info').innerHTML += ' | ❌ Sin conexión';
+            });
+    }, 1000);
+});
 
+// ==================== CONSOLE INFO ====================
+console.log('%c🚀 Telecom Copilot Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
+console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
+console.log('%cPara probar conexión ejecuta: testConnection()', 'color: #ff9800;');
 
