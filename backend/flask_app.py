@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from groq import Groq
 import os
 from dotenv import load_dotenv
 import logging
+import requests
+import json
 
 # ==================== CONFIGURACIÓN ====================
 load_dotenv()
@@ -20,10 +21,19 @@ PORT = int(os.getenv("PORT", 10000))
 # Inicializar cliente Groq - Versión compatible
 try:
     if GROQ_API_KEY:
+        # Para versiones más recientes de groq
+        from groq import Groq
         client = Groq(api_key=GROQ_API_KEY)
         logger.info("✅ Cliente Groq inicializado correctamente")
     else:
         logger.error("❌ GROQ_API_KEY no configurada en variables de entorno")
+        client = None
+except TypeError as e:
+    if "proxies" in str(e):
+        logger.warning("⚠️  Versión incompatible de Groq, usando fallback directo a API")
+        client = "api_fallback"
+    else:
+        logger.error(f"❌ Error inicializando Groq: {str(e)}")
         client = None
 except Exception as e:
     logger.error(f"❌ Error inicializando Groq: {str(e)}")
@@ -164,6 +174,26 @@ def get_context_for_query(prompt):
     # Por defecto
     return "Información general sobre telecomunicaciones, salud y educación."
 
+def call_groq_api_directly(messages):
+    """Llamada directa a la API de Groq como fallback"""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    data = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": messages,
+        "temperature": 0.7,
+        "max_tokens": 2000
+    }
+    
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status()
+    return response.json()
+
 # ==================== ENDPOINTS ====================
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -171,14 +201,14 @@ def health_check():
     return jsonify({
         "status": "healthy", 
         "service": "Telecom Copilot API",
-        "ai_ready": client is not None
+        "ai_ready": client is not None or GROQ_API_KEY is not None
     })
 
 @app.route('/chat', methods=['POST'])
 def chat():
     """Endpoint principal de chat"""
     try:
-        if not client:
+        if not client and not GROQ_API_KEY:
             return jsonify({
                 "success": False,
                 "error": "Servicio de IA no disponible"
@@ -204,15 +234,20 @@ def chat():
             {"role": "user", "content": user_message}
         ]
         
-        # Llamar a Groq
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=messages,
-            temperature=0.7,
-            max_tokens=2000
-        )
-        
-        response = completion.choices[0].message.content
+        # Llamar a Groq - con fallback para diferentes versiones
+        if client and client != "api_fallback":
+            # Usar cliente Groq normal
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2000
+            )
+            response = completion.choices[0].message.content
+        else:
+            # Usar API directa como fallback
+            result = call_groq_api_directly(messages)
+            response = result["choices"][0]["message"]["content"]
         
         return jsonify({
             "success": True,
@@ -260,6 +295,5 @@ def serve_static(path):
 # ==================== EJECUCIÓN ====================
 if __name__ == '__main__':
     logger.info(f"🚀 Iniciando servidor Flask en http://localhost:{PORT}")
-    app.run(host='0.0.0.0', port=PORT, debug=False)  # IMPORTANTE: debug=False para producción
-
+    app.run(host='0.0.0.0', port=PORT, debug=False)
 
