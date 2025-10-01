@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Claro·GenAI - Asistente IA</title>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <title>Claro Asistente IA - Telecom Copilot</title>
     <link rel="stylesheet" href="styles/main.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
 <body>
     <!-- Overlay para cerrar sidebar en móvil -->
@@ -24,7 +25,7 @@
                         <line x1="12" y1="16" x2="18" y2="16" stroke="#DA291C" stroke-width="2.5"/>
                     </svg>
                 </span>
-                <span>Claro·GenAI</span>
+                <span>Claro Asistente IA</span>
             </div>
             <div style="width:40px"></div>
         </header>
@@ -41,10 +42,10 @@
             </div>
 
             <div class="sidebar-title">
-                <span class="claro">Claro</span>·Assistant
+                <span class="claro">Claro</span>·Asistente IA
             </div>
 
-            <div class="nav-item active" data-section="home">
+            <div class="nav-item active" data-section="home" id="newConversationBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 5v14M5 12h14"/>
                 </svg>
@@ -61,34 +62,31 @@
 
             <!-- Tasks container (se expande cuando se da clic en Gestión de tareas) -->
             <div class="tasks-container" id="tasksContainer">
-                <div class="task-card">
-                    <div class="task-header">
-                        <span>🔔 Recordatorios</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M6 9l6 6 6-6"/>
-                        </svg>
+                <div class="task-category">
+                    <h4><i class="fas fa-bell"></i> Recordatorios</h4>
+                    <div id="reminders-list" class="task-list">
+                        <div class="no-tasks">No hay recordatorios</div>
                     </div>
-                    <div class="task-body">No hay recordatorios pendientes</div>
+                </div>
+                
+                <div class="task-category">
+                    <h4><i class="fas fa-sticky-note"></i> Notas</h4>
+                    <div id="notes-list" class="task-list">
+                        <div class="no-tasks">No hay notas</div>
+                    </div>
+                </div>
+                
+                <div class="task-category">
+                    <h4><i class="fas fa-calendar"></i> Calendario</h4>
+                    <div id="calendar-list" class="task-list">
+                        <div class="no-tasks">No hay eventos</div>
+                    </div>
                 </div>
 
-                <div class="task-card">
-                    <div class="task-header">
-                        <span>📅 Agenda</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M6 9l6 6 6-6"/>
-                        </svg>
-                    </div>
-                    <div class="task-body">No hay eventos programados</div>
-                </div>
-
-                <div class="task-card">
-                    <div class="task-header">
-                        <span>📝 Notas</span>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M6 9l6 6 6-6"/>
-                        </svg>
-                    </div>
-                    <div class="task-body">No hay notas</div>
+                <div class="action-buttons">
+                    <button id="clear-tasks" class="btn-secondary">
+                        <i class="fas fa-trash"></i> Limpiar tareas
+                    </button>
                 </div>
             </div>
 
@@ -128,6 +126,8 @@
                     <p class="hero-title">"Una idea comienza con una simple palabra"</p>
                 </div>
 
+                <!-- TARJETAS DE SUGERENCIAS (COMENTADAS TEMPORALMENTE) -->
+                <!--
                 <div class="suggestions">
                     <div class="suggestion-card">
                         <div class="card-icon red">A</div>
@@ -147,6 +147,7 @@
                         <div class="card-desc">"Envía un mensaje de buenos días a Ana todos los días a las 8:00 am"</div>
                     </div>
                 </div>
+                -->
             </div>
 
             <!-- Chat page (oculto por defecto) -->
@@ -159,9 +160,11 @@
                 <div class="input-wrapper">
                     <span class="add-btn" id="addBtn">+</span>
                     <input id="userInput" type="text" placeholder="Pregunta lo que quieras">
-                    <span class="voice-icon">🎤</span>
+        
+                    
                 </div>
-                <p class="footer-note">Claro·GenAI puede cometer errores. Considera verificar información importante.</p>
+                <p class="footer-note">Claro Asistente IA puede cometer errores.</p>
+                <p class="footer-note"> Considera verificar información importante.</p>
             </div>
         </main>
     </div>
