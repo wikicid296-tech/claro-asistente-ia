@@ -10,7 +10,16 @@ import json
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# CORS MEJORADO para móviles
+CORS(app, resources={
+    r"/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"]
+    }
+})
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -21,7 +30,6 @@ PORT = int(os.getenv("PORT", 10000))
 # Inicializar cliente Groq - Versión compatible
 try:
     if GROQ_API_KEY:
-        # Para versiones más recientes de groq
         from groq import Groq
         client = Groq(api_key=GROQ_API_KEY)
         logger.info("✅ Cliente Groq inicializado correctamente")
@@ -190,7 +198,8 @@ def call_groq_api_directly(messages):
         "max_tokens": 2000
     }
     
-    response = requests.post(url, headers=headers, json=data)
+    # Agregar timeout para móviles
+    response = requests.post(url, headers=headers, json=data, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -210,9 +219,14 @@ def health_check():
         "ai_ready": client is not None or GROQ_API_KEY is not None
     })
 
-@app.route('/chat', methods=['POST'])
+@app.route('/chat', methods=['POST', 'OPTIONS'])
 def chat():
-    """Endpoint principal de chat"""
+    """Endpoint principal de chat - MEJORADO para móviles"""
+    
+    # Manejar preflight OPTIONS para móviles
+    if request.method == 'OPTIONS':
+        return '', 200
+    
     try:
         if not client and not GROQ_API_KEY:
             return jsonify({
@@ -220,7 +234,20 @@ def chat():
                 "error": "Servicio de IA no disponible"
             }), 503
         
+        # Mejor manejo de JSON para móviles
+        if not request.is_json:
+            return jsonify({
+                "success": False,
+                "error": "Content-Type debe ser application/json"
+            }), 400
+        
         data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "Cuerpo de la petición vacío o inválido"
+            }), 400
+        
         user_message = data.get('message', '')
         
         if not user_message:
@@ -240,6 +267,8 @@ def chat():
             {"role": "user", "content": user_message}
         ]
         
+        logger.info(f"📱 Procesando mensaje desde móvil: {user_message[:50]}...")
+        
         # Llamar a Groq - con fallback para diferentes versiones
         if client and client != "api_fallback":
             # Usar cliente Groq normal
@@ -247,7 +276,8 @@ def chat():
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 temperature=0.7,
-                max_tokens=2000
+                max_tokens=2000,
+                timeout=30  # Timeout para móviles
             )
             response = completion.choices[0].message.content
         else:
@@ -255,16 +285,30 @@ def chat():
             result = call_groq_api_directly(messages)
             response = result["choices"][0]["message"]["content"]
         
+        logger.info("✅ Respuesta enviada exitosamente a móvil")
+        
         return jsonify({
             "success": True,
             "response": response
         })
         
-    except Exception as e:
-        logger.error(f"Error en /chat: {str(e)}")
+    except requests.exceptions.Timeout:
+        logger.error("⏰ Timeout en petición desde móvil")
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": "Timeout: El servidor tardó demasiado en responder. Intenta nuevamente."
+        }), 408
+    except requests.exceptions.ConnectionError:
+        logger.error("🌐 Error de conexión desde móvil")
+        return jsonify({
+            "success": False,
+            "error": "Error de conexión. Verifica tu internet e intenta nuevamente."
+        }), 503
+    except Exception as e:
+        logger.error(f"❌ Error en /chat desde móvil: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Error interno del servidor: {str(e)}"
         }), 500
 
 # ==================== SERVIR FRONTEND - VERSIÓN MEJORADA ====================
@@ -323,18 +367,37 @@ def debug_info():
         "frontend_path": frontend_path,
         "frontend_exists": os.path.exists(frontend_path),
         "index_html_exists": os.path.exists(os.path.join(frontend_path, 'index.html')),
-        "files_in_frontend": os.listdir(frontend_path) if os.path.exists(frontend_path) else []
+        "files_in_frontend": os.listdir(frontend_path) if os.path.exists(frontend_path) else [],
+        "groq_api_configured": bool(GROQ_API_KEY),
+        "client_status": "active" if client else "inactive"
     }
     
     return jsonify(info)
 
-# ==================== CONFIGURACIÓN CORS PARA MÓVILES ====================
+# ==================== CONFIGURACIÓN CORS MEJORADA PARA MÓVILES ====================
 @app.after_request
 def after_request(response):
     response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept,Origin,X-Requested-With')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Max-Age', '86400')  # 24 horas
     return response
+
+# ==================== MANEJO DE ERRORES GLOBAL ====================
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        "success": False,
+        "error": "Endpoint no encontrado"
+    }), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({
+        "success": False,
+        "error": "Error interno del servidor"
+    }), 500
 
 # ==================== EJECUCIÓN ====================
 if __name__ == '__main__':
