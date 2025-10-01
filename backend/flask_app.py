@@ -19,7 +19,7 @@ PORT = int(os.getenv("PORT", 10000))  # Cambiado a 10000 para Render
 
 # Inicializar cliente Groq - Versión compatible
 try:
-    if GROQ_API_KEY and GROQ_API_KEY != "tu_api_key_de_groq_aqui":
+    if GROQ_API_KEY and GROQ_API_KEY != os.getenv("GROQ_API_KEY"):
         client = Groq(api_key=GROQ_API_KEY)
         logger.info("✅ Cliente Groq inicializado correctamente")
     else:
@@ -261,3 +261,4 @@ def serve_static(path):
 if __name__ == '__main__':
     logger.info(f"🚀 Iniciando servidor Flask en http://localhost:{PORT}")
     app.run(host='0.0.0.0', port=PORT, debug=False)  # IMPORTANTE: debug=False para producción
+
