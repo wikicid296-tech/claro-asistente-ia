@@ -1,234 +1,297 @@
-// Estado de la aplicación
-class AppState {
-    constructor() {
-        this.messages = [];
-        this.tasks = {
-            reminders: [],
-            notes: [],
-            calendar: []
-        };
-        this.showMenu = false;
-        this.selectedAction = null;
-        this.apiBaseUrl = window.location.origin;
+/// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
+const API_URL = 'http://localhost:8000'; // Ajusta según tu configuración
+
+// Estado global de la aplicación
+const appState = {
+    currentMode: null,
+    conversationHistory: [],
+    tasks: {
+        reminders: [],
+        notes: [],
+        calendar: []
     }
-}
-
-const appState = new AppState();
-
-// Elementos DOM
-const elements = {
-    chatMessages: document.getElementById('chat-messages'),
-    messageInput: document.getElementById('message-input'),
-    sendButton: document.getElementById('send-button'),
-    menuToggle: document.getElementById('menu-toggle'),
-    quickMenu: document.getElementById('quick-menu'),
-    activeMode: document.getElementById('active-mode'),
-    modeIcon: document.getElementById('mode-icon'),
-    modeText: document.getElementById('mode-text'),
-    closeMode: document.getElementById('close-mode'),
-    loading: document.getElementById('loading'),
-    clearTasks: document.getElementById('clear-tasks'),
-    clearChat: document.getElementById('clear-chat'),
-    remindersList: document.getElementById('reminders-list'),
-    notesList: document.getElementById('notes-list'),
-    calendarList: document.getElementById('calendar-list')
 };
 
-// Inicialización
+// Elementos del DOM
+const elements = {
+    // Sidebar
+    sidebar: document.getElementById('sidebar'),
+    overlay: document.getElementById('overlay'),
+    menuToggle: document.getElementById('menuToggle'),
+    navItems: document.querySelectorAll('.nav-item'),
+    tasksContainer: document.getElementById('tasksContainer'),
+    taskHeaders: document.querySelectorAll('.task-header'),
+    
+    // Main content
+    welcomePage: document.getElementById('welcomePage'),
+    chatPage: document.getElementById('chatPage'),
+    chatHistory: document.getElementById('chatHistory'),
+    
+    // Input
+    userInput: document.getElementById('userInput'),
+    addBtn: document.getElementById('addBtn'),
+    actionMenu: document.getElementById('actionMenu'),
+    actionItems: document.querySelectorAll('.action-item'),
+    
+    // Suggestions
+    suggestionCards: document.querySelectorAll('.suggestion-card'),
+    
+    // Loading
+    loadingOverlay: document.getElementById('loadingOverlay')
+};
+
+// ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
     loadFromLocalStorage();
-    updateTasksUI();
 });
 
 function initializeEventListeners() {
-    // Envío de mensajes
-    elements.sendButton.addEventListener('click', sendMessage);
-    elements.messageInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            sendMessage();
+    // Toggle sidebar (móvil)
+    elements.menuToggle.addEventListener('click', toggleSidebar);
+    elements.overlay.addEventListener('click', closeSidebar);
+    
+    // Navegación sidebar
+    elements.navItems.forEach(item => {
+        item.addEventListener('click', handleNavigation);
+    });
+    
+    // Task headers (expandir/contraer)
+    elements.taskHeaders.forEach(header => {
+        header.addEventListener('click', toggleTaskCard);
+    });
+    
+    // Botón + (mostrar menú de acciones)
+    elements.addBtn.addEventListener('click', toggleActionMenu);
+    
+    // Action items (opciones del menú)
+    elements.actionItems.forEach(item => {
+        item.addEventListener('click', selectAction);
+    });
+    
+    // Suggestion cards
+    elements.suggestionCards.forEach(card => {
+        card.addEventListener('click', handleSuggestionClick);
+    });
+    
+    // Input de usuario (Enter para enviar)
+    elements.userInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && this.value.trim()) {
+            sendMessage(this.value.trim());
+            this.value = '';
         }
     });
-
-    // Menú rápido
-    elements.menuToggle.addEventListener('click', toggleQuickMenu);
-    elements.closeMode.addEventListener('click', closeActiveMode);
-
-    // Opciones del menú
-    document.querySelectorAll('.menu-option').forEach(option => {
-        option.addEventListener('click', function() {
-            const action = this.getAttribute('data-action');
-            setActiveMode(action);
-        });
-    });
-
-    // Botones de limpieza
-    elements.clearTasks.addEventListener('click', clearAllTasks);
-    elements.clearChat.addEventListener('click', clearChat);
-
+    
     // Cerrar menú al hacer clic fuera
-    document.addEventListener('click', function(e) {
-        if (appState.showMenu && 
-            !elements.quickMenu.contains(e.target) && 
-            !elements.menuToggle.contains(e.target)) {
-            toggleQuickMenu();
-        }
-    });
+    document.addEventListener('click', handleOutsideClick);
 }
 
-// Funciones del chat
-async function sendMessage() {
-    const message = elements.messageInput.value.trim();
-    if (!message) return;
+// ==================== SIDEBAR FUNCTIONS ====================
+function toggleSidebar() {
+    elements.sidebar.classList.toggle('active');
+    elements.overlay.classList.toggle('active');
+}
 
+function closeSidebar() {
+    elements.sidebar.classList.remove('active');
+    elements.overlay.classList.remove('active');
+}
+
+function handleNavigation(e) {
+    const section = this.getAttribute('data-section');
+    
+    // Remover active de todos
+    elements.navItems.forEach(item => item.classList.remove('active'));
+    this.classList.add('active');
+    
+    // Toggle tasks container
+    if (section === 'tasks') {
+        elements.tasksContainer.classList.toggle('active');
+    } else {
+        elements.tasksContainer.classList.remove('active');
+    }
+    
+    // No cerrar sidebar en desktop, solo en móvil
+    if (window.innerWidth < 900) {
+        closeSidebar();
+    }
+}
+
+function toggleTaskCard(e) {
+    const body = this.nextElementSibling;
+    const isOpen = body.classList.contains('open');
+    
+    // Cerrar todos primero
+    document.querySelectorAll('.task-body').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.task-header').forEach(h => h.classList.remove('collapsed'));
+    
+    // Abrir el clickeado si no estaba abierto
+    if (!isOpen) {
+        body.classList.add('open');
+        this.classList.add('collapsed');
+    }
+}
+
+// ==================== ACTION MENU FUNCTIONS ====================
+function toggleActionMenu(e) {
+    e.stopPropagation();
+    elements.actionMenu.classList.toggle('active');
+}
+
+function selectAction(e) {
+    const action = this.getAttribute('data-action');
+    
+    // Remover selected de todos
+    elements.actionItems.forEach(item => item.classList.remove('selected'));
+    this.classList.add('selected');
+    
+    // Cambiar placeholder según la acción
+    const placeholders = {
+        'aprende': 'Pregunta sobre cursos de aprende.org',
+        'busqueda': 'Pregunta lo que quieras',
+        'tareas': 'Crea o asigna una tarea...',
+        'aprende-estudia': 'Pide un resumen o lección...',
+        'productividad': 'Organiza tu trabajo...'
+    };
+    
+    elements.userInput.placeholder = placeholders[action] || 'Pregunta lo que quieras';
+    appState.currentMode = action;
+    
+    // Cerrar menú
+    elements.actionMenu.classList.remove('active');
+}
+
+function handleOutsideClick(e) {
+    const menu = elements.actionMenu;
+    const addBtn = e.target.closest('.add-btn');
+    const menuItem = e.target.closest('.action-item');
+    
+    if (!addBtn && !menuItem && menu.classList.contains('active')) {
+        menu.classList.remove('active');
+    }
+}
+
+// ==================== SUGGESTION CARDS ====================
+function handleSuggestionClick(e) {
+    const text = this.querySelector('.card-desc').textContent.replace(/['"]/g, '');
+    sendMessage(text);
+}
+
+// ==================== CHAT FUNCTIONS ====================
+function sendMessage(text) {
+    if (!text || !text.trim()) return;
+    
+    // Cambiar a vista de chat
+    showChatView();
+    
     // Agregar mensaje del usuario
-    addMessage('user', message);
-    elements.messageInput.value = '';
-
+    addMessage('user', text);
+    
     // Mostrar loading
     showLoading();
+    
+    // Llamar a la API
+    callAPI(text)
+        .then(response => {
+            addMessage('bot', response);
+            
+            // Procesar si es una tarea
+            if (isTaskMessage(response)) {
+                processTask(text, response);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            addMessage('bot', '❌ Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.');
+        })
+        .finally(() => {
+            hideLoading();
+            saveToLocalStorage();
+        });
+    
+    // Limpiar input
+    elements.userInput.value = '';
+}
 
+function showChatView() {
+    elements.welcomePage.style.display = 'none';
+    elements.chatPage.style.display = 'flex';
+}
+
+function addMessage(type, content) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'msg ' + type;
+    messageDiv.textContent = content;
+    
+    elements.chatHistory.appendChild(messageDiv);
+    
+    // Auto-scroll al final
+    setTimeout(() => {
+        elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+    }, 100);
+    
+    // Guardar en historial
+    appState.conversationHistory.push({ type, content, timestamp: new Date().toISOString() });
+}
+
+// ==================== API CALLS ====================
+async function callAPI(message) {
     try {
-        const response = await fetch(`${appState.apiBaseUrl}/chat`, {
+        const response = await fetch(`${API_URL}/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
                 message: message,
-                action: appState.selectedAction
+                action: appState.currentMode
             })
         });
-
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
-
+        
         if (data.success) {
-            addMessage('assistant', data.response);
-            
-            // Verificar si es una tarea y procesarla
-            if (data.response.includes('✅') || data.response.includes('📝') || data.response.includes('📅')) {
-                processTaskFromResponse(message, data.response);
-            }
+            return data.response;
         } else {
-            addMessage('assistant', '❌ Error: ' + (data.error || 'No se pudo procesar tu mensaje'));
+            throw new Error(data.error || 'Error desconocido');
         }
-
-        // Limpiar modo activo después de enviar
-        if (appState.selectedAction) {
-            closeActiveMode();
-        }
-
     } catch (error) {
-        console.error('Error:', error);
-        addMessage('assistant', '❌ Error de conexión. Por favor, intenta de nuevo.');
-    } finally {
-        hideLoading();
-        saveToLocalStorage();
+        console.error('API Error:', error);
+        throw error;
     }
 }
 
-function addMessage(role, content) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message-bubble ${role}`;
-    
-    const timestamp = new Date().toLocaleTimeString('es-ES', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-    });
-
-    messageDiv.innerHTML = `
-        <div class="message-content">${formatMessage(content)}</div>
-        <div class="message-time">${timestamp}</div>
-    `;
-
-    elements.chatMessages.appendChild(messageDiv);
-    elements.chatMessages.scrollTop = elements.chatMessages.scrollHeight;
-    
-    // Agregar al estado
-    appState.messages.push({ role, content });
+// ==================== TASK MANAGEMENT ====================
+function isTaskMessage(message) {
+    return message.includes('✅') || 
+           message.includes('📝') || 
+           message.includes('📅') ||
+           message.toLowerCase().includes('recordatorio') ||
+           message.toLowerCase().includes('nota') ||
+           message.toLowerCase().includes('evento');
 }
 
-function formatMessage(content) {
-    // Convertir saltos de línea a <br>
-    content = content.replace(/\n/g, '<br>');
-    
-    // Formatear listas y mejorar emojis
-    content = content.replace(/\•/g, '<br>•');
-    content = content.replace(/\✅/g, '<span style="color: #28a745;">✅</span>');
-    content = content.replace(/\📝/g, '<span style="color: #17a2b8;">📝</span>');
-    content = content.replace(/\📅/g, '<span style="color: #ffc107;">📅</span>');
-    content = content.replace(/\❌/g, '<span style="color: #dc3545;">❌</span>');
-    
-    return content;
-}
-
-// Funciones del menú rápido
-function toggleQuickMenu() {
-    appState.showMenu = !appState.showMenu;
-    if (appState.showMenu) {
-        elements.quickMenu.classList.remove('hidden');
-        elements.menuToggle.innerHTML = '<i class="fas fa-times"></i>';
-    } else {
-        elements.quickMenu.classList.add('hidden');
-        elements.menuToggle.innerHTML = '<i class="fas fa-plus"></i>';
-    }
-}
-
-function setActiveMode(action) {
-    const modeConfig = {
-        smart_search: { icon: '💡', text: 'Búsqueda Inteligente' },
-        task: { icon: '📋', text: 'Modo Tareas' },
-        learn: { icon: '📚', text: 'Modo Aprendizaje' },
-        health: { icon: '🏥', text: 'Modo Salud' }
-    };
-
-    if (modeConfig[action]) {
-        appState.selectedAction = action;
-        elements.modeIcon.textContent = modeConfig[action].icon;
-        elements.modeText.textContent = modeConfig[action].text;
-        elements.activeMode.classList.remove('hidden');
-        
-        // Actualizar placeholder
-        const placeholders = {
-            smart_search: '💡 ¿Qué quieres buscar?',
-            task: '📋 Describe la tarea...',
-            learn: '📚 ¿Qué quieres aprender?',
-            health: '🏥 Consulta sobre salud...'
-        };
-        elements.messageInput.placeholder = placeholders[action] || '¿En qué puedo ayudarte?';
-        
-        toggleQuickMenu();
-    }
-}
-
-function closeActiveMode() {
-    appState.selectedAction = null;
-    elements.activeMode.classList.add('hidden');
-    elements.messageInput.placeholder = '¿En qué puedo ayudarte hoy?';
-}
-
-// Gestión de tareas
-function processTaskFromResponse(message, response) {
+function processTask(userMessage, botResponse) {
     const timestamp = new Date().toLocaleString('es-ES');
     
-    if (response.includes('✅')) {
-        appState.tasks.reminders.push({
-            content: message,
-            created_at: timestamp,
-            completed: false
-        });
-    } else if (response.includes('📝')) {
-        appState.tasks.notes.push({
-            content: message,
-            created_at: timestamp,
-            completed: false
-        });
-    } else if (response.includes('📅')) {
-        appState.tasks.calendar.push({
-            content: message,
-            created_at: timestamp,
-            completed: false
-        });
+    const task = {
+        content: userMessage,
+        response: botResponse,
+        created_at: timestamp,
+        completed: false
+    };
+    
+    // Determinar tipo de tarea
+    if (botResponse.includes('✅') || userMessage.toLowerCase().includes('recordatorio')) {
+        appState.tasks.reminders.push(task);
+    } else if (botResponse.includes('📝') || userMessage.toLowerCase().includes('nota')) {
+        appState.tasks.notes.push(task);
+    } else if (botResponse.includes('📅') || userMessage.toLowerCase().includes('evento')) {
+        appState.tasks.calendar.push(task);
     }
     
     updateTasksUI();
@@ -236,48 +299,102 @@ function processTaskFromResponse(message, response) {
 }
 
 function updateTasksUI() {
-    updateTaskList('reminders', elements.remindersList);
-    updateTaskList('notes', elements.notesList);
-    updateTaskList('calendar', elements.calendarList);
+    // Actualizar cada sección de tareas
+    updateTaskSection('reminders', 'Recordatorios');
+    updateTaskSection('notes', 'Notas');
+    updateTaskSection('calendar', 'Agenda');
 }
 
-function updateTaskList(taskType, listElement) {
+function updateTaskSection(taskType, label) {
     const tasks = appState.tasks[taskType];
+    const containers = document.querySelectorAll('.task-body');
+    const index = taskType === 'reminders' ? 0 : taskType === 'calendar' ? 1 : 2;
+    const container = containers[index];
+    
+    if (!container) return;
     
     if (tasks.length === 0) {
-        listElement.innerHTML = '<div class="no-tasks">No hay ' + getTaskLabel(taskType) + '</div>';
+        container.innerHTML = `No hay ${label.toLowerCase()}`;
         return;
     }
     
-    let html = '';
-    tasks.forEach((task, index) => {
+    let html = '<div style="max-height: 200px; overflow-y: auto;">';
+    tasks.forEach((task, idx) => {
         html += `
-            <div class="task-item">
-                <div class="task-content">${task.content}</div>
-                <div class="task-time">📅 ${task.created_at}</div>
-                <button class="task-delete" onclick="deleteTask('${taskType}', ${index})">
-                    <i class="fas fa-times"></i>
-                </button>
+            <div class="task-item" style="background: white; padding: 8px; margin: 5px 0; border-radius: 4px; border-left: 3px solid #00BCD4; position: relative;">
+                <div style="font-size: 13px; color: #333; padding-right: 20px;">${task.content}</div>
+                <div style="font-size: 11px; color: #999; margin-top: 4px;">${task.created_at}</div>
+                <button onclick="deleteTask('${taskType}', ${idx})" style="position: absolute; top: 5px; right: 5px; background: none; border: none; color: #dc3545; cursor: pointer; font-size: 16px;">×</button>
             </div>
         `;
     });
+    html += '</div>';
     
-    listElement.innerHTML = html;
-}
-
-function getTaskLabel(taskType) {
-    const labels = {
-        reminders: 'recordatorios',
-        notes: 'notas', 
-        calendar: 'eventos'
-    };
-    return labels[taskType] || 'tareas';
+    container.innerHTML = html;
 }
 
 function deleteTask(taskType, index) {
-    if (confirm('¿Estás seguro de que quieres eliminar esta tarea?')) {
+    if (confirm('¿Eliminar esta tarea?')) {
         appState.tasks[taskType].splice(index, 1);
         updateTasksUI();
+        saveToLocalStorage();
+    }
+}
+
+// Hacer disponible globalmente para onclick
+window.deleteTask = deleteTask;
+
+// ==================== LOADING ====================
+function showLoading() {
+    elements.loadingOverlay.classList.add('active');
+}
+
+function hideLoading() {
+    elements.loadingOverlay.classList.remove('active');
+}
+
+// ==================== LOCAL STORAGE ====================
+function saveToLocalStorage() {
+    try {
+        localStorage.setItem('claroGenAI_state', JSON.stringify({
+            conversationHistory: appState.conversationHistory.slice(-50), // Solo últimas 50
+            tasks: appState.tasks
+        }));
+    } catch (e) {
+        console.error('Error guardando en localStorage:', e);
+    }
+}
+
+function loadFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('claroGenAI_state');
+        if (saved) {
+            const data = JSON.parse(saved);
+            appState.conversationHistory = data.conversationHistory || [];
+            appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
+            
+            // Restaurar mensajes del chat si existen
+            if (appState.conversationHistory.length > 0) {
+                showChatView();
+                appState.conversationHistory.forEach(msg => {
+                    addMessage(msg.type, msg.content);
+                });
+            }
+            
+            updateTasksUI();
+        }
+    } catch (e) {
+        console.error('Error cargando desde localStorage:', e);
+    }
+}
+
+// ==================== UTILITY FUNCTIONS ====================
+function clearChat() {
+    if (confirm('¿Estás seguro de que quieres limpiar el chat?')) {
+        appState.conversationHistory = [];
+        elements.chatHistory.innerHTML = '';
+        elements.welcomePage.style.display = 'flex';
+        elements.chatPage.style.display = 'none';
         saveToLocalStorage();
     }
 }
@@ -287,175 +404,28 @@ function clearAllTasks() {
         appState.tasks = { reminders: [], notes: [], calendar: [] };
         updateTasksUI();
         saveToLocalStorage();
-        showNotification('Todas las tareas han sido eliminadas', 'success');
     }
 }
 
-function clearChat() {
-    if (confirm('¿Estás seguro de que quieres limpiar el chat?')) {
-        appState.messages = [];
-        elements.chatMessages.innerHTML = `
-            <div class="welcome-message">
-                <div class="message-bubble assistant">
-                    <div class="message-content">
-                        <strong>👋 ¡Chat limpiado!</strong>
-                        <p>¿En qué puedo ayudarte ahora?</p>
-                    </div>
-                    <div class="message-time">Ahora</div>
-                </div>
-            </div>
-        `;
-        saveToLocalStorage();
-        showNotification('Chat limpiado correctamente', 'success');
-    }
-}
+// Hacer disponibles globalmente si se necesitan
+window.clearChat = clearChat;
+window.clearAllTasks = clearAllTasks;
 
-// Notificaciones
-function showNotification(message, type = 'info') {
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.innerHTML = `
-        <span>${message}</span>
-        <button onclick="this.parentElement.remove()">×</button>
-    `;
-    
-    // Estilos para la notificación
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: ${type === 'success' ? '#28a745' : '#17a2b8'};
-        color: white;
-        padding: 12px 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        z-index: 1000;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        animation: slideInRight 0.3s ease;
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto-remover después de 3 segundos
-    setTimeout(() => {
-        if (notification.parentElement) {
-            notification.remove();
+// ==================== RESPONSIVE HANDLERS ====================
+window.addEventListener('resize', function() {
+    if (window.innerWidth >= 900) {
+        // En desktop, asegurar que el sidebar esté visible
+        elements.sidebar.style.left = '0';
+        elements.overlay.classList.remove('active');
+    } else {
+        // En móvil, resetear
+        if (!elements.sidebar.classList.contains('active')) {
+            elements.sidebar.style.left = '-280px';
         }
-    }, 3000);
-}
-
-// Loading
-function showLoading() {
-    elements.loading.classList.remove('hidden');
-}
-
-function hideLoading() {
-    elements.loading.classList.add('hidden');
-}
-
-// Local Storage
-function saveToLocalStorage() {
-    try {
-        localStorage.setItem('telecomCopilot_messages', JSON.stringify(appState.messages));
-        localStorage.setItem('telecomCopilot_tasks', JSON.stringify(appState.tasks));
-    } catch (e) {
-        console.error('Error guardando en localStorage:', e);
     }
-}
+});
 
-function loadFromLocalStorage() {
-    try {
-        const savedMessages = localStorage.getItem('telecomCopilot_messages');
-        const savedTasks = localStorage.getItem('telecomCopilot_tasks');
-        
-        if (savedMessages) {
-            const messages = JSON.parse(savedMessages);
-            // Solo cargar los últimos 20 mensajes para no saturar
-            appState.messages = messages.slice(-20);
-            
-            // Re-renderizar mensajes
-            elements.chatMessages.innerHTML = '';
-            appState.messages.forEach(msg => {
-                addMessage(msg.role, msg.content);
-            });
-        }
-        
-        if (savedTasks) {
-            appState.tasks = JSON.parse(savedTasks);
-        }
-    } catch (e) {
-        console.error('Error cargando desde localStorage:', e);
-    }
-}
-
-// Estilos CSS adicionales para las notificaciones
-const notificationStyles = `
-@keyframes slideInRight {
-    from {
-        transform: translateX(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(0);
-        opacity: 1;
-    }
-}
-
-.notification button {
-    background: none;
-    border: none;
-    color: white;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.task-item {
-    position: relative;
-    background: white;
-    border-left: 3px solid #e53935;
-    padding: 8px;
-    margin: 5px 0;
-    border-radius: 4px;
-    font-size: 0.8rem;
-}
-
-.task-content {
-    margin-bottom: 2px;
-}
-
-.task-time {
-    font-size: 0.7rem;
-    color: #666;
-}
-
-.task-delete {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: none;
-    border: none;
-    color: #dc3545;
-    cursor: pointer;
-    font-size: 0.7rem;
-    padding: 2px;
-    border-radius: 3px;
-}
-
-.task-delete:hover {
-    background: #dc3545;
-    color: white;
-}
-`;
-
-// Agregar estilos al documento
-const styleSheet = document.createElement('style');
-styleSheet.textContent = notificationStyles;
-document.head.appendChild(styleSheet);
+// ==================== CONSOLE INFO ====================
+console.log('%c🚀 Claro GenAI Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
+console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
+console.log('%cReady to chat!', 'color: #28a745;');
