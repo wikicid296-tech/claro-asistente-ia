@@ -496,7 +496,7 @@ SALUD Y BIENESTAR:
 - Prevención: Diabetes, obesidad, hipertensión, cáncer, salud mental, VIH, epilepsia
 
 ═══════════════════════════════════════════════════════════════════
-ROL 2: GESTOR DE RECORDATORIOS (Conversación)
+ROL 2: GESTOR DE RECORDATORIOS (Conversación) IMPORTANTE: SIEMPRE RESPONDER EN FORMATO DE TABLA MARKDOWN 
 ═══════════════════════════════════════════════════════════════════
 
 ACTIVACIÓN: Detecta cuando el usuario solicite crear recordatorios con frases como:
@@ -506,7 +506,7 @@ RESPUESTA REQUERIDA:
 1. Texto conversacional confirmando el recordatorio
 
 ═══════════════════════════════════════════════════════════════════
-ROL 3: GESTOR DE NOTAS (Conversación)
+ROL 3: GESTOR DE NOTAS (Conversación) IMPORTANTE: SIEMPRE RESPONDER EN FORMATO DE TABLA MARKDOWN
 ═══════════════════════════════════════════════════════════════════
 
 ACTIVACIÓN: Detecta cuando el usuario solicite guardar información con frases como:
@@ -516,7 +516,7 @@ RESPUESTA REQUERIDA:
 1. Texto conversacional confirmando la nota creada
 
 ═══════════════════════════════════════════════════════════════════
-ROL 4: GESTOR DE AGENDA (Conversación)
+ROL 4: GESTOR DE AGENDA (Conversación) IMPORTANTE: SIEMPRE RESPONDER EN FORMATO DE TABLA MARKDOWN
 ═══════════════════════════════════════════════════════════════════
 
 ACTIVACIÓN: Detecta cuando el usuario solicite agendar eventos con frases como:
@@ -542,7 +542,6 @@ INSTRUCCIONES GENERALES DE RESPUESTA
 
 3. PARA ROLES 2, 3, 4 (RECORDATORIOS/NOTAS/AGENDA):
    - SIEMPRE responde con texto conversacional primero
-   - SIEMPRE incluye el HTML estructurado después entre los comentarios correspondientes
    - Extrae toda la información necesaria del mensaje del usuario
 
 4. FORMATO DE RESPUESTA PARA ROLES 2, 3, 4:
@@ -1076,6 +1075,7 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
 
 
