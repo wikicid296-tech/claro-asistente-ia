@@ -1,6 +1,9 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
 const API_URL = 'https://claro-asistente-ia.onrender.com'; // Tu URL de Render
 
+
+
+
 // Estado global de la aplicación
 const appState = {
     currentMode: 'busqueda',
@@ -307,8 +310,8 @@ function addMessage(type, content) {
     messageDiv.className = 'msg ' + type;
     
     // Formatear el contenido
-    content = formatMessage(content);
-    messageDiv.innerHTML = content;
+    const formattedContent = formatMessage(content);
+    messageDiv.innerHTML = formattedContent;
     
     elements.chatHistory.appendChild(messageDiv);
     
@@ -317,60 +320,110 @@ function addMessage(type, content) {
         elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
     }, 100);
     
-    // Guardar en historial
+    // IMPORTANTE: Guardar el contenido SIN formatear (texto original)
     appState.conversationHistory.push({ 
         type, 
-        content, 
+        content: content, // Guardamos el texto original, NO el HTML
         timestamp: new Date().toISOString() 
     });
 }
 
-// ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES ====================
+// ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES CON MARKDOWN ====================
 function formatMessage(content) {
-    // 1. Escapar HTML para prevenir inyección
-    content = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // PRIMERO: Eliminar comentarios HTML <!-- -->
+    content = content.replace(/<!--[\s\S]*?-->/g, '');
     
-    // 2. Convertir markdown básico
-    // Negritas: **texto** o __texto__
-    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    content = content.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    // También eliminar etiquetas <! y -> sueltas
+    content = content.replace(/<!-+/g, '');
+    content = content.replace(/-+>/g, '');
     
-    // Cursivas: *texto* o _texto_
-    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    content = content.replace(/_(.*?)_/g, '<em>$1</em>');
+    // 1. Escapar HTML básico
+    const escapeHtml = (text) => {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+        };
+        return text.replace(/[&<>]/g, m => map[m]);
+    };
     
-    // 3. Formatear listas numeradas
-    content = content.replace(/(\d+\.\s+[^\n]+)/g, '<br>$1');
+    // Dividir en líneas
+    let lines = content.split('\n');
     
-    // 4. Formatear listas con viñetas
-    content = content.replace(/([•\-\*]\s+[^\n]+)/g, '<br>$1');
+    let formatted = lines.map((line) => {
+        // Saltar líneas que son solo separadores ---
+        if (line.trim().match(/^-{3,}$/)) {
+            return '<hr class="msg-divider" />';
+        }
+        
+        // Líneas vacías
+        if (line.trim() === '') {
+            return '<div class="msg-spacer"></div>';
+        }
+        
+        // Headers (# Título)
+        if (line.startsWith('### ')) {
+            return `<h3 class="msg-header">${escapeHtml(line.substring(4))}</h3>`;
+        }
+        if (line.startsWith('## ')) {
+            return `<h2 class="msg-header">${escapeHtml(line.substring(3))}</h2>`;
+        }
+        if (line.startsWith('# ')) {
+            return `<h1 class="msg-header">${escapeHtml(line.substring(2))}</h1>`;
+        }
+        
+        // Blockquotes (> texto) - convertir a texto destacado
+        if (line.startsWith('> ')) {
+            return `<div class="msg-quote">${escapeHtml(line.substring(2))}</div>`;
+        }
+        
+        // Listas con viñetas (-, *, •)
+        if (line.match(/^[\s]*[-\*•]\s+/)) {
+            const listContent = line.replace(/^[\s]*[-\*•]\s+/, '');
+            return `<li class="msg-list-item">${escapeHtml(listContent)}</li>`;
+        }
+        
+        // Listas numeradas (1., 2., etc.)
+        if (line.match(/^[\s]*\d+\.\s+/)) {
+            const listContent = line.replace(/^[\s]*\d+\.\s+/, '');
+            return `<li class="msg-list-item numbered">${escapeHtml(listContent)}</li>`;
+        }
+        
+        // Texto normal
+        return `<p class="msg-paragraph">${escapeHtml(line)}</p>`;
+    });
     
-    // 5. Detectar y formatear párrafos (dos saltos de línea)
-    content = content.replace(/\n\n/g, '<br><br>');
+    // Unir todo
+    let html = formatted.join('');
     
-    // 6. Detectar frases que empiezan con mayúscula después de punto
-    // Esto ayuda a separar oraciones largas
-    content = content.replace(/\.\s+([A-ZÁÉÍÓÚÑ])/g, '.<br><br>$1');
+    // APLICAR FORMATOS INLINE EN ORDEN ESPECÍFICO
     
-    // 7. Saltos de línea simples
-    content = content.replace(/\n/g, '<br>');
+    // 1. Primero procesar negritas: **texto**
+    html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
     
-    // 8. Formatear títulos (# Título)
-    content = content.replace(/^#\s+(.+)$/gm, '<strong style="font-size: 1.1em;">$1</strong><br>');
-    content = content.replace(/^##\s+(.+)$/gm, '<strong>$1</strong><br>');
+    // 2. Luego cursivas: *texto* (pero no si ya es parte de **)
+    html = html.replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
     
-    // 9. Formatear emojis con colores
-    content = content.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
-    content = content.replace(/📝/g, '<span style="color: #17a2b8;">📝</span>');
-    content = content.replace(/📅/g, '<span style="color: #ffc107;">📅</span>');
-    content = content.replace(/❌/g, '<span style="color: #dc3545;">❌</span>');
-    content = content.replace(/⚠️/g, '<span style="color: #ff9800;">⚠️</span>');
-    content = content.replace(/ℹ️/g, '<span style="color: #2196F3;">ℹ️</span>');
+    // 3. Código inline: `código`
+    html = html.replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>');
     
-    // 10. Añadir espaciado después de puntos seguidos
-    content = content.replace(/\.\s+/g, '. &nbsp;');
+    // 4. Links markdown: [texto](url) - PRIMERO
+    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
     
-    return content;
+    // 5. URLs simples - pero NO si ya están dentro de <a> o tienen comillas de atributos cerca
+    html = html.replace(/(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function(match) {
+        return `<a href="${match}" target="_blank" rel="noopener" class="msg-link">${match}</a>`;
+    });
+    
+    // 6. Emojis con colores
+    html = html.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
+    html = html.replace(/📝/g, '<span style="color: #17a2b8;">📝</span>');
+    html = html.replace(/📅/g, '<span style="color: #ffc107;">📅</span>');
+    html = html.replace(/❌/g, '<span style="color: #dc3545;">❌</span>');
+    html = html.replace(/⚠️/g, '<span style="color: #ff9800;">⚠️</span>');
+    html = html.replace(/😊/g, '<span style="font-size: 1.2em;">😊</span>');
+    
+    return html;
 }
 
 // ==================== TASK MANAGEMENT ====================
@@ -478,9 +531,10 @@ function saveToLocalStorage() {
         const data = {
             conversationHistory: appState.conversationHistory.slice(-50),
             tasks: appState.tasks,
-            currentMode: appState.currentMode
+            currentMode: appState.currentMode,
+            sessionId: sessionStorage.getItem('claroAssistant_sessionId')
         };
-        localStorage.setItem('claroGenAI_state', JSON.stringify(data));
+        localStorage.setItem('claroAssistant_state', JSON.stringify(data));
     } catch (e) {
         console.error('Error guardando en localStorage:', e);
     }
@@ -488,26 +542,48 @@ function saveToLocalStorage() {
 
 function loadFromLocalStorage() {
     try {
-        const saved = localStorage.getItem('claroGenAI_state');
+        // Generar o recuperar ID de sesión única
+        let currentSessionId = sessionStorage.getItem('claroAssistant_sessionId');
+        
+        if (!currentSessionId) {
+            // Nueva sesión: generar ID único
+            currentSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            sessionStorage.setItem('claroAssistant_sessionId', currentSessionId);
+            
+            // Limpiar conversación anterior al iniciar nueva sesión
+            localStorage.removeItem('claroAssistant_state');
+            console.log('Nueva sesion iniciada');
+            return;
+        }
+        
+        // Sesión existente: cargar datos
+        const saved = localStorage.getItem('claroAssistant_state');
         if (saved) {
             const data = JSON.parse(saved);
-            appState.conversationHistory = data.conversationHistory || [];
-            appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
-            appState.currentMode = data.currentMode || 'busqueda';
             
-            // Restaurar mensajes del chat si existen
-            if (appState.conversationHistory.length > 0) {
-                showChatView();
-                elements.chatHistory.innerHTML = '';
-                appState.conversationHistory.forEach(msg => {
-                    const messageDiv = document.createElement('div');
-                    messageDiv.className = 'msg ' + msg.type;
-                    messageDiv.innerHTML = formatMessage(msg.content);
-                    elements.chatHistory.appendChild(messageDiv);
-                });
+            // Verificar que sea la misma sesión
+            if (data.sessionId === currentSessionId) {
+                appState.conversationHistory = data.conversationHistory || [];
+                appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
+                appState.currentMode = data.currentMode || 'busqueda';
+                
+                // Restaurar mensajes del chat si existen
+                if (appState.conversationHistory.length > 0) {
+                    showChatView();
+                    elements.chatHistory.innerHTML = '';
+                    appState.conversationHistory.forEach(msg => {
+                        const messageDiv = document.createElement('div');
+                        messageDiv.className = 'msg ' + msg.type;
+                        messageDiv.innerHTML = formatMessage(msg.content);
+                        elements.chatHistory.appendChild(messageDiv);
+                    });
+                    console.log('Conversacion restaurada');
+                }
+                
+                updateTasksUI();
+            } else {
+                console.log('Nueva pestana - chat limpio');
             }
-            
-            updateTasksUI();
         }
     } catch (e) {
         console.error('Error cargando desde localStorage:', e);
@@ -520,12 +596,11 @@ window.addEventListener('resize', function() {
         elements.sidebar.classList.remove('active');
         elements.overlay.classList.remove('active');
     }
-});
+}); 
 
 // ==================== CONSOLE INFO ====================
 console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cReady to chat!', 'color: #28a745;');
-
 
 
