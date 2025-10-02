@@ -1,5 +1,5 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-const API_URL = 'http://localhost:8000'; // Cambiar a tu URL de producción si es necesario
+const API_URL = 'https://claro-asistente-ia.onrender.com'; // Cambiar a tu URL de producción si es necesario
 
 // Estado global de la aplicación
 const appState = {
@@ -491,4 +491,5 @@ window.addEventListener('resize', function() {
 console.log('%c🚀 Claro·GenAI Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cReady to chat!', 'color: #28a745;');
+
 
