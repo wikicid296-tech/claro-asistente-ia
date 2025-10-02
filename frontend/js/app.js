@@ -1,10 +1,9 @@
-/// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-// URL CORREGIDA para producción
-const API_URL = 'https://claro-asistente-ia.onrender.com';
+// ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
+const API_URL = 'http://localhost:8000'; // Cambiar a tu URL de producción si es necesario
 
 // Estado global de la aplicación
 const appState = {
-    currentMode: null,
+    currentMode: 'busqueda',
     conversationHistory: [],
     tasks: {
         reminders: [],
@@ -22,6 +21,8 @@ const elements = {
     navItems: document.querySelectorAll('.nav-item'),
     tasksContainer: document.getElementById('tasksContainer'),
     taskHeaders: document.querySelectorAll('.task-header'),
+    newConversationBtn: document.getElementById('newConversationBtn'),
+    clearTasksBtn: document.getElementById('clear-tasks'),
     
     // Main content
     welcomePage: document.getElementById('welcomePage'),
@@ -30,6 +31,7 @@ const elements = {
     
     // Input
     userInput: document.getElementById('userInput'),
+    sendBtn: document.getElementById('sendBtn'),
     addBtn: document.getElementById('addBtn'),
     actionMenu: document.getElementById('actionMenu'),
     actionItems: document.querySelectorAll('.action-item'),
@@ -38,12 +40,16 @@ const elements = {
     suggestionCards: document.querySelectorAll('.suggestion-card'),
     
     // Loading
-    loadingOverlay: document.getElementById('loadingOverlay')
+    loadingOverlay: document.getElementById('loadingOverlay'),
+    
+    // Task lists
+    remindersList: document.getElementById('reminders-list'),
+    notesList: document.getElementById('notes-list'),
+    calendarList: document.getElementById('calendar-list')
 };
 
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Iniciando aplicación en:', API_URL);
     initializeEventListeners();
     loadFromLocalStorage();
 });
@@ -58,13 +64,34 @@ function initializeEventListeners() {
         item.addEventListener('click', handleNavigation);
     });
     
+    // Nueva conversación (SIN ALERT)
+    if (elements.newConversationBtn) {
+        elements.newConversationBtn.addEventListener('click', startNewConversation);
+    }
+    
     // Task headers (expandir/contraer)
     elements.taskHeaders.forEach(header => {
         header.addEventListener('click', toggleTaskCard);
     });
     
+    // Limpiar tareas (SIN ALERT)
+    if (elements.clearTasksBtn) {
+        elements.clearTasksBtn.addEventListener('click', clearAllTasks);
+    }
+    
     // Botón + (mostrar menú de acciones)
     elements.addBtn.addEventListener('click', toggleActionMenu);
+    
+    // Botón enviar
+    if (elements.sendBtn) {
+        elements.sendBtn.addEventListener('click', function() {
+            const text = elements.userInput.value.trim();
+            if (text) {
+                sendMessage(text);
+                elements.userInput.value = '';
+            }
+        });
+    }
     
     // Action items (opciones del menú)
     elements.actionItems.forEach(item => {
@@ -102,6 +129,12 @@ function closeSidebar() {
 function handleNavigation(e) {
     const section = this.getAttribute('data-section');
     
+    // Si es "home", iniciar nueva conversación
+    if (section === 'home') {
+        startNewConversation();
+        return;
+    }
+    
     // Remover active de todos
     elements.navItems.forEach(item => item.classList.remove('active'));
     this.classList.add('active');
@@ -114,6 +147,27 @@ function handleNavigation(e) {
     }
     
     // No cerrar sidebar en desktop, solo en móvil
+    if (window.innerWidth < 900) {
+        closeSidebar();
+    }
+}
+
+// ==================== NUEVA CONVERSACIÓN (SIN ALERT) ====================
+function startNewConversation() {
+    // Limpiar historial directamente sin confirmación
+    appState.conversationHistory = [];
+    elements.chatHistory.innerHTML = '';
+    elements.welcomePage.style.display = 'flex';
+    elements.chatPage.style.display = 'none';
+    saveToLocalStorage();
+    
+    // Activar "Nueva conversación"
+    elements.navItems.forEach(item => item.classList.remove('active'));
+    if (elements.newConversationBtn) {
+        elements.newConversationBtn.classList.add('active');
+    }
+    elements.tasksContainer.classList.remove('active');
+    
     if (window.innerWidth < 900) {
         closeSidebar();
     }
@@ -179,7 +233,7 @@ function handleSuggestionClick(e) {
     sendMessage(text);
 }
 
-// ==================== CHAT FUNCTIONS ====================
+// ==================== CHAT FUNCTIONS CON API ====================
 function sendMessage(text) {
     if (!text || !text.trim()) return;
     
@@ -192,7 +246,7 @@ function sendMessage(text) {
     // Mostrar loading
     showLoading();
     
-    // Llamar a la API con mejor manejo de errores
+    // Llamar a la API REAL
     callAPI(text)
         .then(response => {
             addMessage('bot', response);
@@ -203,26 +257,44 @@ function sendMessage(text) {
             }
         })
         .catch(error => {
-            console.error('Error en sendMessage:', error);
-            let errorMessage = '❌ Lo siento, hubo un error al procesar tu mensaje. ';
-            
-            if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-                errorMessage += 'Problema de conexión. Verifica tu internet.';
-            } else if (error.message.includes('Timeout')) {
-                errorMessage += 'El servidor tardó demasiado. Intenta nuevamente.';
-            } else {
-                errorMessage += 'Por favor, intenta de nuevo.';
-            }
-            
-            addMessage('bot', errorMessage);
+            console.error('Error:', error);
+            addMessage('bot', '❌ Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.');
         })
         .finally(() => {
             hideLoading();
             saveToLocalStorage();
         });
-    
-    // Limpiar input
-    elements.userInput.value = '';
+}
+
+// ==================== API CALLS ====================
+async function callAPI(message) {
+    try {
+        const response = await fetch(`${API_URL}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                message: message,
+                action: appState.currentMode
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            return data.response;
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+    } catch (error) {
+        console.error('API Error:', error);
+        throw error;
+    }
 }
 
 function showChatView() {
@@ -233,7 +305,10 @@ function showChatView() {
 function addMessage(type, content) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'msg ' + type;
-    messageDiv.textContent = content;
+    
+    // Formatear el contenido
+    content = formatMessage(content);
+    messageDiv.innerHTML = content;
     
     elements.chatHistory.appendChild(messageDiv);
     
@@ -243,66 +318,24 @@ function addMessage(type, content) {
     }, 100);
     
     // Guardar en historial
-    appState.conversationHistory.push({ type, content, timestamp: new Date().toISOString() });
+    appState.conversationHistory.push({ 
+        type, 
+        content, 
+        timestamp: new Date().toISOString() 
+    });
 }
 
-// ==================== API CALLS ====================
-async function callAPI(message) {
-    console.log('📡 Enviando mensaje a:', `${API_URL}/chat`);
+function formatMessage(content) {
+    // Convertir saltos de línea a <br>
+    content = content.replace(/\n/g, '<br>');
     
-    try {
-        // Configuración mejorada para móviles
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
-        
-        const response = await fetch(`${API_URL}/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                message: message,
-                action: appState.currentMode
-            }),
-            signal: controller.signal,
-            mode: 'cors',
-            credentials: 'omit'
-        });
-        
-        clearTimeout(timeoutId);
-        
-        console.log('📡 Status de respuesta:', response.status);
-        
-        if (!response.ok) {
-            let errorText = 'Error del servidor';
-            try {
-                errorText = await response.text();
-            } catch (e) {
-                // No se pudo leer el cuerpo de la respuesta
-            }
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('✅ Respuesta recibida:', data);
-        
-        if (data.success) {
-            return data.response;
-        } else {
-            throw new Error(data.error || 'Error desconocido del servidor');
-        }
-        
-    } catch (error) {
-        console.error('❌ Error en callAPI:', error);
-        
-        if (error.name === 'AbortError') {
-            throw new Error('Timeout: La petición tardó demasiado. Intenta nuevamente.');
-        } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            throw new Error('Error de conexión. No se pudo conectar al servidor.');
-        } else {
-            throw error;
-        }
-    }
+    // Formatear emojis con colores
+    content = content.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
+    content = content.replace(/📝/g, '<span style="color: #17a2b8;">📝</span>');
+    content = content.replace(/📅/g, '<span style="color: #ffc107;">📅</span>');
+    content = content.replace(/❌/g, '<span style="color: #dc3545;">❌</span>');
+    
+    return content;
 }
 
 // ==================== TASK MANAGEMENT ====================
@@ -316,7 +349,13 @@ function isTaskMessage(message) {
 }
 
 function processTask(userMessage, botResponse) {
-    const timestamp = new Date().toLocaleString('es-ES');
+    const timestamp = new Date().toLocaleString('es-MX', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
     
     const task = {
         content: userMessage,
@@ -339,50 +378,55 @@ function processTask(userMessage, botResponse) {
 }
 
 function updateTasksUI() {
-    // Actualizar cada sección de tareas
-    updateTaskSection('reminders', 'Recordatorios');
-    updateTaskSection('notes', 'Notas');
-    updateTaskSection('calendar', 'Agenda');
+    updateTaskList(elements.remindersList, appState.tasks.reminders, 'reminders', 'No hay recordatorios pendientes');
+    updateTaskList(elements.notesList, appState.tasks.notes, 'notes', 'No hay notas');
+    updateTaskList(elements.calendarList, appState.tasks.calendar, 'calendar', 'No hay eventos programados');
 }
 
-function updateTaskSection(taskType, label) {
-    const tasks = appState.tasks[taskType];
-    const containers = document.querySelectorAll('.task-body');
-    const index = taskType === 'reminders' ? 0 : taskType === 'calendar' ? 1 : 2;
-    const container = containers[index];
-    
+function updateTaskList(container, tasks, taskType, emptyMessage) {
     if (!container) return;
     
     if (tasks.length === 0) {
-        container.innerHTML = `No hay ${label.toLowerCase()}`;
+        container.innerHTML = emptyMessage;
         return;
     }
     
-    let html = '<div style="max-height: 200px; overflow-y: auto;">';
+    let html = '';
     tasks.forEach((task, idx) => {
         html += `
-            <div class="task-item" style="background: white; padding: 8px; margin: 5px 0; border-radius: 4px; border-left: 3px solid #00BCD4; position: relative;">
-                <div style="font-size: 13px; color: #333; padding-right: 20px;">${task.content}</div>
-                <div style="font-size: 11px; color: #999; margin-top: 4px;">${task.created_at}</div>
-                <button onclick="deleteTask('${taskType}', ${idx})" style="position: absolute; top: 5px; right: 5px; background: none; border: none; color: #dc3545; cursor: pointer; font-size: 16px;">×</button>
+            <div class="task-item">
+                <div class="task-content">${task.content}</div>
+                <div class="task-time">${task.created_at}</div>
+                <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})">×</button>
             </div>
         `;
     });
-    html += '</div>';
     
     container.innerHTML = html;
 }
 
 function deleteTask(taskType, index) {
-    if (confirm('¿Eliminar esta tarea?')) {
-        appState.tasks[taskType].splice(index, 1);
-        updateTasksUI();
-        saveToLocalStorage();
-    }
+    // Eliminar directamente sin confirmación
+    appState.tasks[taskType].splice(index, 1);
+    updateTasksUI();
+    saveToLocalStorage();
 }
 
-// Hacer disponible globalmente para onclick
+// ==================== LIMPIAR TAREAS (SIN ALERT) ====================
+function clearAllTasks() {
+    // Limpiar directamente sin confirmación
+    appState.tasks = { 
+        reminders: [], 
+        notes: [], 
+        calendar: [] 
+    };
+    updateTasksUI();
+    saveToLocalStorage();
+}
+
+// Hacer disponibles globalmente
 window.deleteTask = deleteTask;
+window.clearAllTasks = clearAllTasks;
 
 // ==================== LOADING ====================
 function showLoading() {
@@ -396,10 +440,12 @@ function hideLoading() {
 // ==================== LOCAL STORAGE ====================
 function saveToLocalStorage() {
     try {
-        localStorage.setItem('claroGenAI_state', JSON.stringify({
-            conversationHistory: appState.conversationHistory.slice(-50), // Solo últimas 50
-            tasks: appState.tasks
-        }));
+        const data = {
+            conversationHistory: appState.conversationHistory.slice(-50),
+            tasks: appState.tasks,
+            currentMode: appState.currentMode
+        };
+        localStorage.setItem('claroGenAI_state', JSON.stringify(data));
     } catch (e) {
         console.error('Error guardando en localStorage:', e);
     }
@@ -412,12 +458,17 @@ function loadFromLocalStorage() {
             const data = JSON.parse(saved);
             appState.conversationHistory = data.conversationHistory || [];
             appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
+            appState.currentMode = data.currentMode || 'busqueda';
             
             // Restaurar mensajes del chat si existen
             if (appState.conversationHistory.length > 0) {
                 showChatView();
+                elements.chatHistory.innerHTML = '';
                 appState.conversationHistory.forEach(msg => {
-                    addMessage(msg.type, msg.content);
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'msg ' + msg.type;
+                    messageDiv.innerHTML = formatMessage(msg.content);
+                    elements.chatHistory.appendChild(messageDiv);
                 });
             }
             
@@ -428,44 +479,16 @@ function loadFromLocalStorage() {
     }
 }
 
-// ==================== UTILITY FUNCTIONS ====================
-function clearChat() {
-    if (confirm('¿Estás seguro de que quieres limpiar el chat?')) {
-        appState.conversationHistory = [];
-        elements.chatHistory.innerHTML = '';
-        elements.welcomePage.style.display = 'flex';
-        elements.chatPage.style.display = 'none';
-        saveToLocalStorage();
-    }
-}
-
-function clearAllTasks() {
-    if (confirm('¿Estás seguro de que quieres eliminar todas las tareas?')) {
-        appState.tasks = { reminders: [], notes: [], calendar: [] };
-        updateTasksUI();
-        saveToLocalStorage();
-    }
-}
-
-// Hacer disponibles globalmente si se necesitan
-window.clearChat = clearChat;
-window.clearAllTasks = clearAllTasks;
-
 // ==================== RESPONSIVE HANDLERS ====================
 window.addEventListener('resize', function() {
     if (window.innerWidth >= 900) {
-        // En desktop, asegurar que el sidebar esté visible
-        elements.sidebar.style.left = '0';
+        elements.sidebar.classList.remove('active');
         elements.overlay.classList.remove('active');
-    } else {
-        // En móvil, resetear
-        if (!elements.sidebar.classList.contains('active')) {
-            elements.sidebar.style.left = '-280px';
-        }
     }
 });
 
 // ==================== CONSOLE INFO ====================
-console.log('%c🚀 Claro Asistente IA Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
+console.log('%c🚀 Claro·GenAI Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cReady to chat!', 'color: #28a745;');
+
