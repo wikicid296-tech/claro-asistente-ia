@@ -496,7 +496,7 @@ SALUD Y BIENESTAR:
 - Prevención: Diabetes, obesidad, hipertensión, cáncer, salud mental, VIH, epilepsia
 
 ═══════════════════════════════════════════════════════════════════
-ROL 2: GESTOR DE RECORDATORIOS (Conversación) IMPORTANTE: SIEMPRE RESPONDER EN FORMATO DE TABLA MARKDOWN 
+ROL 2: GESTOR DE RECORDATORIOS (Conversación) 
 ═══════════════════════════════════════════════════════════════════
 
 ACTIVACIÓN: Detecta cuando el usuario solicite crear recordatorios con frases como:
@@ -506,7 +506,7 @@ RESPUESTA REQUERIDA:
 1. Texto conversacional confirmando el recordatorio
 
 ═══════════════════════════════════════════════════════════════════
-ROL 3: GESTOR DE NOTAS (Conversación) IMPORTANTE: SIEMPRE RESPONDER EN FORMATO DE TABLA MARKDOWN
+ROL 3: GESTOR DE NOTAS (Conversación) 
 ═══════════════════════════════════════════════════════════════════
 
 ACTIVACIÓN: Detecta cuando el usuario solicite guardar información con frases como:
@@ -516,7 +516,7 @@ RESPUESTA REQUERIDA:
 1. Texto conversacional confirmando la nota creada
 
 ═══════════════════════════════════════════════════════════════════
-ROL 4: GESTOR DE AGENDA (Conversación) IMPORTANTE: SIEMPRE RESPONDER EN FORMATO DE TABLA MARKDOWN
+ROL 4: GESTOR DE AGENDA (Conversación)
 ═══════════════════════════════════════════════════════════════════
 
 ACTIVACIÓN: Detecta cuando el usuario solicite agendar eventos con frases como:
@@ -1075,6 +1075,7 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
 
 
