@@ -34,7 +34,7 @@ html, body {
     overflow: hidden;
 }
 
-/* ==================== TOPBAR ==================== */
+/* ==================== TOPBAR (SIEMPRE VISIBLE) ==================== */
 header.topbar {
     background: var(--negro);
     color: var(--blanco);
@@ -43,6 +43,10 @@ header.topbar {
     justify-content: space-between;
     padding: 12px 16px;
     z-index: 30;
+    position: sticky;
+    top: 0;
+    height: 56px;
+    flex-shrink: 0;
 }
 
 .menu-toggle {
@@ -75,7 +79,7 @@ header.topbar {
 nav.sidebar {
     position: fixed;
     left: -280px;
-    top: 0;
+    top: 56px; /* Debajo del topbar */
     bottom: 0;
     width: 280px;
     background: var(--blanco);
@@ -93,7 +97,7 @@ nav.sidebar.active {
 .sidebar-overlay {
     display: none;
     position: fixed;
-    top: 0;
+    top: 56px; /* Debajo del topbar */
     left: 0;
     right: 0;
     bottom: 0;
@@ -174,7 +178,7 @@ nav.sidebar.active {
     font-size: 13px;
 }
 
-/* ==================== TASKS EN SIDEBAR ==================== */
+/* ==================== TASKS EN SIDEBAR (DISEÑO ORIGINAL) ==================== */
 .tasks-container {
     margin-top: 10px;
     display: none;
@@ -184,35 +188,49 @@ nav.sidebar.active {
     display: block;
 }
 
-.task-category {
-    margin-bottom: 20px;
+.task-card {
+    background: #E0F7FA;
+    border: 1.5px solid var(--azul);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
 }
 
-.task-category h4 {
-    color: var(--texto-claro);
-    font-size: 14px;
-    margin-bottom: 10px;
+.task-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    justify-content: space-between;
+    color: #006064;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
 }
 
-.task-list {
-    background: var(--blanco);
-    border-radius: 8px;
-    padding: 10px;
-    min-height: 50px;
-    border: 1px solid var(--gris-borde);
+.task-header svg {
+    width: 16px;
+    height: 16px;
+    transition: transform 0.2s;
 }
 
-.no-tasks {
-    color: var(--texto-claro);
-    font-style: italic;
-    text-align: center;
-    padding: 10px;
+.task-header.collapsed svg {
+    transform: rotate(-90deg);
+}
+
+.task-body {
+    margin-top: 10px;
     font-size: 13px;
+    color: #555;
+    line-height: 1.4;
+    display: none;
 }
 
+.task-body.open {
+    display: block;
+}
+
+/* Estilos para los items de tareas individuales */
 .task-item {
     position: relative;
     background: var(--blanco);
@@ -685,6 +703,7 @@ main.content {
 
     nav.sidebar {
         position: static;
+        top: auto;
         left: 0;
         box-shadow: none;
         border-right: 1px solid var(--gris-borde);
@@ -714,5 +733,25 @@ main.content {
 
     .input-section {
         left: 280px;
+    }
+}
+
+/* ==================== ANIMATIONS UTILITIES ==================== */
+.fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
     }
 }
