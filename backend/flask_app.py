@@ -1,3 +1,4 @@
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
@@ -13,31 +14,41 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuración
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-PORT = int(os.getenv("PORT", 10000))
+# ! MOD 1 #########
+# Añadido: memoria en memoria (in-memory) por cliente para simular "memoria" de chat.
+# Nota: es una solución simple que no persiste entre reinicios y no requiere cambios en el frontend.
+CHAT_MEMORY = {}
 
-try:
-    if GROQ_API_KEY:
-        from groq import Groq
-        client = Groq(api_key=GROQ_API_KEY)
-        logger.info("✅ Cliente Groq inicializado correctamente")
-    else:
-        logger.error("❌ GROQ_API_KEY no configurada en variables de entorno")
-        client = None
-except TypeError as e:
-    if "proxies" in str(e):
-        logger.warning("⚠️ Versión incompatible de Groq, usando fallback directo a API")
-        client = "api_fallback"
-    else:
-        logger.error(f"❌ Error inicializando Groq: {str(e)}")
-        client = None
-except Exception as e:
-    logger.error(f"❌ Error inicializando Groq: {str(e)}")
-    client = None
+def _get_user_key():
+    """
+    Genera una clave simple para identificar al cliente basada en IP y User-Agent.
+    (No requiere cambios en el frontend. Si el frontend ya enviara un header propio como X-User-Id,
+    podríamos usarlo; aquí intentamos ser lo menos intrusivos posible).
+    """
+    ip = request.remote_addr or "unknown"
+    ua = request.headers.get("User-Agent", "")
+    return f"{ip}:{ua}"
+
+# Manejo seguro cuando URLS o SYSTEM_PROMPT fueron omitidos por el usuario (placeholder {})
+# Si el usuario decidió colocar URLS={} y SYSTEM_PROMPT={}, estas funciones deben seguir funcionando.
+def safe_extract_relevant_urls(prompt):
+    """Wrapper que evita excepción si URLS está vacío."""
+    try:
+        return extract_relevant_urls(prompt)
+    except Exception:
+        return []
+
+def safe_get_context_for_query(prompt):
+    """Wrapper que evita excepción si SYSTEM_PROMPT o URLS están vacíos."""
+    try:
+        return get_context_for_query(prompt)
+    except Exception:
+        return "Información general disponible"
+# ! MOD 1 CIERRE ########
 
 # ==================== URLs DE CONTENIDO ====================
-URLS = {
+# NOTE: El usuario pidió que se deje como placeholder para que ellos lo coloquen después.
+RLS = {
     "claro": {
         "argentina": [
             "https://www.claro.com.ar/personas",
@@ -54,7 +65,8 @@ URLS = {
             "https://www.clarochile.cl/empresas/"
         ],
     },
-    "telcel": ["https://www.telcel.com/",
+    "telcel": [
+            "https://www.telcel.com/",
             "https://www.telcel.com/personas/planes-de-renta/tarifas-y-opciones/telcel-libre?utm_source=gg&utm_medium=sem&utm_campaign=52025_gg_AONPTL2025_visitas_pospago_planlibre_brand&utm_content=gg_planestelcel_nacional___intereses_texto&utm_term=gg_planestelcel_nacional___intereses_texto&gclsrc=aw.ds&&campaignid=22494109880&network=g&device=c&gad_source=1&gad_campaignid=22494109880&gclid=EAIaIQobChMIltP0qd6DkAMVwiRECB2H0jZLEAAYASAAEgLsQPD_BwE"
             "https://www.telcel.com/personas/planes-de-renta/tarifas-y-opciones",
             "https://www.telcel.com/personas/amigo/paquetes/paquetes-amigo-sin-limite",
@@ -93,7 +105,7 @@ URLS = {
             ],
         },
         "aprende_org_general": {
-            "principal": ["https://aprende.org/"],
+            "principal": ["https://aprende.org/","https://aprende.org/area/educacion"],
             "areas_principales": [
                 "https://aprende.org/area/educacion",
                 "https://aprende.org/area/capacitate",
@@ -104,20 +116,101 @@ URLS = {
             "trabajo_formacion": [
                 "https://aprende.org/rutas-aprendizaje",
                 "https://aprende.org/diplomados",
-                "https://aprende.org/especialidades"
+                "https://aprende.org/especialidades",
+                "https://aprende.org/cursos/view/100848",
+                "https://aprende.org/cursos/view/100847",
+                "https://aprende.org/diplomado/62",
+                "https://aprende.org/especialidad/6",
+                "https://aprende.org/especialidad/5",
+                "https://aprende.org/especialidad/4",
+                "https://aprende.org/diplomado/72",
+                "https://aprende.org/diplomado/71",
+                "https://aprende.org/diplomado/73",
+                "https://aprende.org/diplomado/33",
+                "https://aprende.org/diplomado/32",
+                "https://aprende.org/diplomado/31",
+                "https://aprende.org/diplomado/30",
+                "https://aprende.org/diplomado/29",
+                "https://aprende.org/diplomado/28",
+                "https://aprende.org/diplomado/27",
+                "https://aprende.org/diplomado/26",
+                "https://aprende.org/diplomado/25",
+                "https://aprende.org/diplomado/24",
+                "https://aprende.org/diplomado/23",
+                "https://aprende.org/diplomado/55",
+                "https://aprende.org/diplomado/35",
+                "https://aprende.org/diplomado/34", 
+                "https://aprende.org/especialidad/6",
+                "https://aprende.org/especialidad/5",
+                "https://aprende.org/especialidad/4",
+                
+                "https://aprende.org/ruta/49",
+                "https://aprende.org/ruta/40",
+                "https://aprende.org/ruta/19",
+                "https://aprende.org/ruta/11",
+                "https://aprende.org/ruta/21",
+                "https://aprende.org/ruta/13",
+                "https://aprende.org/ruta/12",
+                "https://aprende.org/ruta/61",
+                "https://aprende.org/ruta/14",
+                "https://aprende.org/ruta/22",
+                "https://aprende.org/ruta/74",
+                "https://aprende.org/ruta/41",
+                "https://aprende.org/ruta/20",
+                "https://aprende.org/ruta/16",
+                "https://aprende.org/ruta/15",
+                "https://aprende.org/ruta/17",
+                "https://aprende.org/ruta/38",
+                "https://aprende.org/ruta/75",
+                "https://aprende.org/ruta/54",
+                "https://aprende.org/ruta/46",
+                "https://aprende.org/ruta/45",
+                "https://aprende.org/ruta/44",
+                "https://aprende.org/ruta/43",
+                "https://aprende.org/ruta/42",
+                "https://aprende.org/ruta/10",
+                "https://aprende.org/ruta/9",
             ]
         },
         "educacion_detallada": {
             "basica_y_media": [
                 "https://educacioninicial.mx/capacitacion",
                 "https://aprende.org/pruebat?sectionId=1",
-                "https://es.khanacademy.org/"
+                "https://es.khanacademy.org/",
+                "https://aprende.org/pruebat?sectionId=4",
+                "https://aprende.org/pruebat?sectionId=2",
+                "https://aprende.org/pruebat?sectionId=1",
+                "https://educacioninicial.mx/temas-interes",
+                "https://educacioninicial.mx/capacitacion",
+                "https://aprende.org/pruebat?sectionId=2",
+                "https://aprende.org/pruebat?sectionId=1",
+                "https://aprende.org/centro-estudios-historia-mexico/1456",
+                "https://aprende.org/podcast-dilemas-y-consecuencias/1451",
+                "https://aprende.org/historia",
+                "https://aprende.org/pruebat?sectionId=10",
+                "https://aprende.org/pruebat?sectionId=9",
             ],
             "superior": [
                 "https://academica.mx/",
                 "https://aprende.org/superior/mit/1439",
                 "https://www.coursera.org/",
-                "https://www.edx.org/"
+                "https://www.edx.org/",
+                "https://www.edx.org/",
+                "https://www.udacity.com/",
+                "https://aprende.org/derecho",
+                "https://aprende.org/superior/mit/1439",
+                "https://academica.mx/?utm_source=Aprende2023&utm_medium=Web&utm_campaign=Aprende2023&utm_id=Aprende2023",
+                "https://telmexeducacion.aprende.org/?utm_source=+AprendeBibliotecaDigital2023&utm_medium=Web&utm_campaign=+AprendeBibliotecaDigital2023&utm_id=+AprendeBibliotecaDigital2023",
+                "https://aprende.org/programacion-para-todos",
+                "https://aprende.org/desarrollo-multimedia",
+                "https://aprende.org/ser-digital",
+                "https://aprende.org/pruebat?sectionId=11",
+                "https://aprende.org/learnmatch",
+                "https://aprende.org/centro-estudios-historia-mexico/1456",
+                "https://aprende.org/podcast-dilemas-y-consecuencias/1451",
+                "https://aprende.org/historia",
+                "https://aprende.org/pruebat?sectionId=10"
+                "https://aprende.org/pruebat?sectionId=9",
             ]
         },
         "rutas_y_oficios": {
@@ -125,23 +218,96 @@ URLS = {
                 "https://aprende.org/ruta/9",
                 "https://aprende.org/ruta/10",
                 "https://aprende.org/ser-digital",
-                "https://aprende.org/programacion-para-todos"
+                "https://aprende.org/programacion-para-todos",
+                "https://aprende.org/ruta/75",
+                "https://aprende.org/ruta/54",
+                "https://aprende.org/ruta/46",
+                "https://aprende.org/ruta/45",
+                "https://aprende.org/ruta/44",
+                "https://aprende.org/ruta/43",
+                "https://aprende.org/ruta/42",
+                "https://aprende.org/ruta/10",
+                "https://aprende.org/ruta/9",
+                "https://www.ochoenpunto.com/category/ochoenpunto/",
+                "https://fasemethod.com/blog-sobre-productividad-personal/",
+                "https://iagofraga.com/blog/",
             ],
             "administracion_finanzas": [
                 "https://aprende.org/ruta/41",
-                "https://aprende.org/ruta/74"
+                "https://aprende.org/ruta/74",
+                "https://aprende.org/cursos/view/385",
+                "https://aprende.org/cursos/view/384",
+                "https://aprende.org/cursos/view/378",
+                "https://aprende.org/cursos/view/100145",
+                "https://aprende.org/cursos/view/113",
+                "https://aprende.org/cursos/view/89",
+                "https://aprende.org/cursos/view/100141",
+                "https://aprende.org/cursos/view/100129",
+                "https://aprende.org/cursos/view/100334",
+                "https://aprende.org/cursos/view/291",
+                "https://aprende.org/cursos/view/100325",
+                "https://aprende.org/cursos/view/100128",
+                "https://aprende.org/cursos/view/100143",
+                "https://aprende.org/cursos/view/100147",
+                "https://aprende.org/cursos/view/100148",
+                "https://aprende.org/cursos/view/100322",
+                "https://aprende.org/cursos/view/100657",
+                "https://aprende.org/cursos/view/109",
+                "https://aprende.org/cursos/view/320",
+                "https://aprende.org/cursos/view/313",
+                "https://aprende.org/cursos/view/306",
+                "https://aprende.org/cursos/view/318",
+                "https://aprende.org/cursos/view/178",
+                "https://www.ochoenpunto.com/category/ochoenpunto/",
+                "https://fasemethod.com/blog-sobre-productividad-personal/",
+                "https://iagofraga.com/blog/",
             ]
         },
         "diplomados_especialidades": {
             "administracion_finanzas": [
                 "https://aprende.org/cursos/view/178",
                 "https://aprende.org/cursos/view/291",
-                "https://aprende.org/cursos/view/89"
+                "https://aprende.org/cursos/view/89",
+                "https://aprende.org/ruta/74",
+                "https://aprende.org/ruta/41",
+                "https://educacioninicial.mx/temas-interes",
+                "https://educacioninicial.mx/capacitacion",
+                "https://es.khanacademy.org/",
+                "https://aprende.org/pruebat?sectionId=4"
+                "https://www.ochoenpunto.com/category/ochoenpunto/",
+                "https://fasemethod.com/blog-sobre-productividad-personal/",
+                "https://iagofraga.com/blog/",
+                "https://aprende.org/ruta/49",
             ],
             "autoempleo_negocio": [
                 "https://aprende.org/cursos/view/159",
-                "https://aprende.org/cursos/view/157"
-            ]
+                "https://aprende.org/cursos/view/157",
+                "https://aprende.org/cursos/view/162",
+                "https://aprende.org/cursos/view/167",
+                "https://aprende.org/cursos/view/93",
+                "https://aprende.org/cursos/view/180",
+                "https://aprende.org/cursos/view/169",
+                "https://aprende.org/cursos/view/164",
+                "https://aprende.org/cursos/view/158",
+                "https://aprende.org/cursos/view/156", 
+                "https://aprende.org/cursos/view/157",
+                "https://aprende.org/cursos/view/100309",
+                "https://aprende.org/cursos/view/160",
+                "https://aprende.org/cursos/view/161",
+                "https://aprende.org/cursos/view/100160",
+                "https://aprende.org/cursos/view/159",
+                "https://www.ochoenpunto.com/category/ochoenpunto/",
+                "https://fasemethod.com/blog-sobre-productividad-personal/",
+                "https://iagofraga.com/blog/",
+            ],
+            "libros": [
+                "https://aprende.org/pruebat?sectionId=10",
+                "https://aprende.org/pruebat?sectionId=9",
+                "https://aprende.org/pruebat?sectionId=8",
+                "https://aprende.org/pruebat?sectionId=7",
+                "https://aprende.org/pruebat?sectionId=6",
+                "https://aprende.org/pruebat?sectionId=5"
+            ],
         }
     },
     "health": {
@@ -188,6 +354,7 @@ URLS = {
 }
 
 # ==================== SYSTEM PROMPT MEJORADO ====================
+# NOTE: El usuario pidió que se deje como placeholder para que ellos lo coloquen después.
 SYSTEM_PROMPT = """Eres un asistente virtual multifuncional con capacidades especializadas en cuatro roles principales.
 
 IMPORTANTE: TODA RESPUESTA DEBE SER DEVUELTA EN MARKDOWN A EXCEPCIÓN DE LOS ROLES QUE INDIQUEN OTRO FORMATO DE RESPUESTA DE ACUERDO A LA SIGUIENTE GUÍA:
@@ -222,6 +389,8 @@ Línea horizontal
 ---
 Enlaces	
 [anchor](https://enlace.tld "título")
+
+**Para contenido tabular, usa formato markdown de tablas cuando sea apropiado para organizar información**
 
 ═══════════════════════════════════════════════════════════════════
 ROL 1: ASESOR ESPECIALIZADO (Respuesta conversacional)
@@ -342,7 +511,6 @@ Recuerda: Tu objetivo es ayudar al usuario de manera efectiva, proporcionando in
 """
 
 # ==================== FUNCIONES DE DETECCIÓN MEJORADAS ====================
-
 def detect_country(text):
     """Detecta país mencionado en el texto"""
     text_lower = text.lower()
@@ -420,6 +588,9 @@ def detect_education_topic(text):
 
 def extract_relevant_urls(prompt):
     """Extrae URLs relevantes basándose en la consulta del usuario"""
+    # Manejo si URLS no fue definido por el usuario (placeholder)
+    if not URLS:
+        return []
     relevant_urls = []
     country = detect_country(prompt)
     operator = detect_operator(prompt)
@@ -430,65 +601,112 @@ def extract_relevant_urls(prompt):
     if health_topic:
         if health_topic == "edad":
             # Agregar todos los manuales por edad
-            for age_range, urls in URLS["health"]["manual_por_edad_clikisalud"].items():
+            for age_range, urls in URLS.get("health", {}).get("manual_por_edad_clikisalud", {}).items():
                 relevant_urls.extend(urls)
         else:
             # Agregar recursos generales de salud
-            relevant_urls.extend(URLS["health"]["cuidado_personal_y_profesional"])
+            relevant_urls.extend(URLS.get("health", {}).get("cuidado_personal_y_profesional", []))
             
             # Agregar URLs específicas del tema
-            if health_topic in URLS["health"]["prevencion_y_enfermedades"]:
+            if health_topic in URLS.get("health", {}).get("prevencion_y_enfermedades", {}):
                 relevant_urls.extend(URLS["health"]["prevencion_y_enfermedades"][health_topic])
             
             # Agregar cursos relacionados
-            relevant_urls.extend(URLS["health"]["cursos_cuidado_salud"][:3])
+            relevant_urls.extend(URLS.get("health", {}).get("cursos_cuidado_salud", [])[:3])
     
     # EDUCACIÓN
     elif education_topic:
         # Agregar plataforma principal
-        relevant_urls.extend(URLS["education_career"]["aprende_org_general"]["principal"])
-        relevant_urls.extend(URLS["education_career"]["aprende_org_general"]["areas_principales"])
+        relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("principal", []))
+        relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("areas_principales", []))
         
         # URLs específicas por país si aplica
-        if country and country in URLS["education_career"]["plataformas_nacionales"]:
+        if country and country in URLS.get("education_career", {}).get("plataformas_nacionales", {}):
             relevant_urls.extend(URLS["education_career"]["plataformas_nacionales"][country])
         
         # URLs específicas por tema
         if education_topic == "digital_tech":
-            relevant_urls.extend(URLS["education_career"]["rutas_y_oficios"]["digital_tech"])
+            relevant_urls.extend(URLS.get("education_career", {}).get("rutas_y_oficios", {}).get("digital_tech", []))
         elif education_topic == "finanzas":
-            relevant_urls.extend(URLS["education_career"]["rutas_y_oficios"]["administracion_finanzas"])
-            relevant_urls.extend(URLS["education_career"]["diplomados_especialidades"]["administracion_finanzas"][:5])
+            relevant_urls.extend(URLS.get("education_career", {}).get("rutas_y_oficios", {}).get("administracion_finanzas", []))
+            relevant_urls.extend(URLS.get("education_career", {}).get("diplomados_especialidades", {}).get("administracion_finanzas", [])[:5])
         elif education_topic == "emprendimiento":
-            relevant_urls.extend(URLS["education_career"]["diplomados_especialidades"]["autoempleo_negocio"])
+            relevant_urls.extend(URLS.get("education_career", {}).get("diplomados_especialidades", {}).get("autoempleo_negocio", []))
         elif education_topic == "basica":
-            relevant_urls.extend(URLS["education_career"]["educacion_detallada"]["basica_y_media"])
+            relevant_urls.extend(URLS.get("education_career", {}).get("educacion_detallada", {}).get("basica_y_media", []))
         elif education_topic == "superior":
-            relevant_urls.extend(URLS["education_career"]["educacion_detallada"]["superior"])
+            relevant_urls.extend(URLS.get("education_career", {}).get("educacion_detallada", {}).get("superior", []))
     
     # TELECOMUNICACIONES
     elif operator:
         if operator == "telcel":
-            relevant_urls.extend(URLS["telcel"])
+            relevant_urls.extend(URLS.get("telcel", []))
         elif operator == "claro" and country:
-            if country in URLS["claro"]:
+            if country in URLS.get("claro", {}):
                 relevant_urls.extend(URLS["claro"][country])
             else:
                 # Agregar todas las opciones de Claro si no hay país específico
-                for country_urls in URLS["claro"].values():
+                for country_urls in URLS.get("claro", {}).values():
                     relevant_urls.extend(country_urls)
         elif operator == "a1" and country:
-            if country in URLS["a1"]:
+            if country in URLS.get("a1", {}):
                 relevant_urls.extend(URLS["a1"][country])
             else:
                 # Agregar todas las opciones de A1
-                for country_urls in URLS["a1"].values():
+                for country_urls in URLS.get("a1", {}).values():
                     relevant_urls.extend(country_urls)
     
     return list(set(relevant_urls))  # Eliminar duplicados
 
 def get_context_for_query(prompt):
     """Genera contexto descriptivo y URLs relevantes para la consulta"""
+    # Manejo si URLS o SYSTEM_PROMPT no fue definido por el usuario (placeholder)
+    if not URLS:
+        # Intentar detectar intención básica aún si no hay URLs definidas
+        health_topic = detect_health_topic(prompt)
+        education_topic = detect_education_topic(prompt)
+        operator = detect_operator(prompt)
+        context = []
+        if health_topic:
+            context.append("📋 ÁREA: SALUD Y BIENESTAR")
+            if health_topic == "diabetes":
+                context.append("Tema: Diabetes - Prevención, cuidados y manejo de la enfermedad")
+            elif health_topic == "obesidad_nutricion":
+                context.append("Tema: Obesidad y Nutrición - Alimentación saludable y control de peso")
+            elif health_topic == "hipertension_corazon":
+                context.append("Tema: Hipertensión y Salud Cardiovascular")
+            elif health_topic == "cancer":
+                context.append("Tema: Prevención y detección del cáncer")
+            elif health_topic == "salud_mental":
+                context.append("Tema: Salud Mental - Manejo de estrés, ansiedad y depresión")
+            elif health_topic == "edad":
+                context.append("Tema: Manuales de salud organizados por grupos de edad")
+        elif education_topic:
+            context.append("📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL")
+            if education_topic == "digital_tech":
+                context.append("Tema: Tecnología y Programación - Cursos de desarrollo digital")
+            elif education_topic == "finanzas":
+                context.append("Tema: Finanzas Personales - Educación financiera y manejo de dinero")
+            elif education_topic == "emprendimiento":
+                context.append("Tema: Emprendimiento - Cómo iniciar y gestionar un negocio")
+            elif education_topic == "basica":
+                context.append("Tema: Educación Básica y Media - Recursos para estudiantes de primaria y secundaria")
+            elif education_topic == "superior":
+                context.append("Tema: Educación Superior - Cursos universitarios y profesionales")
+            elif education_topic == "capacitacion":
+                context.append("Tema: Capacitación y Desarrollo de Habilidades")
+        elif operator:
+            context.append("🌐 ÁREA: TELECOMUNICACIONES")
+            if operator == "telcel":
+                context.append("Operador: Telcel México - Servicios de telefonía móvil")
+            elif operator == "claro":
+                context.append("Operador: Claro")
+            elif operator == "a1":
+                context.append("Operador: A1 Group (Europa)")
+        else:
+            context.append("ℹ️ Asistente general disponible para Telecomunicaciones, Educación y Salud")
+        return "\n".join(context) if context else "Información general disponible"
+
     country = detect_country(prompt)
     operator = detect_operator(prompt)
     health_topic = detect_health_topic(prompt)
@@ -625,9 +843,35 @@ def chat():
                 "error": "Mensaje vacío"
             }), 400
         
-        # Obtener contexto y URLs relevantes
-        context = get_context_for_query(user_message)
-        relevant_urls = extract_relevant_urls(user_message)
+        # ================= Memoria local por cliente =================
+        # Tomamos hasta 3 mensajes anteriores del mismo cliente (si existen)
+        try:
+            user_key = _get_user_key()
+            mem = CHAT_MEMORY.get(user_key, [])
+            # prev_messages son los mensajes anteriores (hasta 3)
+            prev_messages = mem[-3:] if mem else []
+        except Exception:
+            # En caso de cualquier error con la memoria, no interrumpimos la ejecución
+            prev_messages = []
+            user_key = None
+        
+        # Actualizamos la memoria con el nuevo mensaje (guardamos máximo 3)
+        try:
+            if user_key is not None:
+                mem = CHAT_MEMORY.get(user_key, [])
+                mem.append(user_message)
+                # Mantener solo los últimos 3 mensajes
+                if len(mem) > 3:
+                    mem = mem[-3:]
+                CHAT_MEMORY[user_key] = mem
+        except Exception:
+            # si falla, no queremos que fallé el endpoint
+            pass
+        # ===========================================================
+        
+        # Obtener contexto y URLs relevantes (métodos seguros si URLS/SYSTEM_PROMPT dejaron como placeholders)
+        context = safe_get_context_for_query(user_message)
+        relevant_urls = safe_extract_relevant_urls(user_message)
         
         # Formatear URLs para el prompt
         urls_text = ""
@@ -637,12 +881,26 @@ def chat():
             urls_text = "Explora nuestras áreas: Telecomunicaciones, Educación (aprende.org) y Salud (clikisalud.net)"
         
         # Preparar mensajes para Groq
-        formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
+        # El SYSTEM_PROMPT fue pedido como placeholder por el usuario; el siguiente formateo lo mantendrá tal cual.
+        try:
+            formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
+        except Exception:
+            # Si SYSTEM_PROMPT es {}, usamos un prompt por defecto mínimo
+            formatted_prompt = f"Eres un asistente. Contexto:\n{context}\n\n{urls_text}"
         
+        # Construir la secuencia de mensajes incluyendo los hasta 3 mensajes previos del usuario
         messages = [
-            {"role": "system", "content": formatted_prompt},
-            {"role": "user", "content": user_message}
+            {"role": "system", "content": formatted_prompt}
         ]
+        
+        # Incluir mensajes previos como contexto adicional (si existen)
+        for pm in prev_messages:
+            # Evitar duplicar exactamente el mensaje actual
+            if pm and pm.strip() and pm.strip() != user_message.strip():
+                messages.append({"role": "user", "content": pm})
+        
+        # Finalmente agregar el mensaje actual
+        messages.append({"role": "user", "content": user_message})
         
         # Llamar a Groq
         if client and client != "api_fallback":
@@ -657,11 +915,13 @@ def chat():
             result = call_groq_api_directly(messages)
             response = result["choices"][0]["message"]["content"]
         
+        # Devolver también qué mensajes previos se usaron (útil para depuración; puede quitarse si se desea)
         return jsonify({
             "success": True,
             "response": response,
             "context": context,
-            "relevant_urls": relevant_urls[:5]  # Devolver las 5 URLs más relevantes
+            "relevant_urls": relevant_urls[:5],  # Devolver las 5 URLs más relevantes
+            "memory_used": prev_messages  # <-- aquí se muestran los mensajes previos que se incluyeron
         })
         
     except Exception as e:
@@ -684,8 +944,8 @@ def get_urls():
                 "error": "Query vacío"
             }), 400
         
-        relevant_urls = extract_relevant_urls(query)
-        context = get_context_for_query(query)
+        relevant_urls = safe_extract_relevant_urls(query)
+        context = safe_get_context_for_query(query)
         
         return jsonify({
             "success": True,
@@ -731,4 +991,5 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
