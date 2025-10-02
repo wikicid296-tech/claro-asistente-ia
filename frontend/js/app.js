@@ -261,7 +261,7 @@ function sendMessage(text) {
         })
         .catch(error => {
             console.error('Error:', error);
-            addMessage('bot', '❌ Lo siento, hubo un error al procesar tu mensaje. Por favor, intenta de nuevo.');
+            addMessage('bot', 'Lo sentimos, has alcanzado tu límite de tokens. 🚫 Te recomendamos actualizar a una cuenta Pro para seguir disfrutando sin interrupciones.');
         })
         .finally(() => {
             hideLoading();
@@ -329,6 +329,7 @@ function addMessage(type, content) {
 }
 
 // ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES CON MARKDOWN ====================
+// ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES CON MARKDOWN INCLUYENDO TABLAS ====================
 function formatMessage(content) {
     // PRIMERO: Eliminar comentarios HTML <!-- -->
     content = content.replace(/<!--[\s\S]*?-->/g, '');
@@ -347,10 +348,62 @@ function formatMessage(content) {
         return text.replace(/[&<>]/g, m => map[m]);
     };
     
-    // Dividir en líneas
+    // PROCESAR TABLAS EN MARKDOWN PRIMERO (antes de dividir en líneas)
+    content = content.replace(/(?:\|?.+\|.+\n(?:\|?[-:| ]+)+\n(?:\|?.+\|.+\n?)+)/g, (tableMatch) => {
+        const rows = tableMatch.trim().split('\n').filter(row => row.trim());
+        
+        // Verificar si es una tabla válida de markdown
+        if (rows.length < 2) return tableMatch;
+        
+        let tableHtml = '<div class="table-container"><table class="markdown-table">';
+        
+        rows.forEach((row, rowIndex) => {
+            // Limpiar la fila y dividir por pipes
+            const cleanRow = row.trim().replace(/^\||\|$/g, '');
+            const cells = cleanRow.split('|').map(cell => cell.trim());
+            
+            if (cells.length === 0) return;
+            
+            // Determinar si es la fila de encabezado o separador
+            const isHeaderRow = rowIndex === 0;
+            const isSeparatorRow = rowIndex === 1 && cells.every(cell => cell.replace(/[-:]/g, '').trim() === '');
+            
+            if (isSeparatorRow) {
+                return; // Saltar fila separadora de markdown
+            }
+            
+            tableHtml += '<tr>';
+            
+            cells.forEach((cell, cellIndex) => {
+                let cellContent = escapeHtml(cell);
+                
+                // Aplicar formato markdown dentro de las celdas
+                cellContent = cellContent
+                    .replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>')
+                    .replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>')
+                    .replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>')
+                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
+                
+                const tag = isHeaderRow ? 'th' : 'td';
+                tableHtml += `<${tag}>${cellContent}</${tag}>`;
+            });
+            
+            tableHtml += '</tr>';
+        });
+        
+        tableHtml += '</table></div>';
+        return tableHtml;
+    });
+    
+    // Dividir en líneas después de procesar tablas
     let lines = content.split('\n');
     
     let formatted = lines.map((line) => {
+        // Si la línea ya fue procesada como parte de una tabla, saltar
+        if (line.includes('</table>') || line.includes('<div class="table-container">')) {
+            return line;
+        }
+        
         // Saltar líneas que son solo separadores ---
         if (line.trim().match(/^-{3,}$/)) {
             return '<hr class="msg-divider" />';
@@ -396,22 +449,22 @@ function formatMessage(content) {
     // Unir todo
     let html = formatted.join('');
     
-    // APLICAR FORMATOS INLINE EN ORDEN ESPECÍFICO
+    // APLICAR FORMATOS INLINE EN ORDEN ESPECÍFICO (solo a texto que no sea tabla)
     
-    // 1. Primero procesar negritas: **texto**
-    html = html.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+    // 1. Primero procesar negritas: **texto** (solo fuera de tablas)
+    html = html.replace(/(?![^<]*<\/table>)\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
     
     // 2. Luego cursivas: *texto* (pero no si ya es parte de **)
-    html = html.replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
+    html = html.replace(/(?![^<]*<\/table>)(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
     
     // 3. Código inline: `código`
-    html = html.replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>');
+    html = html.replace(/(?![^<]*<\/table>)`([^`]+)`/g, '<code class="msg-code">$1</code>');
     
     // 4. Links markdown: [texto](url) - PRIMERO
-    html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
+    html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
     
     // 5. URLs simples - pero NO si ya están dentro de <a> o tienen comillas de atributos cerca
-    html = html.replace(/(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function(match) {
+    html = html.replace(/(?![^<]*<\/table>)(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function(match) {
         return `<a href="${match}" target="_blank" rel="noopener" class="msg-link">${match}</a>`;
     });
     
@@ -602,5 +655,3 @@ window.addEventListener('resize', function() {
 console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cReady to chat!', 'color: #28a745;');
-
-
