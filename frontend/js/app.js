@@ -1,5 +1,5 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-const API_URL = 'https://claro-asistente-ia.onrender.com'; // Cambiar a tu URL de producción si es necesario
+const API_URL = 'https://claro-asistente-ia.onrender.com'; // Tu URL de Render
 
 // Estado global de la aplicación
 const appState = {
@@ -325,15 +325,50 @@ function addMessage(type, content) {
     });
 }
 
+// ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES ====================
 function formatMessage(content) {
-    // Convertir saltos de línea a <br>
+    // 1. Escapar HTML para prevenir inyección
+    content = content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // 2. Convertir markdown básico
+    // Negritas: **texto** o __texto__
+    content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    content = content.replace(/__(.*?)__/g, '<strong>$1</strong>');
+    
+    // Cursivas: *texto* o _texto_
+    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    content = content.replace(/_(.*?)_/g, '<em>$1</em>');
+    
+    // 3. Formatear listas numeradas
+    content = content.replace(/(\d+\.\s+[^\n]+)/g, '<br>$1');
+    
+    // 4. Formatear listas con viñetas
+    content = content.replace(/([•\-\*]\s+[^\n]+)/g, '<br>$1');
+    
+    // 5. Detectar y formatear párrafos (dos saltos de línea)
+    content = content.replace(/\n\n/g, '<br><br>');
+    
+    // 6. Detectar frases que empiezan con mayúscula después de punto
+    // Esto ayuda a separar oraciones largas
+    content = content.replace(/\.\s+([A-ZÁÉÍÓÚÑ])/g, '.<br><br>$1');
+    
+    // 7. Saltos de línea simples
     content = content.replace(/\n/g, '<br>');
     
-    // Formatear emojis con colores
+    // 8. Formatear títulos (# Título)
+    content = content.replace(/^#\s+(.+)$/gm, '<strong style="font-size: 1.1em;">$1</strong><br>');
+    content = content.replace(/^##\s+(.+)$/gm, '<strong>$1</strong><br>');
+    
+    // 9. Formatear emojis con colores
     content = content.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
     content = content.replace(/📝/g, '<span style="color: #17a2b8;">📝</span>');
     content = content.replace(/📅/g, '<span style="color: #ffc107;">📅</span>');
     content = content.replace(/❌/g, '<span style="color: #dc3545;">❌</span>');
+    content = content.replace(/⚠️/g, '<span style="color: #ff9800;">⚠️</span>');
+    content = content.replace(/ℹ️/g, '<span style="color: #2196F3;">ℹ️</span>');
+    
+    // 10. Añadir espaciado después de puntos seguidos
+    content = content.replace(/\.\s+/g, '. &nbsp;');
     
     return content;
 }
@@ -488,8 +523,9 @@ window.addEventListener('resize', function() {
 });
 
 // ==================== CONSOLE INFO ====================
-console.log('%c🚀 Claro·GenAI Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
+console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cReady to chat!', 'color: #28a745;');
+
 
 
