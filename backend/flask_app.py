@@ -993,10 +993,12 @@ def chat():
                 temperature=0.7,
                 max_tokens=2048
             )
-            response = completion.choices[0].message.content
+            response = completion.choices[0].message.content 
+            print(response)
         else:
             result = call_groq_api_directly(messages)
             response = result["choices"][0]["message"]["content"]
+            print(response)
         
         # Devolver también qué mensajes previos se usaron (útil para depuración; puede quitarse si se desea)
         return jsonify({
@@ -1074,6 +1076,7 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
 
 
