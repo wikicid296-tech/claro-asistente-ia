@@ -74,20 +74,79 @@ def safe_get_context_for_query(prompt):
 # NOTE: El usuario pidió que se deje como placeholder para que ellos lo coloquen después.
 RLS = {
     "claro": {
-        "argentina": [
-            "https://www.claro.com.ar/personas",
-            "https://www.claro.com.ar/negocios",
-            "https://www.claro.com.ar/empresas"
-        ],
-        "peru": [
-            "https://www.claro.com.pe/personas/",
-            "https://www.claro.com.pe/empresas/"
-        ],
-        "chile": [
-            "https://www.clarochile.cl/personas/",
-            "https://www.clarochile.cl/negocios/",
-            "https://www.clarochile.cl/empresas/"
-        ],
+            "Argentina": [
+        "https://www.claro.com.ar/personas",
+        "https://www.claro.com.ar/negocios",
+        "https://www.claro.com.ar/empresas"
+    ],
+    "Brasil": [
+        "https://www.claro.com.br/",
+        "https://www.claro.com.br/empresas",
+        "https://www.claro.com.br/empresas/grandes-empresas-e-governo"
+    ],
+    "Chile": [
+        "https://www.clarochile.cl/personas/",
+        "https://www.clarochile.cl/negocios/",
+        "https://www.clarochile.cl/empresas/"
+    ],
+    "Colombia": [
+        "https://www.claro.com.co/personas/",
+        "https://www.claro.com.co/negocios/",
+        "https://www.claro.com.co/empresas/",
+        "https://www.claro.com.co/institucional/"
+    ],
+    "Costa Rica": [
+        "https://www.claro.cr/personas/",
+        "https://www.claro.cr/empresas/",
+        "https://www.claro.cr/institucional/"
+    ],
+    "Ecuador": [
+        "https://www.claro.com.ec/personas/",
+        "https://www.claro.com.ec/negocios/",
+        "https://www.claro.com.ec/empresas/"
+    ],
+    "El Salvador": [
+        "https://www.claro.com.sv/personas/",
+        "https://www.claro.com.sv/empresas/",
+        "https://www.claro.com.sv/institucional/"
+    ],
+    "Guatemala": [
+        "https://www.claro.com.gt/personas/",
+        "https://www.claro.com.gt/empresas/",
+        "https://www.claro.com.gt/institucional/"
+    ],
+    "Honduras": [
+        "https://www.claro.com.hn/personas/",
+        "https://www.claro.com.hn/empresas/",
+        "https://www.claro.com.hn/institucional/"
+    ],
+    "Nicaragua": [
+        "https://www.claro.com.ni/personas/",
+        "https://www.claro.com.ni/empresas/",
+        "https://www.claro.com.ni/institucional/"
+    ],
+    "Panamá": [],
+    "Paraguay": [
+        "https://www.claro.com.py/personas",
+        "https://www.claro.com.py/empresas"
+    ],
+    "Perú": [
+        "https://www.claro.com.pe/personas/",
+        "https://www.claro.com.pe/empresas/"
+    ],
+    "Puerto Rico": [
+        "https://www.claropr.com/personas/",
+        "https://www.claropr.com/empresas/"
+    ],
+    "República Dominicana": [
+        "https://www.claro.com.do/personas/",
+        "https://www.claro.com.do/negocios/",
+        "https://www.claro.com.do/empresas/"
+    ],
+    "Uruguay": [
+        "https://www.claro.com.uy/personas",
+        "https://www.claro.com.uy/empresas"
+    ],
     },
     "telcel": [
             "https://www.telcel.com/",
@@ -380,7 +439,7 @@ RLS = {
 # ==================== SYSTEM PROMPT MEJORADO ====================
 # NOTE: El usuario pidió que se deje como placeholder para que ellos lo coloquen después.
 SYSTEM_PROMPT = """Eres un asistente virtual multifuncional con capacidades especializadas en cuatro roles principales.
-
+IMPORTANTE: DETECTA LA PETICION PRINCIPAL DEL USUARIO QUE CORRESPONDE A LA PARTE ULTIMA DEL CONTEXTO EN CASO DE SER AMBIGUA TOMA COMO REFERENCIA LOS MENSAJES ANTERIORES DEL USUARIO PERO SOLO RESPONDE A LA PETICION MAS ACTUAL DEL USUARIO
 IMPORTANTE: TODA RESPUESTA DEBE SER DEVUELTA EN MARKDOWN A EXCEPCIÓN DE LOS ROLES QUE INDIQUEN OTRO FORMATO DE RESPUESTA DE ACUERDO A LA SIGUIENTE GUÍA:
 
 FORMATO MARKDOWN REQUERIDO: 
@@ -421,7 +480,7 @@ ROL 1: ASESOR ESPECIALIZADO (Respuesta conversacional)
 ═══════════════════════════════════════════════════════════════════
 
 TELECOMUNICACIONES:
-- Claro (Argentina, Perú, Chile): Planes móviles, internet, TV y servicios empresariales
+- Claro (Argentina, Perú, Chile, Brazil, Colombia, Costa rica, Ecuador, El Salvador, Guatemala, Honduras, Nicaragua, Panama, Paraguay, Puerto Rico, Republica Dominicana, Uruguay, EUA): Planes móviles, internet, TV y servicios empresariales
 - Telcel (México): Servicios de telefonía móvil
 - A1 Group (Europa): Operadora en Austria, Bulgaria, Croacia, Serbia, Eslovenia, Macedonia del Norte y Bielorrusia
 
@@ -1015,6 +1074,7 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
 
 
