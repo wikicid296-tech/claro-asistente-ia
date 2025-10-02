@@ -14,6 +14,30 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Configuración
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+PORT = int(os.getenv("PORT", 10000))
+
+try:
+    if GROQ_API_KEY:
+        from groq import Groq
+        client = Groq(api_key=GROQ_API_KEY)
+        logger.info("✅ Cliente Groq inicializado correctamente")
+    else:
+        logger.error("❌ GROQ_API_KEY no configurada en variables de entorno")
+        client = None
+except TypeError as e:
+    if "proxies" in str(e):
+        logger.warning("⚠️ Versión incompatible de Groq, usando fallback directo a API")
+        client = "api_fallback"
+    else:
+        logger.error(f"❌ Error inicializando Groq: {str(e)}")
+        client = None
+except Exception as e:
+    logger.error(f"❌ Error inicializando Groq: {str(e)}")
+    client = None
+
+
 # ! MOD 1 #########
 # Añadido: memoria en memoria (in-memory) por cliente para simular "memoria" de chat.
 # Nota: es una solución simple que no persiste entre reinicios y no requiere cambios en el frontend.
@@ -991,5 +1015,6 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
 
