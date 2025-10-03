@@ -989,7 +989,7 @@ def chat():
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                temperature=0.7,
+                temperature=0.5,
                 max_tokens=2048
             )
             response = completion.choices[0].message.content 
@@ -1099,3 +1099,4 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
