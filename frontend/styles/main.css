@@ -112,7 +112,7 @@ nav.sidebar.active {
 .sidebar-logo {
     width: 40px;
     height: 40px;
-    background: var(--rojo);
+    
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -331,7 +331,7 @@ main.content {
 .hero-icon {
     width: 60px;
     height: 60px;
-    background: var(--rojo);
+   
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -391,11 +391,11 @@ main.content {
 }
 
 .card-icon.red {
-    background: var(--rojo);
+   
 }
 
 .card-icon.cyan {
-    background: var(--azul);
+    
 }
 
 .card-title {
@@ -943,4 +943,62 @@ main.content {
     .markdown-table td {
         padding: 8px 10px;
     }
+}
+
+
+/* ==================== MEJORAS PARA TAREAS EN SIDEBAR ==================== */
+.empty-task-message {
+    color: #999;
+    font-style: italic;
+    text-align: center;
+    padding: 10px;
+    font-size: 13px;
+}
+
+/* Mejorar visibilidad de las tareas */
+.tasks-container.active {
+    display: block;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+/* ESTILOS AGREADOS ++++++++++++++++++++++++++++++++++++++++++++++ */
+
+
+
+
+/* Badge para contador de tareas */
+.nav-item .task-badge {
+    background: var(--rojo);
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 11px;
+    margin-left: auto;
+}
+
+/* Mejorar hover en items de tareas */
+.task-item:hover {
+    background: rgba(0, 188, 212, 0.05);
+    transform: translateX(2px);
+    transition: all 0.2s ease;
 }
