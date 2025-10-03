@@ -1055,6 +1055,30 @@ def serve_frontend():
     except Exception as e:
         return f"Error cargando frontend: {str(e)}", 500
 
+@app.route('/images/<path:filename>')
+def serve_images(filename):
+    """Servir imágenes"""
+    try:
+        with open(f'../frontend/images/{filename}', 'rb') as f:
+            content = f.read()
+            # Detectar tipo de imagen por extensión
+            content_type = 'image/png'
+            if filename.endswith('.jpg') or filename.endswith('.jpeg'):
+                content_type = 'image/jpeg'
+            elif filename.endswith('.svg'):
+                content_type = 'image/svg+xml'
+            elif filename.endswith('.ico'):
+                content_type = 'image/x-icon'
+            elif filename.endswith('.gif'):
+                content_type = 'image/gif'
+            elif filename.endswith('.webp'):
+                content_type = 'image/webp'
+            
+            return content, 200, {'Content-Type': content_type}
+    except Exception as e:
+        logger.error(f"Error sirviendo imagen {filename}: {str(e)}")
+        return f"Imagen no encontrada: {filename}", 404
+
 @app.route('/<path:path>')
 def serve_static(path):
     """Servir archivos estáticos"""
@@ -1075,11 +1099,3 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
-
-
-
-
-
-
-
-
