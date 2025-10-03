@@ -1,8 +1,6 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
 const API_URL = 'https://claro-asistente-ia.onrender.com'; // Tu URL de Render
 
-
-
 // Configuración de tokens
 const TOKEN_CONFIG = {
     MAX_TOKENS: 1000,
@@ -513,51 +511,56 @@ function formatMessage(content) {
 
 // ==================== TASK MANAGEMENT ====================
 function isTaskMessage(userMsg, botMsg) {
-    const lowerUserMsg = userMsg.toLowerCase();
+    const lowerUserMsg = userMsg.toLowerCase().trim();
     const lowerBotMsg = botMsg.toLowerCase();
     
-    // PRIMERO: Excluir consultas generales que NO son tareas
-    if (lowerUserMsg.includes('dime') || 
-        lowerUserMsg.includes('cuales') || 
-        lowerUserMsg.includes('cuáles') ||
-        lowerUserMsg.includes('qué') ||
-        lowerUserMsg.includes('que son') ||
-        lowerUserMsg.includes('dame') ||
-        lowerUserMsg.includes('muestra') ||
-        lowerUserMsg.includes('cual es') ||
-        lowerUserMsg.includes('cuál es')) {
-        // Solo es tarea si el BOT responde con los emojis específicos
-        if (botMsg.includes('✅') || botMsg.includes('📝') || botMsg.includes('📅')) {
-            // Continuar con la detección normal
-        } else {
-            return false; // NO es una tarea
+    // ============ PASO 1: EXCLUIR MENSAJES CORTOS Y PALABRAS SUELTAS ============
+    // Si es muy corto (menos de 15 caracteres) o una sola palabra, NO es tarea
+    if (lowerUserMsg.length < 15 || !lowerUserMsg.includes(' ')) {
+        return false;
+    }
+    
+    // ============ PASO 2: EXCLUIR PREGUNTAS ============
+    const questionWords = ['qué', 'que', 'cómo', 'como', 'cuál', 'cual', 'cuáles', 
+                          'cuales', 'dónde', 'donde', 'cuándo', 'cuando', 'por qué', 
+                          'porque', 'quién', 'quien'];
+    
+    if (questionWords.some(q => lowerUserMsg.includes(q)) && !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
+        return false;
+    }
+    
+    // ============ PASO 3: EXCLUIR PALABRAS DE CONSULTA ============
+    const consultaWords = ['dime', 'dimelo', 'dame', 'muestra', 'explica', 'explicame',
+                           'ayuda', 'ayudame', 'busca', 'encuentra', 'hablame', 'háblame'];
+    
+    if (consultaWords.some(w => lowerUserMsg.startsWith(w)) && !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
+        return false;
+    }
+    
+    // ============ PASO 4: SOLO ES TAREA SI TIENE VERBOS EXPLÍCITOS ============
+    const taskVerbs = {
+        reminders: ['recuerdame', 'recuérdame', 'recordarme', 'avisame', 'avísame'],
+        notes: ['anota', 'apunta', 'guarda esto', 'guardar esto'],
+        calendar: ['agendar', 'agenda', 'programar']
+    };
+    
+    let hasTaskVerb = false;
+    for (const category in taskVerbs) {
+        if (taskVerbs[category].some(verb => lowerUserMsg.includes(verb))) {
+            hasTaskVerb = true;
+            break;
         }
     }
     
-    // Ahora sí, detectar si es tarea
-    return botMsg.includes('✅') || 
-           botMsg.includes('📝') || 
-           botMsg.includes('📅') ||
-           lowerUserMsg.includes('recordar') ||
-           lowerUserMsg.includes('recuerdame') ||
-           lowerUserMsg.includes('recuérdame') ||
-           lowerUserMsg.includes('avisame') ||
-           lowerUserMsg.includes('avísame') ||
-           lowerUserMsg.includes('nota') ||
-           lowerUserMsg.includes('anota') ||
-           lowerUserMsg.includes('apunta') ||
-           lowerUserMsg.includes('guardar') ||
-           lowerUserMsg.includes('agendar') ||
-           lowerUserMsg.includes('agenda') ||
-           lowerUserMsg.includes('reunion') ||
-           lowerUserMsg.includes('reunión') ||
-           lowerUserMsg.includes('cita') ||
-           lowerUserMsg.includes('evento') ||
-           lowerUserMsg.includes('programar') ||
-           lowerBotMsg.includes('recordatorio') ||
-           lowerBotMsg.includes('nota') ||
-           lowerBotMsg.includes('agendado') ||
-           lowerBotMsg.includes('evento');
+    // ============ PASO 5: O SI EL BOT CONFIRMA CON EMOJIS ============
+    const hasBotEmoji = botMsg.includes('✅') || botMsg.includes('📝') || botMsg.includes('📅');
+    const botConfirms = lowerBotMsg.includes('he creado') || 
+                       lowerBotMsg.includes('he guardado') || 
+                       lowerBotMsg.includes('he agendado');
+    
+    // ============ DECISIÓN FINAL ============
+    // Solo es tarea si tiene verbo de acción O (emoji + confirmación del bot)
+    return hasTaskVerb || (hasBotEmoji && botConfirms);
 }
 
 function processTask(userMessage, botResponse) {
