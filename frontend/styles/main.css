@@ -1002,3 +1002,46 @@ main.content {
     transform: translateX(2px);
     transition: all 0.2s ease;
 }
+
+.nav-item {
+  text-decoration: none; /* quita el subrayado */
+  color: inherit;        /* mantiene el color del texto */
+  display: flex;         /* opcional, para alinear icono + texto */
+  align-items: center;   /* centra verticalmente el svg con el texto */
+  gap: 6px;              /* espacio entre el icono y el texto */
+}
+
+
+/* ==================== CONTADOR DE TOKENS ==================== */
+.token-counter {
+    font-size: 11px;
+    color: #999;
+    text-align: right;
+    margin-top: 4px;
+    margin-bottom: 8px;
+    padding-right: 8px;
+    transition: color 0.3s ease;
+    user-select: none;
+}
+
+.token-counter #currentTokens {
+    font-weight: 600;
+}
+
+.token-counter #maxTokens {
+    opacity: 0.7;
+}
+
+/* Ajustes al botón deshabilitado */
+.send-btn-icon:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .token-counter {
+        font-size: 10px;
+    }
+}
