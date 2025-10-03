@@ -254,20 +254,35 @@ function sendMessage(text) {
         .then(response => {
             addMessage('bot', response);
             
-            // Procesar si es una tarea
-            if (isTaskMessage(response)) {
+            // Procesar si es una tarea - PASA AMBOS MENSAJES
+            if (isTaskMessage(text, response)) {
                 processTask(text, response);
             }
         })
         .catch(error => {
-            console.error('Error:', error);
-            addMessage('bot', 'Lo sentimos, has alcanzado tu límite de tokens. 🚫 Te recomendamos actualizar a una cuenta Pro para seguir disfrutando sin interrupciones.');
+            console.error('Error completo:', error);
+            
+            // Mensaje de error genérico por defecto
+            let errorMessage = 'Lo siento, ocurrió un error al procesar tu solicitud. Por favor, intenta nuevamente.';
+            
+            // Solo mostrar mensaje de tokens si hay evidencia clara
+            if (error.status === 429 || 
+                (error.message && (error.message.toLowerCase().includes('token') || 
+                                  error.message.toLowerCase().includes('limit') ||
+                                  error.message.toLowerCase().includes('rate')))) {
+                errorMessage = 'Lo sentimos, has alcanzado tu límite de tokens. 🚫 Te recomendamos actualizar a una cuenta Pro para seguir disfrutando sin interrupciones.';
+            } else if (!navigator.onLine) {
+                errorMessage = 'No hay conexión a internet. Por favor, verifica tu conexión e intenta nuevamente.';
+            }
+            
+            addMessage('bot', errorMessage);
         })
         .finally(() => {
             hideLoading();
             saveToLocalStorage();
         });
 }
+
 
 // ==================== API CALLS ====================
 async function callAPI(message) {
@@ -479,20 +494,58 @@ function formatMessage(content) {
     return html;
 }
 
+
+
+
+
+
+
+//MEJORA+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+
+
+
+
+
 // ==================== TASK MANAGEMENT ====================
-function isTaskMessage(message) {
-    return message.includes('✅') || 
-           message.includes('📝') || 
-           message.includes('📅') ||
-           message.toLowerCase().includes('recordatorio') ||
-           message.toLowerCase().includes('nota') ||
-           message.toLowerCase().includes('evento');
+function isTaskMessage(userMsg, botMsg) {
+    const lowerUserMsg = userMsg.toLowerCase();
+    const lowerBotMsg = botMsg.toLowerCase();
+    
+    return botMsg.includes('✅') || 
+           botMsg.includes('📝') || 
+           botMsg.includes('📅') ||
+           lowerUserMsg.includes('recordar') ||
+           lowerUserMsg.includes('recuerdame') ||
+           lowerUserMsg.includes('recuérdame') ||
+           lowerUserMsg.includes('avisame') ||
+           lowerUserMsg.includes('avísame') ||
+           lowerUserMsg.includes('nota') ||
+           lowerUserMsg.includes('anota') ||
+           lowerUserMsg.includes('apunta') ||
+           lowerUserMsg.includes('guardar') ||
+           lowerUserMsg.includes('agendar') ||
+           lowerUserMsg.includes('agenda') ||
+           lowerUserMsg.includes('reunion') ||
+           lowerUserMsg.includes('reunión') ||
+           lowerUserMsg.includes('cita') ||
+           lowerUserMsg.includes('evento') ||
+           lowerUserMsg.includes('programar') ||
+           lowerBotMsg.includes('recordatorio') ||
+           lowerBotMsg.includes('nota') ||
+           lowerBotMsg.includes('agendado') ||
+           lowerBotMsg.includes('evento');
 }
 
 function processTask(userMessage, botResponse) {
     const timestamp = new Date().toLocaleString('es-MX', {
         day: '2-digit',
-        month: '2-digit',
+        month: '2-digit', 
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
@@ -502,49 +555,192 @@ function processTask(userMessage, botResponse) {
         content: userMessage,
         response: botResponse,
         created_at: timestamp,
-        completed: false
+        completed: false,
+        id: Date.now() + Math.random().toString(36).substr(2, 9)
     };
     
-    // Determinar tipo de tarea
-    if (botResponse.includes('✅') || userMessage.toLowerCase().includes('recordatorio')) {
-        appState.tasks.reminders.push(task);
-    } else if (botResponse.includes('📝') || userMessage.toLowerCase().includes('nota')) {
-        appState.tasks.notes.push(task);
-    } else if (botResponse.includes('📅') || userMessage.toLowerCase().includes('evento')) {
-        appState.tasks.calendar.push(task);
+    // DETECCIÓN CON PRIORIDAD CORREGIDA
+    let taskType = null;
+    
+    const lowerUserMsg = userMessage.toLowerCase();
+    const lowerBotMsg = botResponse.toLowerCase();
+    
+    console.log('🔍 Detectando tipo de tarea...');
+    console.log('Usuario:', userMessage);
+    console.log('Bot:', botResponse);
+    
+    // PRIORIDAD 1: RECORDATORIOS (verificar PRIMERO)
+    // Si dice "recordar", "recuérdame", "avísame" ES un recordatorio
+    if (lowerUserMsg.includes('recordar') || 
+        lowerUserMsg.includes('recuerdame') || 
+        lowerUserMsg.includes('recuérdame') ||
+        lowerUserMsg.includes('avisame') ||
+        lowerUserMsg.includes('avísame') ||
+        lowerUserMsg.includes('recordatorio') ||
+        (botResponse.includes('✅') && !lowerUserMsg.includes('agendar')) ||
+        (lowerBotMsg.includes('recordatorio') && !lowerBotMsg.includes('agendado'))) {
+        taskType = 'reminders';
+    } 
+    // PRIORIDAD 2: AGENDA/CALENDARIO
+    // Solo si dice explícitamente "agendar", "agenda", "programar"
+    else if (lowerUserMsg.includes('agendar') || 
+             lowerUserMsg.includes('agenda ') || // espacio después para evitar "agendame"
+             lowerUserMsg.includes('programar') ||
+             lowerUserMsg.includes('agendar') ||
+             (lowerUserMsg.includes('cita') && !lowerUserMsg.includes('recordar')) ||
+             botResponse.includes('📅') ||
+             lowerBotMsg.includes('agendado') ||
+             lowerBotMsg.includes('he agendado')) {
+        taskType = 'calendar';
+    } 
+    // PRIORIDAD 3: NOTAS
+    else if (lowerUserMsg.includes('nota') || 
+             lowerUserMsg.includes('anota') || 
+             lowerUserMsg.includes('apunta') ||
+             lowerUserMsg.includes('guardar') ||
+             lowerUserMsg.includes('guarda') ||
+             botResponse.includes('📝') ||
+             lowerBotMsg.includes('nota guardada') ||
+             lowerBotMsg.includes('he guardado')) {
+        taskType = 'notes';
     }
     
+    // Si no se detectó nada específico, usar reminders por defecto
+    if (!taskType) {
+        taskType = 'reminders';
+    }
+    
+    console.log('✅ Tipo detectado:', taskType);
+    
+    // Agregar a la lista correspondiente
+    if (!appState.tasks[taskType]) {
+        appState.tasks[taskType] = [];
+    }
+    
+    appState.tasks[taskType].push(task);
+    
+    // ACTUALIZAR UI
     updateTasksUI();
+    
+    // Asegurar que el tasks container esté visible
+    if (elements.tasksContainer) {
+        elements.tasksContainer.classList.add('active');
+    }
+    
+    // Expandir automáticamente la sección correspondiente
+    expandTaskSection(taskType);
+    
     saveToLocalStorage();
+    
+    console.log('💾 Tarea guardada en:', taskType);
+    console.log('📊 Estado actual:', appState.tasks);
+}
+
+// Nueva función para expandir automáticamente la sección de tareas
+function expandTaskSection(taskType) {
+    // Cerrar todas las secciones primero
+    document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));
+    document.querySelectorAll('.task-header').forEach(header => header.classList.remove('collapsed'));
+    
+    // Abrir la sección correspondiente
+    const targetHeader = document.querySelector(`.task-header[data-task-type="${taskType}"]`);
+    if (targetHeader) {
+        const targetBody = targetHeader.nextElementSibling;
+        targetBody.classList.add('open');
+        targetHeader.classList.add('collapsed');
+    }
 }
 
 function updateTasksUI() {
+    console.log('🔄 Actualizando UI de tareas:', appState.tasks);
+    
     updateTaskList(elements.remindersList, appState.tasks.reminders, 'reminders', 'No hay recordatorios pendientes');
     updateTaskList(elements.notesList, appState.tasks.notes, 'notes', 'No hay notas');
     updateTaskList(elements.calendarList, appState.tasks.calendar, 'calendar', 'No hay eventos programados');
+    
+    // Actualizar badges - CON VALIDACIÓN
+    updateTaskBadges();
+}
+
+// Nueva función para mostrar badges/contadores en el sidebar - CON VALIDACIÓN
+function updateTaskBadges() {
+    const totalTasks = (appState.tasks.reminders?.length || 0) + 
+                      (appState.tasks.notes?.length || 0) + 
+                      (appState.tasks.calendar?.length || 0);
+    
+    // Actualizar el texto del botón de Gestión de tareas - CON VALIDACIÓN
+    const tasksNavBtn = document.getElementById('tasksNavBtn');
+    if (tasksNavBtn) {
+        const textSpan = tasksNavBtn.querySelector('span');
+        if (textSpan) {
+            let badgeText = 'Gestión de tareas';
+            if (totalTasks > 0) {
+                badgeText += ` (${totalTasks})`;
+            }
+            textSpan.textContent = badgeText;
+        }
+    }
 }
 
 function updateTaskList(container, tasks, taskType, emptyMessage) {
-    if (!container) return;
-    
-    if (tasks.length === 0) {
-        container.innerHTML = emptyMessage;
+    if (!container) {
+        console.error('❌ Contenedor no encontrado para:', taskType);
         return;
     }
     
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = `<div class="empty-task-message">${emptyMessage}</div>`;
+        return;
+    }
+    
+    console.log(`📝 Renderizando ${tasks.length} tareas de tipo:`, taskType);
+    
     let html = '';
     tasks.forEach((task, idx) => {
+        const displayContent = task.content.length > 80 
+            ? task.content.substring(0, 80) + '...' 
+            : task.content;
+            
         html += `
-            <div class="task-item">
-                <div class="task-content">${task.content}</div>
-                <div class="task-time">${task.created_at}</div>
-                <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})">×</button>
+            <div class="task-item" data-task-id="${task.id}">
+                <div class="task-content">${escapeHtml(displayContent)}</div>
+                <div class="task-time">Creado: ${task.created_at}</div>
+                <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})" title="Eliminar">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
         `;
     });
     
     container.innerHTML = html;
 }
+
+
+
+// Función helper para escapar HTML (seguridad)
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+
+
+
+
+//MEJORA++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+
+
+
+
+
+
 
 function deleteTask(taskType, index) {
     // Eliminar directamente sin confirmación
@@ -593,6 +789,20 @@ function saveToLocalStorage() {
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+//mejora++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
 function loadFromLocalStorage() {
     try {
         // Generar o recuperar ID de sesión única
@@ -633,7 +843,10 @@ function loadFromLocalStorage() {
                     console.log('Conversacion restaurada');
                 }
                 
+                // ACTUALIZAR UI DE TAREAS AL CARGAR - ESTA ES LA LÍNEA CLAVE
                 updateTasksUI();
+                console.log('Tareas cargadas:', appState.tasks);
+                
             } else {
                 console.log('Nueva pestana - chat limpio');
             }
@@ -642,6 +855,22 @@ function loadFromLocalStorage() {
         console.error('Error cargando desde localStorage:', e);
     }
 }
+
+
+
+
+
+
+//mejora++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+
+
+
 
 // ==================== RESPONSIVE HANDLERS ====================
 window.addEventListener('resize', function() {
