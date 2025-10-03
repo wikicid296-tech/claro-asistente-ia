@@ -23,7 +23,7 @@ TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
-Inicializar cliente Twilio
+#Inicializar cliente Twilio
 try:
     if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
         twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -1242,4 +1242,5 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
