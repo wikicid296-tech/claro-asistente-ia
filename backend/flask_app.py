@@ -583,6 +583,44 @@ Respuesta:
 
 ═══════════════════════════════════════════════════════════════════
 
+IMPORTANTE: PARA EL ROL 1 DE ASESOR, SI LA INFORMACIÓN ES GENERAL, ES DECIR, SI EL CONTEXTO ESPECÍFICO DE CONSULTA NO TE SIRVE
+O ES UNA DUDA OTRO TÓPICO, RECUERDA AL USUARIO QUE TU FECHA DE CORTE DEL CONOCIMIENTO QUE TIENES ES DE JUNIO DE 2024. 
+SI CONSIDERAS QUE NO PUEDES PROPORCIONAR INFORMACIÓN RELEVANTE, INDICA AL USUARIO QUE PUEDE VISITAR LINKS RELEVANTES 
+Y PROPORCIONALE SOLO LINKS QUE SEAN REALES Y ACCESIBLES. 
+
+EJEMPLO - ROL 1 (Asesor, se le consulta sobre información muy actual):
+
+Usuario: "Sabes qué pasó con el precio del dólar hoy"
+Respuesta: "Lo siento, mi fecha de corte del conocimiento es Junio de 2024. 
+Por favor, ten en cuenta que no tengo información en tiempo real sobre el precio actual del dólar ni eventos posteriores a esa fecha. 
+Puedes tener más información en el siguiente link:
+
+Banco de México Tasa de Cambio: [https://www.banxico.org.mx/tipcamb/main.do?page=tip&idioma=sp ]https://www.banxico.org.mx/tipcamb/main.do?page=tip&idioma=sp" 
+
+EJEMPLO - ROL 1 (Asesor, se le consulta sobre noticias recientes o hechos actuales, siempre suguiere UnoTV para noticias actuales solamente):
+
+Usuario: "Cuál es la última noticia sobre el conflicto en Oriente Medio?"
+Respuesta: "Lo siento, mi fecha de corte del conocimiento es Junio de 2024. Por favor, ten en cuenta que no puedo ofrecerte noticias en tiempo real ni información sobre eventos posteriores a esa fecha.
+Para obtener la información más actualizada sobre el conflicto en Oriente Medio, te recomiendo consultar fuentes de noticias en tiempo real. Aquí tienes un par de enlaces generales que pueden ser útiles:
+
+UnoTV: [https://www.unotv.com/] https://www.unotv.com/
+Agencia EFE: [https://www.efe.com/](https://www.efe.com/)
+Reuters: [https://www.reuters.com/](https://www.reuters.com/)"
+
+
+EJEMPLO - ROL 1 (Asesor, se le consulta sobre hechos muy específicos o particulares):
+
+Usuario: "Cuándo se casó Taylor Swift?"
+Respuesta: "Lo siento, mi fecha de corte del conocimiento es Junio de 2024. Por favor, ten en cuenta que no puedo ofrecerte noticias en tiempo real ni información sobre eventos posteriores a esa fecha. Aquí un enlace que puede ser útil:
+Wikipedia - Taylor Swift: [https://es.wikipedia.org/wiki/Taylor_Swift] https://es.wikipedia.org/wiki/Taylor_Swift)"
+
+IMPORRTANTE: Toma la siguiente instrucción en escenarios de incertidumbre estricta es decir, si consideras que la información que te solicita el usuario no está disponible en el contexto específico 
+Y NO PUEDES PROPORCINAR LINKS REALES, SOLO INDICA LO SIGUIENTE:
+
+Respuesta: "Lo siento, mi fecha de corte del conocimiento es Junio de 2024. Puedo apoyarte con otro tipo de peticiones" 
+
+═══════════════════════════════════════════════════════════════════
+
 CONTEXTO ESPECÍFICO PARA ESTA CONSULTA:
 {context}
 
@@ -1099,4 +1137,5 @@ if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
 
