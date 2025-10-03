@@ -99,13 +99,16 @@
 
      
 
-            <div class="nav-item" data-section="learn">
+
+           <a class="nav-item" data-section="learn" href="https://aprende.org/" target="_blank" rel="noopener noreferrer">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
                 </svg>
                 Aprende.org
-            </div>
+            </a>
+
+
 
             <div class="nav-item" data-section="discover">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -114,10 +117,11 @@
                 </svg>
                 Descubre
             </div>
-
             <div class="section-title">Conversaciones</div>
             <div class="no-conversations">Sin conversaciones recientes</div>
         </nav>
+
+
 
         <!-- Main content -->
         <main class="content">
@@ -160,17 +164,22 @@
             </div>
 
             <!-- Input section (siempre visible) -->
-            <div class="input-section">
-                <div class="input-wrapper">
-                    <span class="add-btn" id="addBtn">+</span>
-                    <input id="userInput" type="text" placeholder="Pregunta lo que quieras">
-                    <button class="send-btn-icon" id="sendBtn">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-                <p class="footer-note">Claro·Assistant puede cometer errores.</p>
-                 <p class="footer-note">Considera verificar información importante.</p>
-            </div>
+<!-- Input section (siempre visible) -->
+<div class="input-section">
+    <div class="input-wrapper">
+        <span class="add-btn" id="addBtn">+</span>
+        <input id="userInput" type="text" placeholder="Pregunta lo que quieras">
+        <button class="send-btn-icon" id="sendBtn">
+            <i class="fas fa-paper-plane"></i>
+        </button>
+    </div>
+    <!-- Contador de tokens DEBAJO del input -->
+    <div class="token-counter" id="tokenCounter">
+        <span id="currentTokens">0</span>/<span id="maxTokens">1000</span> Tokens
+    </div>
+    <p class="footer-note">Claro·Assistant puede cometer errores.</p>
+    <p class="footer-note">Considera verificar información importante.</p>
+</div>
         </main>
     </div>
 
