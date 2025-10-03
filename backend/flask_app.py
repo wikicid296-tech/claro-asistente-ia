@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from twilio.twiml.messaging_response import MessagingResponse
+from twilio.rest import Client
 import os
 from dotenv import load_dotenv
 import logging
@@ -14,9 +16,25 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuración
+# Configuración Twilio (después de las variables GROQ_API_KEY y PORT)
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
-
+Inicializar cliente Twilio
+try:
+    if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
+        twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        logger.info("✅ Cliente Twilio inicializado correctamente")
+    else:
+        logger.warning("⚠️ Credenciales de Twilio no configuradas")
+        twilio_client = None
+except Exception as e:
+    logger.error(f"❌ Error inicializando Twilio: {str(e)}")
+    twilio_client = None
+    
 try:
     if GROQ_API_KEY:
         from groq import Groq
@@ -1138,7 +1156,90 @@ def serve_static(path):
     except Exception as e:
         return f"Archivo no encontrado: {path}", 404
 
+@app.route('/whatsapp', methods=['POST'])
+def whatsapp_webhook():
+    """Endpoint para recibir mensajes de WhatsApp vía Twilio"""
+    try:
+        # Obtener datos del mensaje de WhatsApp
+        incoming_msg = request.values.get('Body', '').strip()
+        from_number = request.values.get('From', '')
+        
+        logger.info(f"📱 Mensaje de WhatsApp recibido de {from_number}: {incoming_msg}")
+        
+        if not incoming_msg:
+            resp = MessagingResponse()
+            resp.message("Por favor envía un mensaje válido.")
+            return str(resp)
+        
+        # Usar el número de WhatsApp como user_key para la memoria
+        user_key = from_number
+        mem = CHAT_MEMORY.get(user_key, [])
+        prev_messages = mem[-3:] if mem else []
+        
+        # Actualizar memoria
+        mem.append(incoming_msg)
+        if len(mem) > 3:
+            mem = mem[-3:]
+        CHAT_MEMORY[user_key] = mem
+        
+        # Obtener contexto y URLs
+        context = safe_get_context_for_query(incoming_msg)
+        relevant_urls = safe_extract_relevant_urls(incoming_msg)
+        
+        # Formatear URLs
+        urls_text = ""
+        if relevant_urls:
+            urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:5]])
+        else:
+            urls_text = "Explora: Telecomunicaciones, Educación (aprende.org) y Salud (clikisalud.net)"
+        
+        # Preparar prompt
+        try:
+            formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
+        except Exception:
+            formatted_prompt = f"Eres un asistente. Contexto:\n{context}\n\n{urls_text}"
+        
+        # Construir mensajes con memoria
+        messages = [{"role": "system", "content": formatted_prompt}]
+        
+        for pm in prev_messages:
+            if pm and pm.strip() and pm.strip() != incoming_msg.strip():
+                messages.append({"role": "user", "content": pm})
+        
+        messages.append({"role": "user", "content": incoming_msg})
+        
+        # Llamar a Groq
+        if client and client != "api_fallback":
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.5,
+                max_tokens=1000  # Reducido para WhatsApp
+            )
+            ai_response = completion.choices[0].message.content
+        else:
+            result = call_groq_api_directly(messages)
+            ai_response = result["choices"][0]["message"]["content"]
+        
+        # Limitar respuesta para WhatsApp (max 1600 caracteres)
+        if len(ai_response) > 1600:
+            ai_response = ai_response[:1597] + "..."
+        
+        # Crear respuesta TwiML
+        resp = MessagingResponse()
+        resp.message(ai_response)
+        
+        logger.info(f"✅ Respuesta enviada a {from_number}")
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+        
+    except Exception as e:
+        logger.error(f"❌ Error en /whatsapp: {str(e)}")
+        resp = MessagingResponse()
+        resp.message("Lo siento, hubo un error procesando tu mensaje. Intenta nuevamente.")
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+
 if __name__ == '__main__':
     logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
     logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
