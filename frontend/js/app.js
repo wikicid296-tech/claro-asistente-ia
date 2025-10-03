@@ -3,6 +3,11 @@ const API_URL = 'https://claro-asistente-ia.onrender.com'; // Tu URL de Render
 
 
 
+// Configuración de tokens
+const TOKEN_CONFIG = {
+    MAX_TOKENS: 1000,
+    CHARS_PER_TOKEN: 3.5 // Promedio fijo entre 3 y 4
+};
 
 // Estado global de la aplicación
 const appState = {
@@ -39,6 +44,11 @@ const elements = {
     actionMenu: document.getElementById('actionMenu'),
     actionItems: document.querySelectorAll('.action-item'),
     
+    // Token counter - NUEVO
+    tokenCounter: document.getElementById('tokenCounter'),
+    currentTokens: document.getElementById('currentTokens'),
+    maxTokens: document.getElementById('maxTokens'),
+    
     // Suggestions
     suggestionCards: document.querySelectorAll('.suggestion-card'),
     
@@ -51,10 +61,65 @@ const elements = {
     calendarList: document.getElementById('calendar-list')
 };
 
+// ==================== FUNCIONES DE TOKENS ====================
+/**
+ * Estima tokens usando un promedio fijo de 3.5 caracteres por token
+ */
+function estimateTokens(text) {
+    if (!text || text.length === 0) {
+        return 0;
+    }
+    return Math.ceil(text.length / TOKEN_CONFIG.CHARS_PER_TOKEN);
+}
+
+/**
+ * Actualiza el contador visual y el estado del botón
+ */
+function updateTokenCounter(tokens) {
+    if (!elements.currentTokens) return;
+    
+    elements.currentTokens.textContent = tokens;
+    
+    // Cambiar color según porcentaje
+    const percentage = (tokens / TOKEN_CONFIG.MAX_TOKENS) * 100;
+    
+    // Deshabilitar botón si excede el límite
+    const exceedsLimit = tokens > TOKEN_CONFIG.MAX_TOKENS;
+    elements.sendBtn.disabled = exceedsLimit;
+    
+    if (exceedsLimit) {
+        elements.tokenCounter.style.color = '#dc3545';
+        elements.tokenCounter.style.fontWeight = 'bold';
+        elements.sendBtn.style.opacity = '0.5';
+        elements.sendBtn.style.cursor = 'not-allowed';
+    } else if (percentage >= 75) {
+        elements.tokenCounter.style.color = '#ff9800';
+        elements.tokenCounter.style.fontWeight = '500';
+        elements.sendBtn.style.opacity = '1';
+        elements.sendBtn.style.cursor = 'pointer';
+    } else if (percentage >= 50) {
+        elements.tokenCounter.style.color = '#ffc107';
+        elements.tokenCounter.style.fontWeight = 'normal';
+        elements.sendBtn.style.opacity = '1';
+        elements.sendBtn.style.cursor = 'pointer';
+    } else {
+        elements.tokenCounter.style.color = '#999';
+        elements.tokenCounter.style.fontWeight = 'normal';
+        elements.sendBtn.style.opacity = '1';
+        elements.sendBtn.style.cursor = 'pointer';
+    }
+}
+
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
     loadFromLocalStorage();
+    
+    // Inicializar contador de tokens
+    if (elements.maxTokens) {
+        elements.maxTokens.textContent = TOKEN_CONFIG.MAX_TOKENS;
+    }
+    updateTokenCounter(0);
 });
 
 function initializeEventListeners() {
@@ -67,36 +132,37 @@ function initializeEventListeners() {
         item.addEventListener('click', handleNavigation);
     });
     
-    // Nueva conversación (SIN ALERT)
+    // Nueva conversación
     if (elements.newConversationBtn) {
         elements.newConversationBtn.addEventListener('click', startNewConversation);
     }
     
-    // Task headers (expandir/contraer)
+    // Task headers
     elements.taskHeaders.forEach(header => {
         header.addEventListener('click', toggleTaskCard);
     });
     
-    // Limpiar tareas (SIN ALERT)
+    // Limpiar tareas
     if (elements.clearTasksBtn) {
         elements.clearTasksBtn.addEventListener('click', clearAllTasks);
     }
     
-    // Botón + (mostrar menú de acciones)
+    // Botón +
     elements.addBtn.addEventListener('click', toggleActionMenu);
     
     // Botón enviar
     if (elements.sendBtn) {
         elements.sendBtn.addEventListener('click', function() {
             const text = elements.userInput.value.trim();
-            if (text) {
+            if (text && !elements.sendBtn.disabled) {
                 sendMessage(text);
                 elements.userInput.value = '';
+                updateTokenCounter(0);
             }
         });
     }
     
-    // Action items (opciones del menú)
+    // Action items
     elements.actionItems.forEach(item => {
         item.addEventListener('click', selectAction);
     });
@@ -106,11 +172,18 @@ function initializeEventListeners() {
         card.addEventListener('click', handleSuggestionClick);
     });
     
-    // Input de usuario (Enter para enviar)
+    // Input de usuario - actualizar tokens en tiempo real
+    elements.userInput.addEventListener('input', function() {
+        const tokens = estimateTokens(this.value);
+        updateTokenCounter(tokens);
+    });
+
+    // Enter para enviar
     elements.userInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && this.value.trim()) {
+        if (e.key === 'Enter' && this.value.trim() && !elements.sendBtn.disabled) {
             sendMessage(this.value.trim());
             this.value = '';
+            updateTokenCounter(0);
         }
     });
     
@@ -132,39 +205,33 @@ function closeSidebar() {
 function handleNavigation(e) {
     const section = this.getAttribute('data-section');
     
-    // Si es "home", iniciar nueva conversación
     if (section === 'home') {
         startNewConversation();
         return;
     }
     
-    // Remover active de todos
     elements.navItems.forEach(item => item.classList.remove('active'));
     this.classList.add('active');
     
-    // Toggle tasks container
     if (section === 'tasks') {
         elements.tasksContainer.classList.toggle('active');
     } else {
         elements.tasksContainer.classList.remove('active');
     }
     
-    // No cerrar sidebar en desktop, solo en móvil
     if (window.innerWidth < 900) {
         closeSidebar();
     }
 }
 
-// ==================== NUEVA CONVERSACIÓN (SIN ALERT) ====================
+// ==================== NUEVA CONVERSACIÓN ====================
 function startNewConversation() {
-    // Limpiar historial directamente sin confirmación
     appState.conversationHistory = [];
     elements.chatHistory.innerHTML = '';
     elements.welcomePage.style.display = 'flex';
     elements.chatPage.style.display = 'none';
     saveToLocalStorage();
     
-    // Activar "Nueva conversación"
     elements.navItems.forEach(item => item.classList.remove('active'));
     if (elements.newConversationBtn) {
         elements.newConversationBtn.classList.add('active');
@@ -180,11 +247,9 @@ function toggleTaskCard(e) {
     const body = this.nextElementSibling;
     const isOpen = body.classList.contains('open');
     
-    // Cerrar todos primero
     document.querySelectorAll('.task-body').forEach(b => b.classList.remove('open'));
     document.querySelectorAll('.task-header').forEach(h => h.classList.remove('collapsed'));
     
-    // Abrir el clickeado si no estaba abierto
     if (!isOpen) {
         body.classList.add('open');
         this.classList.add('collapsed');
@@ -200,11 +265,9 @@ function toggleActionMenu(e) {
 function selectAction(e) {
     const action = this.getAttribute('data-action');
     
-    // Remover selected de todos
     elements.actionItems.forEach(item => item.classList.remove('selected'));
     this.classList.add('selected');
     
-    // Cambiar placeholder según la acción
     const placeholders = {
         'aprende': 'Pregunta sobre cursos de aprende.org',
         'busqueda': 'Pregunta lo que quieras',
@@ -216,7 +279,6 @@ function selectAction(e) {
     elements.userInput.placeholder = placeholders[action] || 'Pregunta lo que quieras';
     appState.currentMode = action;
     
-    // Cerrar menú
     elements.actionMenu.classList.remove('active');
 }
 
@@ -240,21 +302,14 @@ function handleSuggestionClick(e) {
 function sendMessage(text) {
     if (!text || !text.trim()) return;
     
-    // Cambiar a vista de chat
     showChatView();
-    
-    // Agregar mensaje del usuario
     addMessage('user', text);
-    
-    // Mostrar loading
     showLoading();
     
-    // Llamar a la API REAL
     callAPI(text)
         .then(response => {
             addMessage('bot', response);
             
-            // Procesar si es una tarea - PASA AMBOS MENSAJES
             if (isTaskMessage(text, response)) {
                 processTask(text, response);
             }
@@ -262,10 +317,8 @@ function sendMessage(text) {
         .catch(error => {
             console.error('Error completo:', error);
             
-            // Mensaje de error genérico por defecto
             let errorMessage = 'Lo siento, ocurrió un error al procesar tu solicitud. Por favor, intenta nuevamente.';
             
-            // Solo mostrar mensaje de tokens si hay evidencia clara
             if (error.status === 429 || 
                 (error.message && (error.message.toLowerCase().includes('token') || 
                                   error.message.toLowerCase().includes('limit') ||
@@ -282,7 +335,6 @@ function sendMessage(text) {
             saveToLocalStorage();
         });
 }
-
 
 // ==================== API CALLS ====================
 async function callAPI(message) {
@@ -324,36 +376,28 @@ function addMessage(type, content) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'msg ' + type;
     
-    // Formatear el contenido
     const formattedContent = formatMessage(content);
     messageDiv.innerHTML = formattedContent;
     
     elements.chatHistory.appendChild(messageDiv);
     
-    // Auto-scroll al final
     setTimeout(() => {
         elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
     }, 100);
     
-    // IMPORTANTE: Guardar el contenido SIN formatear (texto original)
     appState.conversationHistory.push({ 
         type, 
-        content: content, // Guardamos el texto original, NO el HTML
+        content: content,
         timestamp: new Date().toISOString() 
     });
 }
 
-// ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES CON MARKDOWN ====================
-// ==================== FUNCIÓN MEJORADA PARA FORMATEAR MENSAJES CON MARKDOWN INCLUYENDO TABLAS ====================
+// ==================== FORMATEAR MENSAJES ====================
 function formatMessage(content) {
-    // PRIMERO: Eliminar comentarios HTML <!-- -->
     content = content.replace(/<!--[\s\S]*?-->/g, '');
-    
-    // También eliminar etiquetas <! y -> sueltas
     content = content.replace(/<!-+/g, '');
     content = content.replace(/-+>/g, '');
     
-    // 1. Escapar HTML básico
     const escapeHtml = (text) => {
         const map = {
             '&': '&amp;',
@@ -363,28 +407,24 @@ function formatMessage(content) {
         return text.replace(/[&<>]/g, m => map[m]);
     };
     
-    // PROCESAR TABLAS EN MARKDOWN PRIMERO (antes de dividir en líneas)
     content = content.replace(/(?:\|?.+\|.+\n(?:\|?[-:| ]+)+\n(?:\|?.+\|.+\n?)+)/g, (tableMatch) => {
         const rows = tableMatch.trim().split('\n').filter(row => row.trim());
         
-        // Verificar si es una tabla válida de markdown
         if (rows.length < 2) return tableMatch;
         
         let tableHtml = '<div class="table-container"><table class="markdown-table">';
         
         rows.forEach((row, rowIndex) => {
-            // Limpiar la fila y dividir por pipes
             const cleanRow = row.trim().replace(/^\||\|$/g, '');
             const cells = cleanRow.split('|').map(cell => cell.trim());
             
             if (cells.length === 0) return;
             
-            // Determinar si es la fila de encabezado o separador
             const isHeaderRow = rowIndex === 0;
             const isSeparatorRow = rowIndex === 1 && cells.every(cell => cell.replace(/[-:]/g, '').trim() === '');
             
             if (isSeparatorRow) {
-                return; // Saltar fila separadora de markdown
+                return;
             }
             
             tableHtml += '<tr>';
@@ -392,7 +432,6 @@ function formatMessage(content) {
             cells.forEach((cell, cellIndex) => {
                 let cellContent = escapeHtml(cell);
                 
-                // Aplicar formato markdown dentro de las celdas
                 cellContent = cellContent
                     .replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>')
                     .replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>')
@@ -410,26 +449,21 @@ function formatMessage(content) {
         return tableHtml;
     });
     
-    // Dividir en líneas después de procesar tablas
     let lines = content.split('\n');
     
     let formatted = lines.map((line) => {
-        // Si la línea ya fue procesada como parte de una tabla, saltar
         if (line.includes('</table>') || line.includes('<div class="table-container">')) {
             return line;
         }
         
-        // Saltar líneas que son solo separadores ---
         if (line.trim().match(/^-{3,}$/)) {
             return '<hr class="msg-divider" />';
         }
         
-        // Líneas vacías
         if (line.trim() === '') {
             return '<div class="msg-spacer"></div>';
         }
         
-        // Headers (# Título)
         if (line.startsWith('### ')) {
             return `<h3 class="msg-header">${escapeHtml(line.substring(4))}</h3>`;
         }
@@ -440,50 +474,33 @@ function formatMessage(content) {
             return `<h1 class="msg-header">${escapeHtml(line.substring(2))}</h1>`;
         }
         
-        // Blockquotes (> texto) - convertir a texto destacado
         if (line.startsWith('> ')) {
             return `<div class="msg-quote">${escapeHtml(line.substring(2))}</div>`;
         }
         
-        // Listas con viñetas (-, *, •)
         if (line.match(/^[\s]*[-\*•]\s+/)) {
             const listContent = line.replace(/^[\s]*[-\*•]\s+/, '');
             return `<li class="msg-list-item">${escapeHtml(listContent)}</li>`;
         }
         
-        // Listas numeradas (1., 2., etc.)
         if (line.match(/^[\s]*\d+\.\s+/)) {
             const listContent = line.replace(/^[\s]*\d+\.\s+/, '');
             return `<li class="msg-list-item numbered">${escapeHtml(listContent)}</li>`;
         }
         
-        // Texto normal
         return `<p class="msg-paragraph">${escapeHtml(line)}</p>`;
     });
     
-    // Unir todo
     let html = formatted.join('');
     
-    // APLICAR FORMATOS INLINE EN ORDEN ESPECÍFICO (solo a texto que no sea tabla)
-    
-    // 1. Primero procesar negritas: **texto** (solo fuera de tablas)
     html = html.replace(/(?![^<]*<\/table>)\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
-    
-    // 2. Luego cursivas: *texto* (pero no si ya es parte de **)
     html = html.replace(/(?![^<]*<\/table>)(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
-    
-    // 3. Código inline: `código`
     html = html.replace(/(?![^<]*<\/table>)`([^`]+)`/g, '<code class="msg-code">$1</code>');
-    
-    // 4. Links markdown: [texto](url) - PRIMERO
     html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
-    
-    // 5. URLs simples - pero NO si ya están dentro de <a> o tienen comillas de atributos cerca
     html = html.replace(/(?![^<]*<\/table>)(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function(match) {
         return `<a href="${match}" target="_blank" rel="noopener" class="msg-link">${match}</a>`;
     });
     
-    // 6. Emojis con colores
     html = html.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
     html = html.replace(/📝/g, '<span style="color: #17a2b8;">📝</span>');
     html = html.replace(/📅/g, '<span style="color: #ffc107;">📅</span>');
@@ -494,29 +511,30 @@ function formatMessage(content) {
     return html;
 }
 
-
-
-
-
-
-
-//MEJORA+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-
-
-
-
-
-
-
-
 // ==================== TASK MANAGEMENT ====================
 function isTaskMessage(userMsg, botMsg) {
     const lowerUserMsg = userMsg.toLowerCase();
     const lowerBotMsg = botMsg.toLowerCase();
     
+    // PRIMERO: Excluir consultas generales que NO son tareas
+    if (lowerUserMsg.includes('dime') || 
+        lowerUserMsg.includes('cuales') || 
+        lowerUserMsg.includes('cuáles') ||
+        lowerUserMsg.includes('qué') ||
+        lowerUserMsg.includes('que son') ||
+        lowerUserMsg.includes('dame') ||
+        lowerUserMsg.includes('muestra') ||
+        lowerUserMsg.includes('cual es') ||
+        lowerUserMsg.includes('cuál es')) {
+        // Solo es tarea si el BOT responde con los emojis específicos
+        if (botMsg.includes('✅') || botMsg.includes('📝') || botMsg.includes('📅')) {
+            // Continuar con la detección normal
+        } else {
+            return false; // NO es una tarea
+        }
+    }
+    
+    // Ahora sí, detectar si es tarea
     return botMsg.includes('✅') || 
            botMsg.includes('📝') || 
            botMsg.includes('📅') ||
@@ -559,18 +577,10 @@ function processTask(userMessage, botResponse) {
         id: Date.now() + Math.random().toString(36).substr(2, 9)
     };
     
-    // DETECCIÓN CON PRIORIDAD CORREGIDA
     let taskType = null;
-    
     const lowerUserMsg = userMessage.toLowerCase();
     const lowerBotMsg = botResponse.toLowerCase();
     
-    console.log('🔍 Detectando tipo de tarea...');
-    console.log('Usuario:', userMessage);
-    console.log('Bot:', botResponse);
-    
-    // PRIORIDAD 1: RECORDATORIOS (verificar PRIMERO)
-    // Si dice "recordar", "recuérdame", "avísame" ES un recordatorio
     if (lowerUserMsg.includes('recordar') || 
         lowerUserMsg.includes('recuerdame') || 
         lowerUserMsg.includes('recuérdame') ||
@@ -581,19 +591,15 @@ function processTask(userMessage, botResponse) {
         (lowerBotMsg.includes('recordatorio') && !lowerBotMsg.includes('agendado'))) {
         taskType = 'reminders';
     } 
-    // PRIORIDAD 2: AGENDA/CALENDARIO
-    // Solo si dice explícitamente "agendar", "agenda", "programar"
     else if (lowerUserMsg.includes('agendar') || 
-             lowerUserMsg.includes('agenda ') || // espacio después para evitar "agendame"
+             lowerUserMsg.includes('agenda ') ||
              lowerUserMsg.includes('programar') ||
-             lowerUserMsg.includes('agendar') ||
              (lowerUserMsg.includes('cita') && !lowerUserMsg.includes('recordar')) ||
              botResponse.includes('📅') ||
              lowerBotMsg.includes('agendado') ||
              lowerBotMsg.includes('he agendado')) {
         taskType = 'calendar';
     } 
-    // PRIORIDAD 3: NOTAS
     else if (lowerUserMsg.includes('nota') || 
              lowerUserMsg.includes('anota') || 
              lowerUserMsg.includes('apunta') ||
@@ -605,44 +611,29 @@ function processTask(userMessage, botResponse) {
         taskType = 'notes';
     }
     
-    // Si no se detectó nada específico, usar reminders por defecto
     if (!taskType) {
         taskType = 'reminders';
     }
     
-    console.log('✅ Tipo detectado:', taskType);
-    
-    // Agregar a la lista correspondiente
     if (!appState.tasks[taskType]) {
         appState.tasks[taskType] = [];
     }
     
     appState.tasks[taskType].push(task);
-    
-    // ACTUALIZAR UI
     updateTasksUI();
     
-    // Asegurar que el tasks container esté visible
     if (elements.tasksContainer) {
         elements.tasksContainer.classList.add('active');
     }
     
-    // Expandir automáticamente la sección correspondiente
     expandTaskSection(taskType);
-    
     saveToLocalStorage();
-    
-    console.log('💾 Tarea guardada en:', taskType);
-    console.log('📊 Estado actual:', appState.tasks);
 }
 
-// Nueva función para expandir automáticamente la sección de tareas
 function expandTaskSection(taskType) {
-    // Cerrar todas las secciones primero
     document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));
     document.querySelectorAll('.task-header').forEach(header => header.classList.remove('collapsed'));
     
-    // Abrir la sección correspondiente
     const targetHeader = document.querySelector(`.task-header[data-task-type="${taskType}"]`);
     if (targetHeader) {
         const targetBody = targetHeader.nextElementSibling;
@@ -652,23 +643,17 @@ function expandTaskSection(taskType) {
 }
 
 function updateTasksUI() {
-    console.log('🔄 Actualizando UI de tareas:', appState.tasks);
-    
     updateTaskList(elements.remindersList, appState.tasks.reminders, 'reminders', 'No hay recordatorios pendientes');
     updateTaskList(elements.notesList, appState.tasks.notes, 'notes', 'No hay notas');
     updateTaskList(elements.calendarList, appState.tasks.calendar, 'calendar', 'No hay eventos programados');
-    
-    // Actualizar badges - CON VALIDACIÓN
     updateTaskBadges();
 }
 
-// Nueva función para mostrar badges/contadores en el sidebar - CON VALIDACIÓN
 function updateTaskBadges() {
     const totalTasks = (appState.tasks.reminders?.length || 0) + 
                       (appState.tasks.notes?.length || 0) + 
                       (appState.tasks.calendar?.length || 0);
     
-    // Actualizar el texto del botón de Gestión de tareas - CON VALIDACIÓN
     const tasksNavBtn = document.getElementById('tasksNavBtn');
     if (tasksNavBtn) {
         const textSpan = tasksNavBtn.querySelector('span');
@@ -683,17 +668,12 @@ function updateTaskBadges() {
 }
 
 function updateTaskList(container, tasks, taskType, emptyMessage) {
-    if (!container) {
-        console.error('❌ Contenedor no encontrado para:', taskType);
-        return;
-    }
+    if (!container) return;
     
     if (!tasks || tasks.length === 0) {
         container.innerHTML = `<div class="empty-task-message">${emptyMessage}</div>`;
         return;
     }
-    
-    console.log(`📝 Renderizando ${tasks.length} tareas de tipo:`, taskType);
     
     let html = '';
     tasks.forEach((task, idx) => {
@@ -715,43 +695,19 @@ function updateTaskList(container, tasks, taskType, emptyMessage) {
     container.innerHTML = html;
 }
 
-
-
-// Función helper para escapar HTML (seguridad)
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-
-
-
-
-//MEJORA++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-
-
-
-
-
-
-
-
-
-
 function deleteTask(taskType, index) {
-    // Eliminar directamente sin confirmación
     appState.tasks[taskType].splice(index, 1);
     updateTasksUI();
     saveToLocalStorage();
 }
 
-// ==================== LIMPIAR TAREAS (SIN ALERT) ====================
 function clearAllTasks() {
-    // Limpiar directamente sin confirmación
     appState.tasks = { 
         reminders: [], 
         notes: [], 
@@ -761,7 +717,6 @@ function clearAllTasks() {
     saveToLocalStorage();
 }
 
-// Hacer disponibles globalmente
 window.deleteTask = deleteTask;
 window.clearAllTasks = clearAllTasks;
 
@@ -789,48 +744,27 @@ function saveToLocalStorage() {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-//mejora++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
 function loadFromLocalStorage() {
     try {
-        // Generar o recuperar ID de sesión única
         let currentSessionId = sessionStorage.getItem('claroAssistant_sessionId');
         
         if (!currentSessionId) {
-            // Nueva sesión: generar ID único
             currentSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
             sessionStorage.setItem('claroAssistant_sessionId', currentSessionId);
-            
-            // Limpiar conversación anterior al iniciar nueva sesión
             localStorage.removeItem('claroAssistant_state');
             console.log('Nueva sesion iniciada');
             return;
         }
         
-        // Sesión existente: cargar datos
         const saved = localStorage.getItem('claroAssistant_state');
         if (saved) {
             const data = JSON.parse(saved);
             
-            // Verificar que sea la misma sesión
             if (data.sessionId === currentSessionId) {
                 appState.conversationHistory = data.conversationHistory || [];
                 appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
                 appState.currentMode = data.currentMode || 'busqueda';
                 
-                // Restaurar mensajes del chat si existen
                 if (appState.conversationHistory.length > 0) {
                     showChatView();
                     elements.chatHistory.innerHTML = '';
@@ -843,10 +777,8 @@ function loadFromLocalStorage() {
                     console.log('Conversacion restaurada');
                 }
                 
-                // ACTUALIZAR UI DE TAREAS AL CARGAR - ESTA ES LA LÍNEA CLAVE
                 updateTasksUI();
                 console.log('Tareas cargadas:', appState.tasks);
-                
             } else {
                 console.log('Nueva pestana - chat limpio');
             }
@@ -855,22 +787,6 @@ function loadFromLocalStorage() {
         console.error('Error cargando desde localStorage:', e);
     }
 }
-
-
-
-
-
-
-//mejora++++++++++++++++++++++++++++++++++++++++++++++++++
-
-
-
-
-
-
-
-
-
 
 // ==================== RESPONSIVE HANDLERS ====================
 window.addEventListener('resize', function() {
@@ -883,4 +799,5 @@ window.addEventListener('resize', function() {
 // ==================== CONSOLE INFO ====================
 console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
+console.log('%cToken Limit:', 'color: #28a745; font-weight: bold;', TOKEN_CONFIG.MAX_TOKENS);
 console.log('%cReady to chat!', 'color: #28a745;');
