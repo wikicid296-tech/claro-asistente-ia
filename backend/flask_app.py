@@ -15,15 +15,16 @@ CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuración
-# Configuración Twilio (después de las variables GROQ_API_KEY y PORT)
+# ==================== CONFIGURACIÓN ====================
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER", "whatsapp:+14155238886")
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
-#Inicializar cliente Twilio
+
+# ==================== INICIALIZAR CLIENTES ====================
+# Inicializar cliente Twilio
 try:
     if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
         twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -34,7 +35,8 @@ try:
 except Exception as e:
     logger.error(f"❌ Error inicializando Twilio: {str(e)}")
     twilio_client = None
-    
+
+# Inicializar cliente Groq
 try:
     if GROQ_API_KEY:
         from groq import Groq
@@ -54,42 +56,21 @@ except Exception as e:
     logger.error(f"❌ Error inicializando Groq: {str(e)}")
     client = None
 
-
-# ! MOD 1 #########
-# Añadido: memoria en memoria (in-memory) por cliente para simular "memoria" de chat.
-# Nota: es una solución simple que no persiste entre reinicios y no requiere cambios en el frontend.
+# ==================== MEMORIA DE CONVERSACIÓN ====================
 CHAT_MEMORY = {}
 
 def _get_user_key():
     """
     Genera una clave simple para identificar al cliente basada en IP y User-Agent.
-    (No requiere cambios en el frontend. Si el frontend ya enviara un header propio como X-User-Id,
-    podríamos usarlo; aquí intentamos ser lo menos intrusivos posible).
+    Para web app.
     """
     ip = request.remote_addr or "unknown"
     ua = request.headers.get("User-Agent", "")
     return f"{ip}:{ua}"
 
-# Manejo seguro cuando URLS o SYSTEM_PROMPT fueron omitidos por el usuario (placeholder {})
-# Si el usuario decidió colocar URLS={} y SYSTEM_PROMPT={}, estas funciones deben seguir funcionando.
-def safe_extract_relevant_urls(prompt):
-    """Wrapper que evita excepción si URLS está vacío."""
-    try:
-        return extract_relevant_urls(prompt)
-    except Exception:
-        return []
-
-def safe_get_context_for_query(prompt):
-    """Wrapper que evita excepción si SYSTEM_PROMPT o URLS están vacíos."""
-    try:
-        return get_context_for_query(prompt)
-    except Exception:
-        return "Información general disponible"
-# ! MOD 1 CIERRE ########
-
-# ==================== URLs DE CONTENIDO ====================
-# NOTE: El usuario pidió que se deje como placeholder para que ellos lo coloquen después.
-RLS = {
+# ==================== URLS DE CONTENIDO ====================
+# COLOCA AQUÍ TU ESTRUCTURA DE URLS
+URLS = {
     "claro": {
             "Argentina": [
         "https://www.claro.com.ar/personas",
@@ -453,8 +434,8 @@ RLS = {
     }
 }
 
-# ==================== SYSTEM PROMPT MEJORADO ====================
-# NOTE: El usuario pidió que se deje como placeholder para que ellos lo coloquen después.
+# ==================== SYSTEM PROMPTS ====================
+# COLOCA AQUÍ TU SYSTEM_PROMPT PARA WEB
 SYSTEM_PROMPT = """Eres un asistente virtual multifuncional con capacidades especializadas en cuatro roles principales.
 IMPORTANTE: DETECTA LA PETICION PRINCIPAL DEL USUARIO QUE CORRESPONDE A LA PARTE ULTIMA DEL CONTEXTO EN CASO DE SER AMBIGUA TOMA COMO REFERENCIA LOS MENSAJES ANTERIORES DEL USUARIO PERO SOLO RESPONDE A LA PETICION MAS ACTUAL DEL USUARIO
 IMPORTANTE: TODA RESPUESTA DEBE SER DEVUELTA EN MARKDOWN A EXCEPCIÓN DE LOS ROLES QUE INDIQUEN OTRO FORMATO DE RESPUESTA DE ACUERDO A LA SIGUIENTE GUÍA:
@@ -653,7 +634,96 @@ RECURSOS DISPONIBLES:
 Recuerda: Tu objetivo es ayudar al usuario de manera efectiva, proporcionando información precisa, direccionándolo a los recursos correctos, y gestionando sus recordatorios, notas y agenda de forma organizada.
 """
 
-# ==================== FUNCIONES DE DETECCIÓN MEJORADAS ====================
+# COLOCA AQUÍ TU WHATSAPP_SYSTEM_PROMPT
+WHATSAPP_SYSTEM_PROMPT = """Eres un asistente virtual multifuncional especializado en Telecomunicaciones, Educación y Salud.
+
+IMPORTANTE: Todas tus respuestas DEBEN usar el formato Markdown de WhatsApp siguiendo ESTRICTAMENTE estas reglas:
+
+**FORMATO MARKDOWN DE WHATSAPP:**
+
+1. **Negrita**: Usa *texto* para negrita (un asterisco a cada lado)
+2. **Cursiva**: Usa _texto_ para cursiva (un guion bajo a cada lado)
+3. **Tachado**: Usa ~texto~ para tachado (una virgulilla a cada lado)
+4. **Monospace**: Usa ```texto``` para texto monoespaciado (tres comillas invertidas)
+5. **Cita**: Usa > seguido de espacio para citas
+6. **Listas**: 
+   - Usa * o - seguido de espacio para listas no ordenadas
+   - Usa 1. 2. 3. para listas ordenadas
+
+**REGLAS CRÍTICAS:**
+- NO uses # para encabezados (no funciona en WhatsApp)
+- NO uses ** para negrita (usa * solamente)
+- NO uses markdown de tablas (no funciona en WhatsApp)
+- Mantén las respuestas concisas (máximo 1000 caracteres)
+- Usa saltos de línea para separar secciones
+- Los emojis son permitidos y recomendados para mejorar la experiencia
+
+**ESTRUCTURA DE RESPUESTA:**
+
+Para consultas informativas:
+*[Título o categoría]*
+
+[Explicación breve]
+
+_Detalles importantes:_
+* Punto 1
+* Punto 2
+* Punto 3
+
+[Enlaces si aplica]
+
+═══════════════════════════════════════════════════════════════════
+ÁREAS DE CONOCIMIENTO
+═══════════════════════════════════════════════════════════════════
+
+*TELECOMUNICACIONES:*
+- Claro (19 países de América Latina)
+- Telcel (México)
+- A1 Group (7 países de Europa)
+
+*EDUCACIÓN Y DESARROLLO:*
+- Aprende.org: Cursos gratuitos, diplomados y rutas de aprendizaje
+- Áreas: Tecnología, finanzas, emprendimiento, idiomas
+- Recursos: Khan Academy, Coursera, edX, MIT OpenCourseware
+
+*SALUD Y BIENESTAR:*
+- Clikisalud: Información médica por grupos de edad
+- Temas: Diabetes, nutrición, salud cardiovascular, cáncer, salud mental
+- Cursos de prevención y primeros auxilios
+
+═══════════════════════════════════════════════════════════════════
+INSTRUCCIONES ESPECIALES
+═══════════════════════════════════════════════════════════════════
+
+1. *Detección de intención:* Identifica si el usuario busca información, quiere crear recordatorio, nota o agenda
+
+2. *Para consultas informativas:*
+   - Proporciona respuestas concisas y accionables
+   - Incluye enlaces relevantes al final
+   - Usa formato WhatsApp correctamente
+
+3. *Para recordatorios/notas/agenda:*
+   - Confirma con emoji apropiado (✅ 📝 📅)
+   - Resume la información capturada
+   - Mantén un tono amigable
+
+4. *Tono:* Profesional, amigable y directo
+
+5. *Limitación de conocimiento:* 
+   - Tu corte de conocimiento es junio 2024
+   - Si no tienes información actualizada, sugiere enlaces confiables
+   - Para noticias: recomienda UnoTV, Reuters o EFE
+
+═══════════════════════════════════════════════════════════════════
+
+CONTEXTO ESPECÍFICO:
+{context}
+
+RECURSOS DISPONIBLES:
+{urls}
+"""
+
+# ==================== FUNCIONES DE DETECCIÓN ====================
 def detect_country(text):
     """Detecta país mencionado en el texto"""
     text_lower = text.lower()
@@ -667,6 +737,14 @@ def detect_country(text):
         "nicaragua": ["nicaragua", "nicaraguense", "managua"],
         "honduras": ["honduras", "hondureño", "tegucigalpa"],
         "guatemala": ["guatemala", "guatemalteco"],
+        "costa_rica": ["costa rica", "costarricense"],
+        "ecuador": ["ecuador", "ecuatoriano"],
+        "paraguay": ["paraguay", "paraguayo"],
+        "uruguay": ["uruguay", "uruguayo"],
+        "panama": ["panama", "panamá", "panameño"],
+        "puerto_rico": ["puerto rico", "puertorriqueño"],
+        "republica_dominicana": ["republica dominicana", "república dominicana", "dominicano"],
+        "brasil": ["brasil", "brazil", "brasileño"],
         "austria": ["austria", "austriaco", "viena"],
         "bulgaria": ["bulgaria", "bulgaro", "sofia"],
         "croacia": ["croacia", "croata", "zagreb"],
@@ -731,9 +809,9 @@ def detect_education_topic(text):
 
 def extract_relevant_urls(prompt):
     """Extrae URLs relevantes basándose en la consulta del usuario"""
-    # Manejo si URLS no fue definido por el usuario (placeholder)
     if not URLS:
         return []
+    
     relevant_urls = []
     country = detect_country(prompt)
     operator = detect_operator(prompt)
@@ -743,31 +821,24 @@ def extract_relevant_urls(prompt):
     # SALUD
     if health_topic:
         if health_topic == "edad":
-            # Agregar todos los manuales por edad
             for age_range, urls in URLS.get("health", {}).get("manual_por_edad_clikisalud", {}).items():
                 relevant_urls.extend(urls)
         else:
-            # Agregar recursos generales de salud
             relevant_urls.extend(URLS.get("health", {}).get("cuidado_personal_y_profesional", []))
             
-            # Agregar URLs específicas del tema
             if health_topic in URLS.get("health", {}).get("prevencion_y_enfermedades", {}):
                 relevant_urls.extend(URLS["health"]["prevencion_y_enfermedades"][health_topic])
             
-            # Agregar cursos relacionados
             relevant_urls.extend(URLS.get("health", {}).get("cursos_cuidado_salud", [])[:3])
     
     # EDUCACIÓN
     elif education_topic:
-        # Agregar plataforma principal
         relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("principal", []))
         relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("areas_principales", []))
         
-        # URLs específicas por país si aplica
         if country and country in URLS.get("education_career", {}).get("plataformas_nacionales", {}):
             relevant_urls.extend(URLS["education_career"]["plataformas_nacionales"][country])
         
-        # URLs específicas por tema
         if education_topic == "digital_tech":
             relevant_urls.extend(URLS.get("education_career", {}).get("rutas_y_oficios", {}).get("digital_tech", []))
         elif education_topic == "finanzas":
@@ -785,69 +856,38 @@ def extract_relevant_urls(prompt):
         if operator == "telcel":
             relevant_urls.extend(URLS.get("telcel", []))
         elif operator == "claro" and country:
-            if country in URLS.get("claro", {}):
-                relevant_urls.extend(URLS["claro"][country])
+            country_key = country.replace("_", " ").title()
+            if country_key in URLS.get("claro", {}):
+                relevant_urls.extend(URLS["claro"][country_key])
             else:
-                # Agregar todas las opciones de Claro si no hay país específico
                 for country_urls in URLS.get("claro", {}).values():
-                    relevant_urls.extend(country_urls)
+                    relevant_urls.extend(country_urls[:2])
         elif operator == "a1" and country:
             if country in URLS.get("a1", {}):
                 relevant_urls.extend(URLS["a1"][country])
             else:
-                # Agregar todas las opciones de A1
                 for country_urls in URLS.get("a1", {}).values():
                     relevant_urls.extend(country_urls)
     
-    return list(set(relevant_urls))  # Eliminar duplicados
+    return list(set(relevant_urls))[:10]  # Eliminar duplicados y limitar a 10
 
 def get_context_for_query(prompt):
-    """Genera contexto descriptivo y URLs relevantes para la consulta"""
-    # Manejo si URLS o SYSTEM_PROMPT no fue definido por el usuario (placeholder)
+    """Genera contexto descriptivo para la consulta"""
     if not URLS:
-        # Intentar detectar intención básica aún si no hay URLs definidas
         health_topic = detect_health_topic(prompt)
         education_topic = detect_education_topic(prompt)
         operator = detect_operator(prompt)
         context = []
+        
         if health_topic:
             context.append("📋 ÁREA: SALUD Y BIENESTAR")
-            if health_topic == "diabetes":
-                context.append("Tema: Diabetes - Prevención, cuidados y manejo de la enfermedad")
-            elif health_topic == "obesidad_nutricion":
-                context.append("Tema: Obesidad y Nutrición - Alimentación saludable y control de peso")
-            elif health_topic == "hipertension_corazon":
-                context.append("Tema: Hipertensión y Salud Cardiovascular")
-            elif health_topic == "cancer":
-                context.append("Tema: Prevención y detección del cáncer")
-            elif health_topic == "salud_mental":
-                context.append("Tema: Salud Mental - Manejo de estrés, ansiedad y depresión")
-            elif health_topic == "edad":
-                context.append("Tema: Manuales de salud organizados por grupos de edad")
         elif education_topic:
             context.append("📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL")
-            if education_topic == "digital_tech":
-                context.append("Tema: Tecnología y Programación - Cursos de desarrollo digital")
-            elif education_topic == "finanzas":
-                context.append("Tema: Finanzas Personales - Educación financiera y manejo de dinero")
-            elif education_topic == "emprendimiento":
-                context.append("Tema: Emprendimiento - Cómo iniciar y gestionar un negocio")
-            elif education_topic == "basica":
-                context.append("Tema: Educación Básica y Media - Recursos para estudiantes de primaria y secundaria")
-            elif education_topic == "superior":
-                context.append("Tema: Educación Superior - Cursos universitarios y profesionales")
-            elif education_topic == "capacitacion":
-                context.append("Tema: Capacitación y Desarrollo de Habilidades")
         elif operator:
             context.append("🌐 ÁREA: TELECOMUNICACIONES")
-            if operator == "telcel":
-                context.append("Operador: Telcel México - Servicios de telefonía móvil")
-            elif operator == "claro":
-                context.append("Operador: Claro")
-            elif operator == "a1":
-                context.append("Operador: A1 Group (Europa)")
         else:
-            context.append("ℹ️ Asistente general disponible para Telecomunicaciones, Educación y Salud")
+            context.append("ℹ️ Asistente general disponible")
+        
         return "\n".join(context) if context else "Información general disponible"
 
     country = detect_country(prompt)
@@ -861,33 +901,33 @@ def get_context_for_query(prompt):
     if health_topic:
         context.append("📋 ÁREA: SALUD Y BIENESTAR")
         if health_topic == "diabetes":
-            context.append("Tema: Diabetes - Prevención, cuidados y manejo de la enfermedad")
+            context.append("Tema: Diabetes - Prevención, cuidados y manejo")
         elif health_topic == "obesidad_nutricion":
-            context.append("Tema: Obesidad y Nutrición - Alimentación saludable y control de peso")
+            context.append("Tema: Obesidad y Nutrición")
         elif health_topic == "hipertension_corazon":
             context.append("Tema: Hipertensión y Salud Cardiovascular")
         elif health_topic == "cancer":
             context.append("Tema: Prevención y detección del cáncer")
         elif health_topic == "salud_mental":
-            context.append("Tema: Salud Mental - Manejo de estrés, ansiedad y depresión")
+            context.append("Tema: Salud Mental")
         elif health_topic == "edad":
-            context.append("Tema: Manuales de salud organizados por grupos de edad")
+            context.append("Tema: Manuales de salud por grupos de edad")
     
     # EDUCACIÓN
     elif education_topic:
         context.append("📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL")
         if education_topic == "digital_tech":
-            context.append("Tema: Tecnología y Programación - Cursos de desarrollo digital")
+            context.append("Tema: Tecnología y Programación")
         elif education_topic == "finanzas":
-            context.append("Tema: Finanzas Personales - Educación financiera y manejo de dinero")
+            context.append("Tema: Finanzas Personales")
         elif education_topic == "emprendimiento":
-            context.append("Tema: Emprendimiento - Cómo iniciar y gestionar un negocio")
+            context.append("Tema: Emprendimiento")
         elif education_topic == "basica":
-            context.append("Tema: Educación Básica y Media - Recursos para estudiantes de primaria y secundaria")
+            context.append("Tema: Educación Básica y Media")
         elif education_topic == "superior":
-            context.append("Tema: Educación Superior - Cursos universitarios y profesionales")
+            context.append("Tema: Educación Superior")
         elif education_topic == "capacitacion":
-            context.append("Tema: Capacitación y Desarrollo de Habilidades")
+            context.append("Tema: Capacitación y Desarrollo")
         
         if country:
             country_names = {
@@ -899,42 +939,36 @@ def get_context_for_query(prompt):
                 "peru": "Perú"
             }
             if country in country_names:
-                context.append(f"País: {country_names[country]} - Plataforma Aprende con Claro disponible")
+                context.append(f"País: {country_names[country]} - Aprende con Claro")
     
     # TELECOMUNICACIONES
     elif operator:
         context.append("🌐 ÁREA: TELECOMUNICACIONES")
         if operator == "telcel":
-            context.append("Operador: Telcel México - Servicios de telefonía móvil")
+            context.append("Operador: Telcel México")
         elif operator == "claro":
             context.append("Operador: Claro")
-            if country:
-                country_names = {
-                    "argentina": "Argentina",
-                    "peru": "Perú",
-                    "chile": "Chile"
-                }
-                if country in country_names:
-                    context.append(f"País: {country_names[country]}")
         elif operator == "a1":
             context.append("Operador: A1 Group (Europa)")
-            if country:
-                country_names = {
-                    "austria": "Austria",
-                    "bulgaria": "Bulgaria",
-                    "croacia": "Croacia",
-                    "bielorrusia": "Bielorrusia",
-                    "serbia": "Serbia",
-                    "eslovenia": "Eslovenia",
-                    "macedonia": "Macedonia del Norte"
-                }
-                if country in country_names:
-                    context.append(f"País: {country_names[country]}")
     
     else:
-        context.append("ℹ️ Asistente general disponible para Telecomunicaciones, Educación y Salud")
+        context.append("ℹ️ Asistente general disponible")
     
     return "\n".join(context) if context else "Información general disponible"
+
+def safe_extract_relevant_urls(prompt):
+    """Wrapper que evita excepción si URLS está vacío."""
+    try:
+        return extract_relevant_urls(prompt)
+    except Exception:
+        return []
+
+def safe_get_context_for_query(prompt):
+    """Wrapper que evita excepción si SYSTEM_PROMPT o URLS están vacíos."""
+    try:
+        return get_context_for_query(prompt)
+    except Exception:
+        return "Información general disponible"
 
 def call_groq_api_directly(messages):
     """Llamada directa a la API de Groq como fallback"""
@@ -946,9 +980,9 @@ def call_groq_api_directly(messages):
     }
     
     data = {
-        "model": "openai/gpt-oss-20b",
+        "model": "llama-3.3-70b-versatile",
         "messages": messages,
-        "temperature": 0.7,
+        "temperature": 0.5,
         "max_tokens": 2048
     }
     
@@ -957,19 +991,21 @@ def call_groq_api_directly(messages):
     return response.json()
 
 # ==================== ENDPOINTS ====================
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
     return jsonify({
         "status": "healthy", 
-        "service": "Telecom Copilot API v2.0",
+        "service": "Telecom Copilot API v2.0 + WhatsApp",
         "ai_ready": client is not None or GROQ_API_KEY is not None,
-        "features": ["telecomunicaciones", "educación", "salud"]
+        "twilio_ready": twilio_client is not None,
+        "features": ["web_chat", "whatsapp", "telecomunicaciones", "educación", "salud"]
     })
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Endpoint principal de chat con contexto mejorado"""
+    """Endpoint principal de chat WEB con contexto mejorado"""
     try:
         if not client and not GROQ_API_KEY:
             return jsonify({
@@ -986,63 +1022,54 @@ def chat():
                 "error": "Mensaje vacío"
             }), 400
         
-        # ================= Memoria local por cliente =================
-        # Tomamos hasta 3 mensajes anteriores del mismo cliente (si existen)
+        # ================= Memoria local por cliente WEB =================
         try:
             user_key = _get_user_key()
             mem = CHAT_MEMORY.get(user_key, [])
-            # prev_messages son los mensajes anteriores (hasta 3)
             prev_messages = mem[-3:] if mem else []
         except Exception:
-            # En caso de cualquier error con la memoria, no interrumpimos la ejecución
             prev_messages = []
             user_key = None
         
-        # Actualizamos la memoria con el nuevo mensaje (guardamos máximo 3)
+        # Actualizar memoria
         try:
             if user_key is not None:
                 mem = CHAT_MEMORY.get(user_key, [])
                 mem.append(user_message)
-                # Mantener solo los últimos 3 mensajes
                 if len(mem) > 3:
                     mem = mem[-3:]
                 CHAT_MEMORY[user_key] = mem
         except Exception:
-            # si falla, no queremos que fallé el endpoint
             pass
-        # ===========================================================
         
-        # Obtener contexto y URLs relevantes (métodos seguros si URLS/SYSTEM_PROMPT dejaron como placeholders)
+        # Obtener contexto y URLs relevantes
         context = safe_get_context_for_query(user_message)
         relevant_urls = safe_extract_relevant_urls(user_message)
         
-        # Formatear URLs para el prompt
+        # Formatear URLs para el prompt WEB
         urls_text = ""
         if relevant_urls:
-            urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:10]])  # Limitar a 10 URLs
+            urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:10]])
         else:
             urls_text = "Explora nuestras áreas: Telecomunicaciones, Educación (aprende.org) y Salud (clikisalud.net)"
         
-        # Preparar mensajes para Groq
-        # El SYSTEM_PROMPT fue pedido como placeholder por el usuario; el siguiente formateo lo mantendrá tal cual.
+        # Preparar mensajes para Groq (WEB)
         try:
             formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
         except Exception:
-            # Si SYSTEM_PROMPT es {}, usamos un prompt por defecto mínimo
             formatted_prompt = f"Eres un asistente. Contexto:\n{context}\n\n{urls_text}"
         
-        # Construir la secuencia de mensajes incluyendo los hasta 3 mensajes previos del usuario
+        # Construir mensajes con memoria
         messages = [
             {"role": "system", "content": formatted_prompt}
         ]
         
-        # Incluir mensajes previos como contexto adicional (si existen)
+        # Incluir mensajes previos
         for pm in prev_messages:
-            # Evitar duplicar exactamente el mensaje actual
             if pm and pm.strip() and pm.strip() != user_message.strip():
                 messages.append({"role": "user", "content": pm})
         
-        # Finalmente agregar el mensaje actual
+        # Mensaje actual
         messages.append({"role": "user", "content": user_message})
         
         # Llamar a Groq
@@ -1054,19 +1081,16 @@ def chat():
                 max_tokens=2048
             )
             response = completion.choices[0].message.content 
-            
         else:
             result = call_groq_api_directly(messages)
             response = result["choices"][0]["message"]["content"]
-            
         
-        # Devolver también qué mensajes previos se usaron (útil para depuración; puede quitarse si se desea)
         return jsonify({
             "success": True,
             "response": response,
             "context": context,
-            "relevant_urls": relevant_urls[:5],  # Devolver las 5 URLs más relevantes
-            "memory_used": prev_messages  # <-- aquí se muestran los mensajes previos que se incluyeron
+            "relevant_urls": relevant_urls[:5],
+            "memory_used": prev_messages
         })
         
     except Exception as e:
@@ -1075,6 +1099,93 @@ def chat():
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route('/whatsapp', methods=['POST'])
+def whatsapp_webhook():
+    """Endpoint para recibir y responder mensajes de WhatsApp vía Twilio"""
+    try:
+        # Obtener mensaje de WhatsApp
+        incoming_msg = request.values.get('Body', '').strip()
+        from_number = request.values.get('From', '')
+        
+        logger.info(f"📱 WhatsApp de {from_number}: {incoming_msg}")
+        
+        if not incoming_msg:
+            resp = MessagingResponse()
+            resp.message("Por favor envía un mensaje válido.")
+            return str(resp)
+        
+        # ================= Memoria para WhatsApp (por número) =================
+        user_key = from_number
+        mem = CHAT_MEMORY.get(user_key, [])
+        prev_messages = mem[-3:] if mem else []
+        
+        # Actualizar memoria
+        mem.append(incoming_msg)
+        if len(mem) > 3:
+            mem = mem[-3:]
+        CHAT_MEMORY[user_key] = mem
+        
+        # Obtener contexto y URLs
+        context = safe_get_context_for_query(incoming_msg)
+        relevant_urls = safe_extract_relevant_urls(incoming_msg)
+        
+        logger.info(f"🔍 URLs encontradas para WhatsApp: {len(relevant_urls)}")
+        
+        # Formatear URLs para WhatsApp (formato simple)
+        urls_text = ""
+        if relevant_urls:
+            urls_text = "\n\n_Enlaces útiles:_\n" + "\n".join([f"• {url}" for url in relevant_urls[:5]])
+        else:
+            urls_text = "\n\n_Más info:_\n• https://aprende.org\n• https://www.clikisalud.net"
+        
+        # Preparar prompt para WhatsApp
+        try:
+            formatted_prompt = WHATSAPP_SYSTEM_PROMPT.format(
+                context=context,
+                urls=urls_text
+            )
+        except Exception:
+            formatted_prompt = f"Eres un asistente para WhatsApp. Usa formato Markdown de WhatsApp.\n\nContexto:\n{context}\n\n{urls_text}"
+        
+        # Construir mensajes con memoria
+        messages = [{"role": "system", "content": formatted_prompt}]
+        
+        for pm in prev_messages[:-1]:  # Excluir mensaje actual
+            if pm and pm.strip():
+                messages.append({"role": "user", "content": pm})
+        
+        messages.append({"role": "user", "content": incoming_msg})
+        
+        # Llamar a Groq
+        if client and client != "api_fallback":
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.5,
+                max_tokens=1000  # Reducido para WhatsApp
+            )
+            ai_response = completion.choices[0].message.content
+        else:
+            result = call_groq_api_directly(messages)
+            ai_response = result["choices"][0]["message"]["content"]
+        
+        # Limitar longitud para WhatsApp (1500 caracteres)
+        if len(ai_response) > 1500:
+            ai_response = ai_response[:1497] + "..."
+        
+        # Crear respuesta TwiML
+        resp = MessagingResponse()
+        resp.message(ai_response)
+        
+        logger.info(f"✅ WhatsApp enviado a {from_number} ({len(ai_response)} chars)")
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+        
+    except Exception as e:
+        logger.error(f"❌ Error en /whatsapp: {str(e)}")
+        resp = MessagingResponse()
+        resp.message("❌ Error procesando mensaje. Intenta nuevamente.")
+        return str(resp), 200, {'Content-Type': 'text/xml'}
 
 @app.route('/urls', methods=['POST'])
 def get_urls():
@@ -1122,7 +1233,6 @@ def serve_images(filename):
     try:
         with open(f'../frontend/images/{filename}', 'rb') as f:
             content = f.read()
-            # Detectar tipo de imagen por extensión
             content_type = 'image/png'
             if filename.endswith('.jpg') or filename.endswith('.jpeg'):
                 content_type = 'image/jpeg'
@@ -1156,91 +1266,13 @@ def serve_static(path):
     except Exception as e:
         return f"Archivo no encontrado: {path}", 404
 
-@app.route('/whatsapp', methods=['POST'])
-def whatsapp_webhook():
-    """Endpoint para recibir mensajes de WhatsApp vía Twilio"""
-    try:
-        # Obtener datos del mensaje de WhatsApp
-        incoming_msg = request.values.get('Body', '').strip()
-        from_number = request.values.get('From', '')
-        
-        logger.info(f"📱 Mensaje de WhatsApp recibido de {from_number}: {incoming_msg}")
-        
-        if not incoming_msg:
-            resp = MessagingResponse()
-            resp.message("Por favor envía un mensaje válido.")
-            return str(resp)
-        
-        # Usar el número de WhatsApp como user_key para la memoria
-        user_key = from_number
-        mem = CHAT_MEMORY.get(user_key, [])
-        prev_messages = mem[-3:] if mem else []
-        
-        # Actualizar memoria
-        mem.append(incoming_msg)
-        if len(mem) > 3:
-            mem = mem[-3:]
-        CHAT_MEMORY[user_key] = mem
-        
-        # Obtener contexto y URLs
-        context = safe_get_context_for_query(incoming_msg)
-        relevant_urls = safe_extract_relevant_urls(incoming_msg)
-        
-        # Formatear URLs
-        urls_text = ""
-        if relevant_urls:
-            urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:5]])
-        else:
-            urls_text = "Explora: Telecomunicaciones, Educación (aprende.org) y Salud (clikisalud.net)"
-        
-        # Preparar prompt
-        try:
-            formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
-        except Exception:
-            formatted_prompt = f"Eres un asistente. Contexto:\n{context}\n\n{urls_text}"
-        
-        # Construir mensajes con memoria
-        messages = [{"role": "system", "content": formatted_prompt}]
-        
-        for pm in prev_messages:
-            if pm and pm.strip() and pm.strip() != incoming_msg.strip():
-                messages.append({"role": "user", "content": pm})
-        
-        messages.append({"role": "user", "content": incoming_msg})
-        
-        # Llamar a Groq
-        if client and client != "api_fallback":
-            completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
-                messages=messages,
-                temperature=0.5,
-                max_tokens=1000  # Reducido para WhatsApp
-            )
-            ai_response = completion.choices[0].message.content
-        else:
-            result = call_groq_api_directly(messages)
-            ai_response = result["choices"][0]["message"]["content"]
-        
-        # Limitar respuesta para WhatsApp (max 1600 caracteres)
-        if len(ai_response) > 1600:
-            ai_response = ai_response[:1597] + "..."
-        
-        # Crear respuesta TwiML
-        resp = MessagingResponse()
-        resp.message(ai_response)
-        
-        logger.info(f"✅ Respuesta enviada a {from_number}")
-        return str(resp), 200, {'Content-Type': 'text/xml'}
-        
-    except Exception as e:
-        logger.error(f"❌ Error en /whatsapp: {str(e)}")
-        resp = MessagingResponse()
-        resp.message("Lo siento, hubo un error procesando tu mensaje. Intenta nuevamente.")
-        return str(resp), 200, {'Content-Type': 'text/xml'}
-
+# ==================== INICIO DE LA APLICACIÓN ====================
 if __name__ == '__main__':
-    logger.info(f"🚀 Iniciando Telecom Copilot v2.0 en http://localhost:{PORT}")
-    logger.info("📚 Áreas disponibles: Telecomunicaciones | Educación | Salud")
+    logger.info(f"🚀 Iniciando Telecom Copilot v2.0 + WhatsApp en http://localhost:{PORT}")
+    logger.info("📱 Endpoints disponibles:")
+    logger.info("   - /chat (Web)")
+    logger.info("   - /whatsapp (Twilio)")
+    logger.info("   - /urls (Búsqueda de URLs)")
+    logger.info("   - /health (Health check)")
+    logger.info("📚 Áreas: Telecomunicaciones | Educación | Salud")
     app.run(host='0.0.0.0', port=PORT, debug=False)
-
-
