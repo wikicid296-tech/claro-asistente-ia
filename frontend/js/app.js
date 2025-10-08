@@ -1,6 +1,19 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
 const API_URL = 'https://claro-asistente-ia.onrender.com'; // Tu URL de Render
 
+
+// ==================== CONFIGURACIÓN DE LÍMITE DE MENSAJES ====================
+const MESSAGE_LIMIT = {
+    FREE: 5,  // Límite de mensajes gratis (solo cuenta mensajes del usuario)
+    PRO: Infinity
+};
+
+// Estado del usuario
+const userState = {
+    isPro: false,
+    messageCount: 0
+};
+
 // Configuración de tokens
 const TOKEN_CONFIG = {
     MAX_TOKENS: 1000,
@@ -176,14 +189,30 @@ function initializeEventListeners() {
         updateTokenCounter(tokens);
     });
 
+    // ===== NUEVO: Detectar clic en input cuando está en límite =====
+elements.userInput.addEventListener('click', function() {
+    if (this.classList.contains('limit-reached')) {
+        showPremiumModal();
+    }
+});
+
+
+// ===== NUEVO: Detectar focus en input cuando está en límite =====
+elements.userInput.addEventListener('focus', function() {
+    if (this.classList.contains('limit-reached')) {
+        this.blur(); // Quitar el focus
+        showPremiumModal();
+    }
+});
+
     // Enter para enviar
     elements.userInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && this.value.trim() && !elements.sendBtn.disabled) {
-            sendMessage(this.value.trim());
-            this.value = '';
-            updateTokenCounter(0);
-        }
-    });
+    if (e.key === 'Enter' && this.value.trim() && !elements.sendBtn.disabled && !this.disabled) {
+        sendMessage(this.value.trim());
+        this.value = '';
+        updateTokenCounter(0);
+    }
+});
     
     // Cerrar menú al hacer clic fuera
     document.addEventListener('click', handleOutsideClick);
@@ -225,9 +254,14 @@ function handleNavigation(e) {
 // ==================== NUEVA CONVERSACIÓN ====================
 function startNewConversation() {
     appState.conversationHistory = [];
+    userState.messageCount = 0;
     elements.chatHistory.innerHTML = '';
     elements.welcomePage.style.display = 'flex';
     elements.chatPage.style.display = 'none';
+    
+    // NUEVO: Habilitar input al iniciar nueva conversación
+    removeLimitWarning();
+    
     saveToLocalStorage();
     
     elements.navItems.forEach(item => item.classList.remove('active'));
@@ -300,8 +334,26 @@ function handleSuggestionClick(e) {
 function sendMessage(text) {
     if (!text || !text.trim()) return;
     
+    // ===== VALIDACIÓN DE LÍMITE DE MENSAJES =====
+if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
+    showPremiumModal();
+    return;
+}
+    
     showChatView();
     addMessage('user', text);
+    
+    // Incrementar contador de mensajes del usuario
+    if (!userState.isPro) {
+        userState.messageCount++;
+        console.log(`Mensajes enviados: ${userState.messageCount}/${MESSAGE_LIMIT.FREE}`);
+        
+        // NUEVO: Deshabilitar si alcanza el límite
+        if (userState.messageCount >= MESSAGE_LIMIT.FREE) {
+            showLimitWarning();
+        }
+    }
+    
     showLoading();
     
     callAPI(text)
@@ -311,6 +363,8 @@ function sendMessage(text) {
             if (isTaskMessage(text, response)) {
                 processTask(text, response);
             }
+            
+
         })
         .catch(error => {
             console.error('Error completo:', error);
@@ -371,18 +425,47 @@ function showChatView() {
 }
 
 function addMessage(type, content) {
+    // Crear contenedor principal del mensaje
+    const messageContainer = document.createElement('div');
+    messageContainer.className = 'message-container ' + type;
+    
+    // Crear avatar
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar ' + type;
+    
+    if (type === 'bot') {
+        // Avatar del bot (logo de Claro)
+        avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
+    } else {
+        // Avatar del usuario (Material Icon)
+        avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
+    }
+    
+    // Crear contenedor del contenido
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    
+    // Crear el mensaje
     const messageDiv = document.createElement('div');
     messageDiv.className = 'msg ' + type;
     
     const formattedContent = formatMessage(content);
     messageDiv.innerHTML = formattedContent;
     
-    elements.chatHistory.appendChild(messageDiv);
+    // Ensamblar estructura
+    contentDiv.appendChild(messageDiv);
+    messageContainer.appendChild(avatarDiv);
+    messageContainer.appendChild(contentDiv);
     
+    // Agregar al chat
+    elements.chatHistory.appendChild(messageContainer);
+    
+    // Scroll automático
     setTimeout(() => {
         elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
     }, 100);
     
+    // Guardar en historial
     appState.conversationHistory.push({ 
         type, 
         content: content,
@@ -739,7 +822,9 @@ function saveToLocalStorage() {
             conversationHistory: appState.conversationHistory.slice(-50),
             tasks: appState.tasks,
             currentMode: appState.currentMode,
-            sessionId: sessionStorage.getItem('claroAssistant_sessionId')
+            sessionId: sessionStorage.getItem('claroAssistant_sessionId'),
+            messageCount: userState.messageCount,  // NUEVO
+            isPro: userState.isPro  // NUEVO
         };
         localStorage.setItem('claroAssistant_state', JSON.stringify(data));
     } catch (e) {
@@ -767,21 +852,51 @@ function loadFromLocalStorage() {
                 appState.conversationHistory = data.conversationHistory || [];
                 appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
                 appState.currentMode = data.currentMode || 'busqueda';
+                userState.messageCount = data.messageCount || 0;
+                userState.isPro = data.isPro || false;
+                
+                // NUEVO: Deshabilitar input si ya alcanzó el límite
+                if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
+                    showLimitWarning();
+                }
                 
                 if (appState.conversationHistory.length > 0) {
                     showChatView();
                     elements.chatHistory.innerHTML = '';
+                    
                     appState.conversationHistory.forEach(msg => {
+                        const messageContainer = document.createElement('div');
+                        messageContainer.className = 'message-container ' + msg.type;
+                        
+                        const avatarDiv = document.createElement('div');
+                        avatarDiv.className = 'message-avatar ' + msg.type;
+                        
+                        if (msg.type === 'bot') {
+                            avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
+                        } else {
+                            avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
+                        }
+                        
+                        const contentDiv = document.createElement('div');
+                        contentDiv.className = 'message-content';
+                        
                         const messageDiv = document.createElement('div');
                         messageDiv.className = 'msg ' + msg.type;
                         messageDiv.innerHTML = formatMessage(msg.content);
-                        elements.chatHistory.appendChild(messageDiv);
+                        
+                        contentDiv.appendChild(messageDiv);
+                        messageContainer.appendChild(avatarDiv);
+                        messageContainer.appendChild(contentDiv);
+                        
+                        elements.chatHistory.appendChild(messageContainer);
                     });
+                    
                     console.log('Conversacion restaurada');
                 }
                 
                 updateTasksUI();
                 console.log('Tareas cargadas:', appState.tasks);
+                console.log(`Mensajes usados: ${userState.messageCount}/${MESSAGE_LIMIT.FREE}`);
             } else {
                 console.log('Nueva pestana - chat limpio');
             }
@@ -790,6 +905,94 @@ function loadFromLocalStorage() {
         console.error('Error cargando desde localStorage:', e);
     }
 }
+
+
+// ==================== FUNCIONES DEL MODAL PREMIUM ====================
+function showPremiumModal() {
+    const overlay = document.getElementById('premiumOverlay');
+    if (overlay) {
+        overlay.classList.add('active');
+    }
+}
+
+function closePremiumModal() {
+    const overlay = document.getElementById('premiumOverlay');
+    if (overlay) {
+        overlay.classList.remove('active');
+    }
+}
+
+
+// ==================== FUNCIONES PARA DESHABILITAR INPUT ====================
+function showLimitWarning() {
+    elements.userInput.value = '';
+    elements.userInput.placeholder = '⚠️ Límite alcanzado - Hazte Pro (clic aquí)';
+    elements.userInput.readOnly = true; // Cambiar a solo lectura en lugar de disabled
+    elements.userInput.style.cursor = 'pointer';
+    elements.userInput.style.fontWeight = '500';
+    elements.userInput.style.color = '#DA291C';
+    elements.sendBtn.disabled = true;
+    elements.sendBtn.style.opacity = '0.5';
+    elements.sendBtn.style.cursor = 'not-allowed';
+    
+    // Agregar clase para identificar estado de límite
+    elements.userInput.classList.add('limit-reached');
+}
+
+function removeLimitWarning() {
+    elements.userInput.placeholder = 'Pregunta lo que quieras';
+    elements.userInput.readOnly = false;
+    elements.userInput.style.cursor = 'text';
+    elements.userInput.style.fontWeight = 'normal';
+    elements.userInput.style.color = '';
+    elements.sendBtn.disabled = false;
+    elements.sendBtn.style.opacity = '1';
+    elements.sendBtn.style.cursor = 'pointer';
+    
+    // Remover clase de límite
+    elements.userInput.classList.remove('limit-reached');
+}
+
+function upgradeToPro() {
+    // Solo cerrar el modal sin mostrar alerta
+    closePremiumModal();
+    
+    // OPCIONAL: Si quieres redirigir a una página real de upgrade:
+    // window.location.href = '/upgrade';
+    
+    // OPCIONAL: Para testing, puedes activar Pro temporalmente descomentando estas líneas:
+    /*
+    userState.isPro = true;
+    userState.messageCount = 0;
+    enableInput();
+    saveToLocalStorage();
+    console.log('✅ Modo Pro activado (testing)');
+    */
+}
+
+// Event Listeners para el modal
+document.addEventListener('DOMContentLoaded', function() {
+    const btnUpgradePro = document.getElementById('btnUpgradePro');
+    const btnClosePremium = document.getElementById('btnClosePremium');
+    const premiumOverlay = document.getElementById('premiumOverlay');
+    
+    if (btnUpgradePro) {
+        btnUpgradePro.addEventListener('click', upgradeToPro);
+    }
+    
+    if (btnClosePremium) {
+        btnClosePremium.addEventListener('click', closePremiumModal);
+    }
+    
+    // Cerrar al hacer clic fuera del modal
+    if (premiumOverlay) {
+        premiumOverlay.addEventListener('click', function(e) {
+            if (e.target === premiumOverlay) {
+                closePremiumModal();
+            }
+        });
+    }
+});
 
 // ==================== RESPONSIVE HANDLERS ====================
 window.addEventListener('resize', function() {
