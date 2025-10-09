@@ -544,6 +544,9 @@ function formatMessage(content) {
         if (line.trim() === '') {
             return '<div class="msg-spacer"></div>';
         }
+            if (line.startsWith('#### ')) {
+        return `<h4 class="msg-header">${escapeHtml(line.substring(5))}</h4>`;
+      }
         
         if (line.startsWith('### ')) {
             return `<h3 class="msg-header">${escapeHtml(line.substring(4))}</h3>`;
@@ -926,7 +929,7 @@ function closePremiumModal() {
 // ==================== FUNCIONES PARA DESHABILITAR INPUT ====================
 function showLimitWarning() {
     elements.userInput.value = '';
-    elements.userInput.placeholder = '⚠️ Límite alcanzado - Hazte Pro (clic aquí)';
+    elements.userInput.placeholder = '⚠️ Límite alcanzado - Hazte Pro';
     elements.userInput.readOnly = true; // Cambiar a solo lectura en lugar de disabled
     elements.userInput.style.cursor = 'pointer';
     elements.userInput.style.fontWeight = '500';
