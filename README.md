@@ -29,7 +29,7 @@
 
 1. **Clonar el repositorio**
 ```bash
-git clone https://github.com/tuusuario/telecom-copilot.git
+git clone [https://github.com/tuusuario/telecom-copilot.git](https://github.com/wikicid296-tech/claro-asistente-ia.git)
 cd telecom-copilot
 
 
