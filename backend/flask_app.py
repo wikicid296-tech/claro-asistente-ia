@@ -24,7 +24,6 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.getenv("PORT", 10000))
 
 # ==================== INICIALIZAR CLIENTES ====================
-# Inicializar cliente Twilio
 try:
     if TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN:
         twilio_client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
@@ -36,7 +35,6 @@ except Exception as e:
     logger.error(f"❌ Error inicializando Twilio: {str(e)}")
     twilio_client = None
 
-# Inicializar cliente Groq
 try:
     if GROQ_API_KEY:
         from groq import Groq
@@ -56,20 +54,109 @@ except Exception as e:
     logger.error(f"❌ Error inicializando Groq: {str(e)}")
     client = None
 
-# ==================== MEMORIA DE CONVERSACIÓN ====================
+# ==================== MEMORIA DE CONVERSACIÓN MEJORADA ====================
 CHAT_MEMORY = {}
 
 def _get_user_key():
-    """
-    Genera una clave simple para identificar al cliente basada en IP y User-Agent.
-    Para web app.
-    """
+    """Genera una clave simple para identificar al cliente basada en IP y User-Agent."""
     ip = request.remote_addr or "unknown"
     ua = request.headers.get("User-Agent", "")
     return f"{ip}:{ua}"
 
-# ==================== URLS DE CONTENIDO ====================
-# COLOCA AQUÍ TU ESTRUCTURA DE URLS
+# ==================== NUEVA FUNCIÓN: DETECTAR CAMBIO DE CONTEXTO ====================
+def detect_context_change(current_message, previous_messages):
+    """
+    Detecta si el mensaje actual es de un contexto COMPLETAMENTE DIFERENTE
+    a los mensajes anteriores.
+    
+    Returns: True si hay cambio de contexto, False si es continuación
+    """
+    if not previous_messages or len(previous_messages) == 0:
+        return False
+    
+    # Obtener el contexto del mensaje actual
+    current_context = detect_main_topic(current_message)
+    
+    # Obtener contextos de mensajes anteriores
+    previous_contexts = [detect_main_topic(msg) for msg in previous_messages]
+    
+    # Si el contexto actual es diferente a TODOS los anteriores, es cambio de contexto
+    if current_context and all(current_context != prev_ctx for prev_ctx in previous_contexts if prev_ctx):
+        logger.info(f"🔄 CAMBIO DE CONTEXTO detectado: {previous_contexts[-1] if previous_contexts else 'none'} → {current_context}")
+        return True
+    
+    return False
+
+def detect_main_topic(text):
+    """
+    Detecta el tema principal del mensaje.
+    Retorna: 'telecom', 'education', 'health', 'task', 'general'
+    """
+    text_lower = text.lower()
+    
+    # Palabras clave específicas por tema
+    telecom_keywords = ['claro', 'telcel', 'a1', 'plan', 'internet', 'telefon', 'móvil', 'movil', 
+                        'datos', 'paquete', 'recarga', 'operador', 'señal']
+    
+    education_keywords = ['curso', 'aprender', 'estudiar', 'educaci', 'diploma', 'universidad',
+                         'inglés', 'ingles', 'programa', 'capacita', 'aprende.org', 'clase',
+                         'enseña', 'profesor', 'escuela', 'carrera', 'profesional']
+    
+    health_keywords = ['salud', 'medic', 'doctor', 'enfermedad', 'diabetes', 'presión', 'presion',
+                      'nutrición', 'nutricion', 'dieta', 'ejercicio', 'hospital', 'sintoma',
+                      'tratamiento', 'clikisalud', 'clinica']
+    
+    task_keywords = ['recordar', 'recuerdame', 'recuérdame', 'agenda', 'agendar', 'nota', 'anota',
+                    'guardar', 'programa']
+    
+    # Contar coincidencias
+    telecom_count = sum(1 for kw in telecom_keywords if kw in text_lower)
+    education_count = sum(1 for kw in education_keywords if kw in text_lower)
+    health_count = sum(1 for kw in health_keywords if kw in text_lower)
+    task_count = sum(1 for kw in task_keywords if kw in text_lower)
+    
+    # Determinar tema predominante
+    counts = {
+        'telecom': telecom_count,
+        'education': education_count,
+        'health': health_count,
+        'task': task_count
+    }
+    
+    max_count = max(counts.values())
+    
+    if max_count == 0:
+        return 'general'
+    
+    # Retornar el tema con más coincidencias
+    for topic, count in counts.items():
+        if count == max_count:
+            return topic
+    
+    return 'general'
+
+# ==================== NUEVA FUNCIÓN: OBTENER MEMORIA RELEVANTE ====================
+def get_relevant_memory(user_key, current_message):
+    """
+    Obtiene solo la memoria RELEVANTE al contexto actual.
+    Si hay cambio de contexto, limpia la memoria automáticamente.
+    """
+    mem = CHAT_MEMORY.get(user_key, [])
+    
+    if not mem:
+        return []
+    
+    # Detectar si hay cambio de contexto
+    if detect_context_change(current_message, mem):
+        logger.info(f"🧹 Limpiando memoria anterior por cambio de contexto")
+        CHAT_MEMORY[user_key] = []  # Limpiar memoria
+        return []
+    
+    # Si no hay cambio, retornar solo el último mensaje (en lugar de 3)
+    # Esto reduce la "contaminación" de contexto
+    return mem[-1:] if mem else []
+
+# ==================== URLs Y DETECCIÓN (MANTENER IGUAL) ====================
 URLS = {
     "claro": {
             "Argentina": [
@@ -434,13 +521,125 @@ URLS = {
     }
 }
 
+
+# Mantener funciones de detección originales
+def detect_country(text):
+    """Detecta país mencionado en el texto"""
+    text_lower = text.lower()
+    country_keywords = {
+        "mexico": ["mexico", "méxico", "mexicano"],
+        "argentina": ["argentina", "argentino"],
+        "peru": ["peru", "perú", "peruano"],
+        "chile": ["chile", "chileno"]
+    }
+    for country, keywords in country_keywords.items():
+        if any(keyword in text_lower for keyword in keywords):
+            return country
+    return None
+
+def detect_operator(text):
+    text_lower = text.lower()
+    if "claro" in text_lower:
+        return "claro"
+    elif "telcel" in text_lower:
+        return "telcel"
+    elif "a1" in text_lower:
+        return "a1"
+    return None
+
+def detect_health_topic(text):
+    text_lower = text.lower()
+    health_topics = {
+        "diabetes": ["diabetes"],
+        "obesidad_nutricion": ["obesidad", "nutricion"],
+        "salud_mental": ["depresion", "ansiedad"]
+    }
+    for topic, keywords in health_topics.items():
+        if any(keyword in text_lower for keyword in keywords):
+            return topic
+    return None
+
+def detect_education_topic(text):
+    text_lower = text.lower()
+    education_topics = {
+        "digital_tech": ["programacion", "tecnologia"],
+        "idiomas": ["ingles", "inglés"]
+    }
+    for topic, keywords in education_topics.items():
+        if any(keyword in text_lower for keyword in keywords):
+            return topic
+    return None
+
+def extract_relevant_urls(prompt):
+    """Extrae URLs relevantes basándose en la consulta del usuario"""
+    relevant_urls = []
+    operator = detect_operator(prompt)
+    health_topic = detect_health_topic(prompt)
+    education_topic = detect_education_topic(prompt)
+    
+    if health_topic:
+        relevant_urls.extend(URLS.get("health", {}).get("cuidado_personal_y_profesional", []))
+    elif education_topic:
+        relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("principal", []))
+    elif operator:
+        if operator == "telcel":
+            relevant_urls.extend(URLS.get("telcel", []))
+        elif operator == "claro":
+            for country_urls in URLS.get("claro", {}).values():
+                relevant_urls.extend(country_urls[:1])
+    
+    return list(set(relevant_urls))[:5]
+
+def get_context_for_query(prompt):
+    """Genera contexto descriptivo para la consulta"""
+    health_topic = detect_health_topic(prompt)
+    education_topic = detect_education_topic(prompt)
+    operator = detect_operator(prompt)
+    
+    if health_topic:
+        return "📋 ÁREA: SALUD Y BIENESTAR"
+    elif education_topic:
+        return "📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL"
+    elif operator:
+        return "🌐 ÁREA: TELECOMUNICACIONES"
+    else:
+        return "ℹ️ Asistente general disponible"
+
+def safe_extract_relevant_urls(prompt):
+    try:
+        return extract_relevant_urls(prompt)
+    except Exception:
+        return []
+
+def safe_get_context_for_query(prompt):
+    try:
+        return get_context_for_query(prompt)
+    except Exception:
+        return "Información general disponible"
+
+def call_groq_api_directly(messages):
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": messages,
+        "temperature": 0.5,
+        "max_tokens": 2048
+    }
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status()
+    return response.json()
+
 # ==================== SYSTEM PROMPTS ====================
 # COLOCA AQUÍ TU SYSTEM_PROMPT PARA WEB
 SYSTEM_PROMPT = """Eres un asistente virtual multifuncional con capacidades especializadas en cuatro roles principales.
-IMPORTANTE: DETECTA LA PETICION PRINCIPAL DEL USUARIO QUE CORRESPONDE A LA PARTE ULTIMA DEL CONTEXTO EN CASO DE SER AMBIGUA TOMA COMO REFERENCIA LOS MENSAJES ANTERIORES DEL USUARIO PERO SOLO RESPONDE A LA PETICION MAS ACTUAL DEL USUARIO
+**DIRECTRIZ DE PRIORIDAD ESTRICTA:** Analiza la solicitud del usuario. **Ignora por completo** cualquier petición previa si la solicitud más reciente es **explícita** y **diferente** (ej. "olvida lo anterior y dame información de [nuevo tema]"). Si la petición más reciente es **ambigua** o de **una sola palabra** (ej. "Inglés"), **SOLO entonces** utiliza el contexto inmediato anterior del usuario para inferir el tema (ej. "cursos de Inglés"). **Tu respuesta debe enfocarse exclusivamente en la petición más actual del usuario**, desatendiendo cualquier tema anterior que no esté directamente relacionado o implícito en la última solicitud.
 IMPORTANTE: TODA RESPUESTA DEBE SER DEVUELTA EN MARKDOWN A EXCEPCIÓN DE LOS ROLES QUE INDIQUEN OTRO FORMATO DE RESPUESTA DE ACUERDO A LA SIGUIENTE GUÍA:
 
-FORMATO MARKDOWN REQUERIDO: 
+FORMATO MARKDOWN REQUERIDO NO USES ESTILOS FUERA DE ESTOS: 
 
 Elemento	Sintaxis
 Encabezados	
@@ -723,310 +922,33 @@ RECURSOS DISPONIBLES:
 {urls}
 """
 
-# ==================== FUNCIONES DE DETECCIÓN ====================
-def detect_country(text):
-    """Detecta país mencionado en el texto"""
-    text_lower = text.lower()
-    country_keywords = {
-        "argentina": ["argentina", "argentino", "buenos aires", "arg"],
-        "peru": ["peru", "perú", "peruano", "lima"],
-        "chile": ["chile", "chileno", "santiago"],
-        "mexico": ["mexico", "méxico", "mexicano", "cdmx", "ciudad de mexico"],
-        "el_salvador": ["el salvador", "salvador", "salvadoreño", "san salvador"],
-        "colombia": ["colombia", "colombiano", "bogota", "bogotá"],
-        "nicaragua": ["nicaragua", "nicaraguense", "managua"],
-        "honduras": ["honduras", "hondureño", "tegucigalpa"],
-        "guatemala": ["guatemala", "guatemalteco"],
-        "costa_rica": ["costa rica", "costarricense"],
-        "ecuador": ["ecuador", "ecuatoriano"],
-        "paraguay": ["paraguay", "paraguayo"],
-        "uruguay": ["uruguay", "uruguayo"],
-        "panama": ["panama", "panamá", "panameño"],
-        "puerto_rico": ["puerto rico", "puertorriqueño"],
-        "republica_dominicana": ["republica dominicana", "república dominicana", "dominicano"],
-        "brasil": ["brasil", "brazil", "brasileño"],
-        "austria": ["austria", "austriaco", "viena"],
-        "bulgaria": ["bulgaria", "bulgaro", "sofia"],
-        "croacia": ["croacia", "croata", "zagreb"],
-        "bielorrusia": ["bielorrusia", "belarus", "bielorruso", "minsk"],
-        "serbia": ["serbia", "serbio", "belgrado"],
-        "eslovenia": ["eslovenia", "esloveno", "liubliana"],
-        "macedonia": ["macedonia", "macedonio", "skopje"]
-    }
-    
-    for country, keywords in country_keywords.items():
-        if any(keyword in text_lower for keyword in keywords):
-            return country
-    return None
-
-def detect_operator(text):
-    """Detecta operadora de telecomunicaciones"""
-    text_lower = text.lower()
-    if "claro" in text_lower:
-        return "claro"
-    elif "telcel" in text_lower:
-        return "telcel"
-    elif "a1" in text_lower:
-        return "a1"
-    return None
-
-def detect_health_topic(text):
-    """Detecta tema específico de salud"""
-    text_lower = text.lower()
-    
-    health_topics = {
-        "diabetes": ["diabetes", "diabetico", "diabética", "glucosa", "insulina", "azucar en sangre"],
-        "obesidad_nutricion": ["obesidad", "sobrepeso", "nutricion", "dieta", "alimentacion", "bajar de peso"],
-        "hipertension_corazon": ["hipertension", "presion alta", "corazon", "cardiaco", "cardiovascular"],
-        "cancer": ["cancer", "cáncer", "tumor", "oncologia", "oncológico", "mama", "prostata"],
-        "salud_mental": ["depresion", "ansiedad", "estres", "mental", "psicologico", "psicológico"],
-        "edad": ["niño", "niña", "bebe", "bebé", "adolescente", "adulto", "anciano", "tercera edad"]
-    }
-    
-    for topic, keywords in health_topics.items():
-        if any(keyword in text_lower for keyword in keywords):
-            return topic
-    return None
-
-def detect_education_topic(text):
-    """Detecta tema específico de educación"""
-    text_lower = text.lower()
-    
-    education_topics = {
-        "digital_tech": ["programacion", "programación", "tecnologia", "tecnología", "digital", "computacion", "computación", "software"],
-        "finanzas": ["finanzas", "dinero", "inversion", "inversión", "ahorro", "credito", "crédito"],
-        "emprendimiento": ["emprender", "negocio", "empresa", "autoempleo", "emprendedor"],
-        "basica": ["primaria", "secundaria", "basica", "básica", "niños", "escolar"],
-        "superior": ["universidad", "licenciatura", "carrera", "profesional", "superior"],
-        "idiomas": ["ingles", "inglés", "idioma", "lenguaje"],
-        "capacitacion": ["curso", "capacitacion", "capacitación", "aprender", "estudiar", "diplomado"]
-    }
-    
-    for topic, keywords in education_topics.items():
-        if any(keyword in text_lower for keyword in keywords):
-            return topic
-    return None
-
-def extract_relevant_urls(prompt):
-    """Extrae URLs relevantes basándose en la consulta del usuario"""
-    if not URLS:
-        return []
-    
-    relevant_urls = []
-    country = detect_country(prompt)
-    operator = detect_operator(prompt)
-    health_topic = detect_health_topic(prompt)
-    education_topic = detect_education_topic(prompt)
-    
-    # SALUD
-    if health_topic:
-        if health_topic == "edad":
-            for age_range, urls in URLS.get("health", {}).get("manual_por_edad_clikisalud", {}).items():
-                relevant_urls.extend(urls)
-        else:
-            relevant_urls.extend(URLS.get("health", {}).get("cuidado_personal_y_profesional", []))
-            
-            if health_topic in URLS.get("health", {}).get("prevencion_y_enfermedades", {}):
-                relevant_urls.extend(URLS["health"]["prevencion_y_enfermedades"][health_topic])
-            
-            relevant_urls.extend(URLS.get("health", {}).get("cursos_cuidado_salud", [])[:3])
-    
-    # EDUCACIÓN
-    elif education_topic:
-        relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("principal", []))
-        relevant_urls.extend(URLS.get("education_career", {}).get("aprende_org_general", {}).get("areas_principales", []))
-        
-        if country and country in URLS.get("education_career", {}).get("plataformas_nacionales", {}):
-            relevant_urls.extend(URLS["education_career"]["plataformas_nacionales"][country])
-        
-        if education_topic == "digital_tech":
-            relevant_urls.extend(URLS.get("education_career", {}).get("rutas_y_oficios", {}).get("digital_tech", []))
-        elif education_topic == "finanzas":
-            relevant_urls.extend(URLS.get("education_career", {}).get("rutas_y_oficios", {}).get("administracion_finanzas", []))
-            relevant_urls.extend(URLS.get("education_career", {}).get("diplomados_especialidades", {}).get("administracion_finanzas", [])[:5])
-        elif education_topic == "emprendimiento":
-            relevant_urls.extend(URLS.get("education_career", {}).get("diplomados_especialidades", {}).get("autoempleo_negocio", []))
-        elif education_topic == "basica":
-            relevant_urls.extend(URLS.get("education_career", {}).get("educacion_detallada", {}).get("basica_y_media", []))
-        elif education_topic == "superior":
-            relevant_urls.extend(URLS.get("education_career", {}).get("educacion_detallada", {}).get("superior", []))
-    
-    # TELECOMUNICACIONES
-    elif operator:
-        if operator == "telcel":
-            relevant_urls.extend(URLS.get("telcel", []))
-        elif operator == "claro" and country:
-            country_key = country.replace("_", " ").title()
-            if country_key in URLS.get("claro", {}):
-                relevant_urls.extend(URLS["claro"][country_key])
-            else:
-                for country_urls in URLS.get("claro", {}).values():
-                    relevant_urls.extend(country_urls[:2])
-        elif operator == "a1" and country:
-            if country in URLS.get("a1", {}):
-                relevant_urls.extend(URLS["a1"][country])
-            else:
-                for country_urls in URLS.get("a1", {}).values():
-                    relevant_urls.extend(country_urls)
-    
-    return list(set(relevant_urls))[:10]  # Eliminar duplicados y limitar a 10
-
-def get_context_for_query(prompt):
-    """Genera contexto descriptivo para la consulta"""
-    if not URLS:
-        health_topic = detect_health_topic(prompt)
-        education_topic = detect_education_topic(prompt)
-        operator = detect_operator(prompt)
-        context = []
-        
-        if health_topic:
-            context.append("📋 ÁREA: SALUD Y BIENESTAR")
-        elif education_topic:
-            context.append("📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL")
-        elif operator:
-            context.append("🌐 ÁREA: TELECOMUNICACIONES")
-        else:
-            context.append("ℹ️ Asistente general disponible")
-        
-        return "\n".join(context) if context else "Información general disponible"
-
-    country = detect_country(prompt)
-    operator = detect_operator(prompt)
-    health_topic = detect_health_topic(prompt)
-    education_topic = detect_education_topic(prompt)
-    
-    context = []
-    
-    # SALUD
-    if health_topic:
-        context.append("📋 ÁREA: SALUD Y BIENESTAR")
-        if health_topic == "diabetes":
-            context.append("Tema: Diabetes - Prevención, cuidados y manejo")
-        elif health_topic == "obesidad_nutricion":
-            context.append("Tema: Obesidad y Nutrición")
-        elif health_topic == "hipertension_corazon":
-            context.append("Tema: Hipertensión y Salud Cardiovascular")
-        elif health_topic == "cancer":
-            context.append("Tema: Prevención y detección del cáncer")
-        elif health_topic == "salud_mental":
-            context.append("Tema: Salud Mental")
-        elif health_topic == "edad":
-            context.append("Tema: Manuales de salud por grupos de edad")
-    
-    # EDUCACIÓN
-    elif education_topic:
-        context.append("📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL")
-        if education_topic == "digital_tech":
-            context.append("Tema: Tecnología y Programación")
-        elif education_topic == "finanzas":
-            context.append("Tema: Finanzas Personales")
-        elif education_topic == "emprendimiento":
-            context.append("Tema: Emprendimiento")
-        elif education_topic == "basica":
-            context.append("Tema: Educación Básica y Media")
-        elif education_topic == "superior":
-            context.append("Tema: Educación Superior")
-        elif education_topic == "capacitacion":
-            context.append("Tema: Capacitación y Desarrollo")
-        
-        if country:
-            country_names = {
-                "el_salvador": "El Salvador",
-                "colombia": "Colombia",
-                "nicaragua": "Nicaragua",
-                "honduras": "Honduras",
-                "guatemala": "Guatemala",
-                "peru": "Perú"
-            }
-            if country in country_names:
-                context.append(f"País: {country_names[country]} - Aprende con Claro")
-    
-    # TELECOMUNICACIONES
-    elif operator:
-        context.append("🌐 ÁREA: TELECOMUNICACIONES")
-        if operator == "telcel":
-            context.append("Operador: Telcel México")
-        elif operator == "claro":
-            context.append("Operador: Claro")
-        elif operator == "a1":
-            context.append("Operador: A1 Group (Europa)")
-    
-    else:
-        context.append("ℹ️ Asistente general disponible")
-    
-    return "\n".join(context) if context else "Información general disponible"
-
-def safe_extract_relevant_urls(prompt):
-    """Wrapper que evita excepción si URLS está vacío."""
-    try:
-        return extract_relevant_urls(prompt)
-    except Exception:
-        return []
-
-def safe_get_context_for_query(prompt):
-    """Wrapper que evita excepción si SYSTEM_PROMPT o URLS están vacíos."""
-    try:
-        return get_context_for_query(prompt)
-    except Exception:
-        return "Información general disponible"
-
-def call_groq_api_directly(messages):
-    """Llamada directa a la API de Groq como fallback"""
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": messages,
-        "temperature": 0.5,
-        "max_tokens": 2048
-    }
-    
-    response = requests.post(url, headers=headers, json=data)
-    response.raise_for_status()
-    return response.json()
-
-# ==================== ENDPOINTS ====================
-
+# ==================== ENDPOINTS MEJORADOS ====================
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
     return jsonify({
-        "status": "healthy", 
-        "service": "Telecom Copilot API v2.0 + WhatsApp",
-        "ai_ready": client is not None or GROQ_API_KEY is not None,
-        "twilio_ready": twilio_client is not None,
-        "features": ["web_chat", "whatsapp", "telecomunicaciones", "educación", "salud"]
+        "status": "healthy",
+        "service": "Telecom Copilot v2.1 - Context-Aware",
+        "ai_ready": client is not None or GROQ_API_KEY is not None
     })
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    """Endpoint principal de chat WEB con contexto mejorado"""
+    """Endpoint principal de chat WEB con detección inteligente de contexto"""
     try:
         if not client and not GROQ_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": "Servicio de IA no disponible"
-            }), 503
+            return jsonify({"success": False, "error": "Servicio de IA no disponible"}), 503
         
         data = request.get_json()
         user_message = data.get('message', '')
         
         if not user_message:
-            return jsonify({
-                "success": False,
-                "error": "Mensaje vacío"
-            }), 400
+            return jsonify({"success": False, "error": "Mensaje vacío"}), 400
         
-        # ================= Memoria local por cliente WEB =================
+        # ================= MEMORIA INTELIGENTE =================
         try:
             user_key = _get_user_key()
-            mem = CHAT_MEMORY.get(user_key, [])
-            prev_messages = mem[-3:] if mem else []
+            # Usar la nueva función de memoria relevante
+            prev_messages = get_relevant_memory(user_key, user_message)
         except Exception:
             prev_messages = []
             user_key = None
@@ -1036,41 +958,42 @@ def chat():
             if user_key is not None:
                 mem = CHAT_MEMORY.get(user_key, [])
                 mem.append(user_message)
-                if len(mem) > 3:
-                    mem = mem[-3:]
+                # Reducir memoria a solo 2 mensajes (antes eran 3)
+                if len(mem) > 2:
+                    mem = mem[-2:]
                 CHAT_MEMORY[user_key] = mem
         except Exception:
             pass
         
-        # Obtener contexto y URLs relevantes
+        # Obtener contexto SOLO del mensaje actual
         context = safe_get_context_for_query(user_message)
         relevant_urls = safe_extract_relevant_urls(user_message)
         
-        # Formatear URLs para el prompt WEB
+        # Formatear URLs
         urls_text = ""
         if relevant_urls:
-            urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:10]])
+            urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:5]])
         else:
-            urls_text = "Explora nuestras áreas: Telecomunicaciones, Educación (aprende.org) y Salud (clikisalud.net)"
+            urls_text = "Explora: aprende.org | clikisalud.net"
         
-        # Preparar mensajes para Groq (WEB)
+        # Preparar prompt
         try:
             formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
         except Exception:
             formatted_prompt = f"Eres un asistente. Contexto:\n{context}\n\n{urls_text}"
         
-        # Construir mensajes con memoria
-        messages = [
-            {"role": "system", "content": formatted_prompt}
-        ]
+        # Construir mensajes
+        messages = [{"role": "system", "content": formatted_prompt}]
         
-        # Incluir mensajes previos
+        # Solo incluir mensaje anterior si es del MISMO contexto
         for pm in prev_messages:
             if pm and pm.strip() and pm.strip() != user_message.strip():
                 messages.append({"role": "user", "content": pm})
         
         # Mensaje actual
         messages.append({"role": "user", "content": user_message})
+        
+        logger.info(f"📊 Mensajes enviados a Groq: {len(messages)} (1 system + {len(prev_messages)} context + 1 current)")
         
         # Llamar a Groq
         if client and client != "api_fallback":
@@ -1080,7 +1003,7 @@ def chat():
                 temperature=0.5,
                 max_tokens=2048
             )
-            response = completion.choices[0].message.content 
+            response = completion.choices[0].message.content
         else:
             result = call_groq_api_directly(messages)
             response = result["choices"][0]["message"]["content"]
@@ -1090,102 +1013,126 @@ def chat():
             "response": response,
             "context": context,
             "relevant_urls": relevant_urls[:5],
-            "memory_used": prev_messages
+            "memory_used": len(prev_messages),
+            "context_reset": len(prev_messages) == 0  # Indica si se limpió la memoria
         })
         
     except Exception as e:
         logger.error(f"Error en /chat: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/whatsapp', methods=['POST'])
 def whatsapp_webhook():
-    """Endpoint para recibir y responder mensajes de WhatsApp vía Twilio"""
+    """Endpoint WhatsApp con detección de contexto"""
     try:
-        # Obtener mensaje de WhatsApp
         incoming_msg = request.values.get('Body', '').strip()
         from_number = request.values.get('From', '')
-        
-        logger.info(f"📱 WhatsApp de {from_number}: {incoming_msg}")
         
         if not incoming_msg:
             resp = MessagingResponse()
             resp.message("Por favor envía un mensaje válido.")
             return str(resp)
         
-        # ================= Memoria para WhatsApp (por número) =================
+        # Memoria inteligente para WhatsApp
         user_key = from_number
-        mem = CHAT_MEMORY.get(user_key, [])
-        prev_messages = mem[-3:] if mem else []
+        prev_messages = get_relevant_memory(user_key, incoming_msg)
         
         # Actualizar memoria
+        mem = CHAT_MEMORY.get(user_key, [])
         mem.append(incoming_msg)
-        if len(mem) > 3:
-            mem = mem[-3:]
+        if len(mem) > 2:
+            mem = mem[-2:]
         CHAT_MEMORY[user_key] = mem
         
-        # Obtener contexto y URLs
         context = safe_get_context_for_query(incoming_msg)
         relevant_urls = safe_extract_relevant_urls(incoming_msg)
         
-        logger.info(f"🔍 URLs encontradas para WhatsApp: {len(relevant_urls)}")
-        
-        # Formatear URLs para WhatsApp (formato simple)
         urls_text = ""
         if relevant_urls:
-            urls_text = "\n\n_Enlaces útiles:_\n" + "\n".join([f"• {url}" for url in relevant_urls[:5]])
-        else:
-            urls_text = "\n\n_Más info:_\n• https://aprende.org\n• https://www.clikisalud.net"
+            urls_text = "\n\n_Enlaces:_\n" + "\n".join([f"• {url}" for url in relevant_urls[:3]])
         
-        # Preparar prompt para WhatsApp
         try:
-            formatted_prompt = WHATSAPP_SYSTEM_PROMPT.format(
-                context=context,
-                urls=urls_text
-            )
+            formatted_prompt = WHATSAPP_SYSTEM_PROMPT.format(context=context, urls=urls_text)
         except Exception:
-            formatted_prompt = f"Eres un asistente para WhatsApp. Usa formato Markdown de WhatsApp.\n\nContexto:\n{context}\n\n{urls_text}"
+            formatted_prompt = f"Asistente WhatsApp.\n{context}\n{urls_text}"
         
-        # Construir mensajes con memoria
         messages = [{"role": "system", "content": formatted_prompt}]
         
-        for pm in prev_messages[:-1]:  # Excluir mensaje actual
+        for pm in prev_messages:
             if pm and pm.strip():
                 messages.append({"role": "user", "content": pm})
         
         messages.append({"role": "user", "content": incoming_msg})
         
-        # Llamar a Groq
         if client and client != "api_fallback":
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 temperature=0.5,
-                max_tokens=1000  # Reducido para WhatsApp
+                max_tokens=1000
             )
             ai_response = completion.choices[0].message.content
         else:
             result = call_groq_api_directly(messages)
             ai_response = result["choices"][0]["message"]["content"]
         
-        # Limitar longitud para WhatsApp (1500 caracteres)
         if len(ai_response) > 1500:
             ai_response = ai_response[:1497] + "..."
         
-        # Crear respuesta TwiML
         resp = MessagingResponse()
         resp.message(ai_response)
-        
-        logger.info(f"✅ WhatsApp enviado a {from_number} ({len(ai_response)} chars)")
         return str(resp), 200, {'Content-Type': 'text/xml'}
         
     except Exception as e:
-        logger.error(f"❌ Error en /whatsapp: {str(e)}")
+        logger.error(f"Error en /whatsapp: {str(e)}")
         resp = MessagingResponse()
-        resp.message("❌ Error procesando mensaje. Intenta nuevamente.")
+        resp.message("❌ Error. Intenta nuevamente.")
         return str(resp), 200, {'Content-Type': 'text/xml'}
+
+# ==================== ENDPOINTS ESTÁTICOS (MANTENER IGUALES) ====================
+@app.route('/')
+def serve_frontend():
+    try:
+        with open('../frontend/index.html', 'r', encoding='utf-8') as f:
+            return f.read()
+    except Exception as e:
+        return f"Error: {str(e)}", 500
+
+@app.route('/images/<path:filename>')
+def serve_images(filename):
+    """Servir imágenes"""
+    try:
+        with open(f'../frontend/images/{filename}', 'rb') as f:
+            content = f.read()
+            content_type = 'image/png'
+            if filename.endswith('.jpg'):
+                content_type = 'image/jpeg'
+            elif filename.endswith('.svg'):
+                content_type = 'image/svg+xml'
+            return content, 200, {'Content-Type': content_type}
+    except Exception as e:
+        logger.error(f"❌ Error sirviendo imagen {filename}: {str(e)}")
+        return "Imagen no encontrada", 404
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Servir archivos estáticos CSS y JS"""
+    try:
+        if path.startswith('styles/'):
+            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
+                return f.read(), 200, {'Content-Type': 'text/css'}
+        elif path.startswith('js/'):
+            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
+                return f.read(), 200, {'Content-Type': 'application/javascript'}
+        else:
+            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
+                return f.read()
+    except FileNotFoundError:
+        logger.error(f"❌ Archivo no encontrado: {path}")
+        return f"Archivo no encontrado: {path}", 404
+    except Exception as e:
+        logger.error(f"❌ Error sirviendo {path}: {str(e)}")
+        return f"Error sirviendo archivo: {path}", 500
 
 @app.route('/urls', methods=['POST'])
 def get_urls():
@@ -1217,62 +1164,7 @@ def get_urls():
             "error": str(e)
         }), 500
 
-# ==================== SERVIR FRONTEND ====================
-@app.route('/')
-def serve_frontend():
-    """Servir el frontend HTML"""
-    try:
-        with open('../frontend/index.html', 'r', encoding='utf-8') as f:
-            return f.read()
-    except Exception as e:
-        return f"Error cargando frontend: {str(e)}", 500
-
-@app.route('/images/<path:filename>')
-def serve_images(filename):
-    """Servir imágenes"""
-    try:
-        with open(f'../frontend/images/{filename}', 'rb') as f:
-            content = f.read()
-            content_type = 'image/png'
-            if filename.endswith('.jpg') or filename.endswith('.jpeg'):
-                content_type = 'image/jpeg'
-            elif filename.endswith('.svg'):
-                content_type = 'image/svg+xml'
-            elif filename.endswith('.ico'):
-                content_type = 'image/x-icon'
-            elif filename.endswith('.gif'):
-                content_type = 'image/gif'
-            elif filename.endswith('.webp'):
-                content_type = 'image/webp'
-            
-            return content, 200, {'Content-Type': content_type}
-    except Exception as e:
-        logger.error(f"Error sirviendo imagen {filename}: {str(e)}")
-        return f"Imagen no encontrada: {filename}", 404
-
-@app.route('/<path:path>')
-def serve_static(path):
-    """Servir archivos estáticos"""
-    try:
-        if path.startswith('styles/'):
-            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
-                return f.read(), 200, {'Content-Type': 'text/css'}
-        elif path.startswith('js/'):
-            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
-                return f.read(), 200, {'Content-Type': 'application/javascript'}
-        else:
-            with open(f'../frontend/{path}', 'r', encoding='utf-8') as f:
-                return f.read()
-    except Exception as e:
-        return f"Archivo no encontrado: {path}", 404
-
-# ==================== INICIO DE LA APLICACIÓN ====================
 if __name__ == '__main__':
-    logger.info(f"🚀 Iniciando Telecom Copilot v2.0 + WhatsApp en http://localhost:{PORT}")
-    logger.info("📱 Endpoints disponibles:")
-    logger.info("   - /chat (Web)")
-    logger.info("   - /whatsapp (Twilio)")
-    logger.info("   - /urls (Búsqueda de URLs)")
-    logger.info("   - /health (Health check)")
-    logger.info("📚 Áreas: Telecomunicaciones | Educación | Salud")
+    logger.info(f"🚀 Telecom Copilot v2.1 - Context-Aware en puerto {PORT}")
+    logger.info("✨ Mejoras: Detección automática de cambio de contexto")
     app.run(host='0.0.0.0', port=PORT, debug=False)
