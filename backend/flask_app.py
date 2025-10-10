@@ -1300,6 +1300,78 @@ def whatsapp_webhook():
         resp.message("❌ Error. Intenta nuevamente.")
         return str(resp), 200, {'Content-Type': 'text/xml'}
 
+# ==================== ENDPOINT SMS (NUEVO) ====================
+@app.route('/sms', methods=['POST'])
+@limiter.limit("20 per minute")
+@limiter.limit("1 per 2 seconds")
+def sms_webhook():
+    """Endpoint SMS para Canadá con límite de 160 caracteres"""
+    try:
+        incoming_msg = request.values.get('Body', '').strip()
+        from_number = request.values.get('From', '')
+        
+        if not incoming_msg:
+            resp = MessagingResponse()
+            resp.message("Mensaje invalido")
+            return str(resp)
+        
+        # Memoria inteligente para SMS
+        user_key = from_number
+        prev_messages = get_relevant_memory(user_key, incoming_msg)
+        
+        # Actualizar memoria
+        mem = CHAT_MEMORY.get(user_key, [])
+        mem.append(incoming_msg)
+        if len(mem) > 2:
+            mem = mem[-2:]
+        CHAT_MEMORY[user_key] = mem
+        
+        context = safe_get_context_for_query(incoming_msg)
+        relevant_urls = safe_extract_relevant_urls(incoming_msg)
+        
+        # NO enviar URLs en SMS por limitación de caracteres
+        urls_text = ""
+        
+        try:
+            formatted_prompt = SMS_SYSTEM_PROMPT.format(context=context, urls=urls_text)
+        except Exception:
+            formatted_prompt = f"Asistente SMS.\n{context}"
+        
+        messages = [{"role": "system", "content": formatted_prompt}]
+        
+        for pm in prev_messages:
+            if pm and pm.strip():
+                messages.append({"role": "user", "content": pm})
+        
+        messages.append({"role": "user", "content": incoming_msg})
+        
+        # Llamar a Groq
+        if client and client != "api_fallback":
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.5,
+                max_tokens=200  # Reducido para SMS
+            )
+            ai_response = completion.choices[0].message.content
+        else:
+            result = call_groq_api_directly(messages)
+            ai_response = result["choices"][0]["message"]["content"]
+        
+        # ⚠️ CRÍTICO: Limitar a 160 caracteres para SMS
+        if len(ai_response) > 160:
+            ai_response = ai_response[:157] + "..."
+        
+        resp = MessagingResponse()
+        resp.message(ai_response)
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+        
+    except Exception as e:
+        logger.error(f"Error en /sms: {str(e)}")
+        resp = MessagingResponse()
+        resp.message("Error. Intenta de nuevo")
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+
 # ==================== ENDPOINTS ESTÁTICOS (MANTENER IGUALES) ====================
 @app.route('/')
 def serve_frontend():
@@ -1379,3 +1451,4 @@ if __name__ == '__main__':
     logger.info(f"🚀 Telecom Copilot v2.1 - Context-Aware en puerto {PORT}")
     logger.info("✨ Mejoras: Detección automática de cambio de contexto")
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
