@@ -8,12 +8,33 @@ import logging
 import requests
 import json
 
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ==================== CONFIGURAR RATE LIMITER ====================
+limiter = Limiter(
+    get_remote_address,  # ✅ Solo la función key_func como primer argumento
+    app=app,              # ✅ app como keyword argument
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# ==================== MANEJADOR DE ERRORES 429 ====================
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({
+        "success": False,
+        "error": "Demasiadas peticiones",
+        "message": "Por favor espera unos segundos antes de enviar otro mensaje. Esto ayuda a mantener el servicio estable para todos. 😊",
+        "retry_after_seconds": 10
+    }), 429
 
 # ==================== CONFIGURACIÓN ====================
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
@@ -930,6 +951,7 @@ RECURSOS DISPONIBLES:
 
 # ==================== ENDPOINTS MEJORADOS ====================
 @app.route('/health', methods=['GET'])
+@limiter.exempt
 def health_check():
     return jsonify({
         "status": "healthy",
@@ -937,7 +959,10 @@ def health_check():
         "ai_ready": client is not None or GROQ_API_KEY is not None
     })
 
+
 @app.route('/chat', methods=['POST'])
+@limiter.limit("10 per minute")
+@limiter.limit("1 per 3 seconds")
 def chat():
     """Endpoint principal de chat WEB con detección inteligente de contexto"""
     try:
@@ -1028,6 +1053,8 @@ def chat():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/whatsapp', methods=['POST'])
+@limiter.limit("20 per minute")
+@limiter.limit("1 per 2 seconds")
 def whatsapp_webhook():
     """Endpoint WhatsApp con detección de contexto"""
     try:

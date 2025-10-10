@@ -402,6 +402,12 @@ async function callAPI(message) {
             })
         });
         
+        // ===== NUEVO: MANEJAR ERROR 429 (RATE LIMIT) =====
+        if (response.status === 429) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || '⏱️ Por favor espera unos segundos antes de enviar otro mensaje');
+        }
+        
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
