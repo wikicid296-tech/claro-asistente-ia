@@ -1471,3 +1471,22 @@ main.content {
 .input-wrapper:has(input.limit-reached) {
     border-color: #DA291C;
 }
+
+.task-download {
+    position: absolute;
+    bottom: 5px;
+    right: 28px;        /* ANTES: 25px → AHORA: 35px */
+    background: #00BCD4;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.task-download:hover {
+    background: #0097A7;
+    transform: scale(1.1);
+}

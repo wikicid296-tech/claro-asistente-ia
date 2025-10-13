@@ -4,6 +4,7 @@ from twilio.twiml.messaging_response import MessagingResponse
 from twilio.rest import Client
 import os
 from dotenv import load_dotenv
+from calendar_routes import calendar_bp
 import logging
 import requests
 import json
@@ -15,6 +16,8 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+# Registrar rutas de calendario
+app.register_blueprint(calendar_bp)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -1382,6 +1385,7 @@ def serve_frontend():
         return f"Error: {str(e)}", 500
 
 @app.route('/images/<path:filename>')
+@limiter.exempt
 def serve_images(filename):
     """Servir imágenes"""
     try:
@@ -1398,6 +1402,7 @@ def serve_images(filename):
         return "Imagen no encontrada", 404
 
 @app.route('/<path:path>')
+@limiter.exempt
 def serve_static(path):
     """Servir archivos estáticos CSS y JS"""
     try:

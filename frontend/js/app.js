@@ -655,7 +655,7 @@ function isTaskMessage(userMsg, botMsg) {
     return hasTaskVerb || (hasBotEmoji && botConfirms);
 }
 
-function processTask(userMessage, botResponse) {
+async function processTask(userMessage, botResponse)  {
     const timestamp = new Date().toLocaleString('es-MX', {
         day: '2-digit',
         month: '2-digit', 
@@ -713,9 +713,21 @@ function processTask(userMessage, botResponse) {
     if (!appState.tasks[taskType]) {
         appState.tasks[taskType] = [];
     }
-    
-    appState.tasks[taskType].push(task);
-    updateTasksUI();
+
+    // Si es evento de calendario, generar archivo .ics
+if (taskType === 'calendar') {
+    await generateICSForTask(task);
+}
+
+appState.tasks[taskType].push(task);
+updateTasksUI();
+
+// NUEVO: Si es calendario, actualizar UI nuevamente después de generar el archivo
+if (taskType === 'calendar') {
+    setTimeout(() => {
+        updateTasksUI();
+    }, 100);
+}
     
     if (elements.tasksContainer) {
         elements.tasksContainer.classList.add('active');
@@ -777,14 +789,19 @@ function updateTaskList(container, tasks, taskType, emptyMessage) {
             : task.content;
             
         html += `
-            <div class="task-item" data-task-id="${task.id}">
-                <div class="task-content">${escapeHtml(displayContent)}</div>
-                <div class="task-time">Creado: ${task.created_at}</div>
-                <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})" title="Eliminar">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-        `;
+    <div class="task-item" data-task-id="${task.id}">
+        <div class="task-content">${escapeHtml(displayContent)}</div>
+        <div class="task-time">Creado: ${task.created_at}</div>
+        ${taskType === 'calendar' && task.icsFileUrl ? `
+        <button class="task-download" onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')" title="Descargar evento">
+            <i class="fas fa-download"></i>
+        </button>
+        ` : ''}
+        <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})" title="Eliminar">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+`;
     });
     
     container.innerHTML = html;
