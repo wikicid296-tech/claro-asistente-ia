@@ -120,7 +120,7 @@ nav.sidebar.active {
 }
 
 .sidebar-logo img {
-    max-width: 100%;
+    max-width: 150px;
     height: auto;
     object-fit: contain;
 }
@@ -1494,4 +1494,5 @@ main.content {
 .task-download:hover {
     background: #0097A7;
     transform: scale(1.1);
+
 }
