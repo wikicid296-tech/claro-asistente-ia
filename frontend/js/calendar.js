@@ -468,60 +468,101 @@ document.addEventListener('DOMContentLoaded', function() {
 async function downloadICSFile(dataUrl, filename) {
     const isBase64 = dataUrl.startsWith('data:');
     
-    // OPCIÓN 1: Intentar Web Share API (nativo en móvil)
-    if (isBase64 && navigator.share) {
-        try {
-            // Extraer el contenido Base64
-            const base64Content = dataUrl.split(',')[1];
-            const binaryData = atob(base64Content);
-            const arrayBuffer = new Uint8Array(binaryData.length);
-            
-            for (let i = 0; i < binaryData.length; i++) {
-                arrayBuffer[i] = binaryData.charCodeAt(i);
-            }
-            
-            const blob = new Blob([arrayBuffer], { type: 'text/calendar' });
-            const file = new File([blob], filename, { type: 'text/calendar' });
-            
-            // Intentar compartir (nativo en móvil)
-            await navigator.share({
-                files: [file],
-                title: 'Evento de calendario',
-                text: 'Agregar evento al calendario'
-            });
-            
-            console.log('✅ Evento compartido:', filename);
-            return;
-        } catch (err) {
-            console.log('ℹ️ Share API no disponible, usando descarga estándar');
-        }
-    }
+    console.log('🔍 Iniciando descarga/compartir:', filename);
+    console.log('📱 User Agent:', navigator.userAgent);
+    console.log('🔗 Tipo de URL:', isBase64 ? 'Base64' : 'Blob');
     
-    // OPCIÓN 2: Descarga estándar (fallback)
-    if (isBase64) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        
-        setTimeout(() => {
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-            }, 100);
-        }, 100);
-    } else {
-        // Método legacy para blob URLs (web)
+    if (!isBase64) {
+        // Si no es Base64, usar método legacy
         const a = document.createElement('a');
         a.href = dataUrl;
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
+        console.log('✅ Descarga iniciada (blob URL)');
+        return;
     }
     
-    console.log('✅ Descargando:', filename);
+    // Convertir Base64 a Blob
+    try {
+        const base64Content = dataUrl.split(',')[1];
+        const binaryData = atob(base64Content);
+        const arrayBuffer = new Uint8Array(binaryData.length);
+        
+        for (let i = 0; i < binaryData.length; i++) {
+            arrayBuffer[i] = binaryData.charCodeAt(i);
+        }
+        
+        const blob = new Blob([arrayBuffer], { type: 'text/calendar' });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        console.log('✅ Blob creado:', blobUrl);
+        
+        // OPCIÓN 1: Intentar Web Share API
+        if (navigator.share && navigator.canShare) {
+            try {
+                const file = new File([blob], filename, { type: 'text/calendar' });
+                const canShareFiles = navigator.canShare({ files: [file] });
+                
+                if (canShareFiles) {
+                    console.log('📤 Intentando compartir con Share API...');
+                    await navigator.share({
+                        files: [file],
+                        title: 'Evento de calendario',
+                        text: 'Agregar evento al calendario'
+                    });
+                    
+                    URL.revokeObjectURL(blobUrl);
+                    console.log('✅ Evento compartido exitosamente');
+                    return;
+                }
+            } catch (shareErr) {
+                console.log('⚠️ Share API falló:', shareErr.message);
+            }
+        }
+        
+        // OPCIÓN 2: Abrir en nueva pestaña (funciona en WebView)
+        console.log('📂 Intentando abrir en nueva ventana...');
+        const newWindow = window.open(blobUrl, '_blank');
+        
+        if (newWindow) {
+            console.log('✅ Archivo abierto en nueva ventana');
+            
+            // Limpiar después de 3 segundos
+            setTimeout(() => {
+                URL.revokeObjectURL(blobUrl);
+            }, 3000);
+            
+            // Mostrar instrucciones al usuario
+            showSuccessMessage('✅ Archivo generado. Presiona "Descargar" o "Agregar a calendario" en la nueva ventana.');
+            return;
+        }
+        
+        // OPCIÓN 3: Crear enlace de descarga manual
+        console.log('🔗 Creando enlace de descarga manual...');
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        a.target = '_blank';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        // Simular click con delay para WebView
+        setTimeout(() => {
+            a.click();
+            console.log('✅ Descarga iniciada');
+            
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(blobUrl);
+            }, 1000);
+        }, 100);
+        
+    } catch (error) {
+        console.error('❌ Error al procesar archivo:', error);
+        showErrorMessage('❌ Error al descargar el archivo. Intenta nuevamente.');
+    }
 }
 
 // ==================== EXPORTAR FUNCIONES ====================
