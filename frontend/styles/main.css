@@ -1475,7 +1475,7 @@ main.content {
 .task-download {
     position: absolute;
     bottom: 5px;
-    right: 28px;        /* ANTES: 25px → AHORA: 35px */
+    right: 8px;        /* ANTES: 25px → AHORA: 35px */
     background: #00BCD4;
     border: none;
     color: white;
