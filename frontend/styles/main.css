@@ -110,14 +110,19 @@ nav.sidebar.active {
 }
 
 .sidebar-logo {
-    width: 40px;
-    height: 40px;
-    
-    border-radius: 50%;
+     width: 100%;
+    height: auto;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     margin-bottom: 20px;
+    border-radius: 0;
+}
+
+.sidebar-logo img {
+    max-width: 100%;
+    height: auto;
+    object-fit: contain;
 }
 
 .sidebar-logo svg {
