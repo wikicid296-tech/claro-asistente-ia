@@ -379,12 +379,17 @@ async function generateICSForTask(task) {
         
         // 5. Obtener blob del archivo
         const blob = await response.blob();
-        
-        // 6. Crear URL temporal del blob
-        const blobUrl = URL.createObjectURL(blob);
-        
-        // 7. Guardar URL en el objeto task
-        task.icsFileUrl = blobUrl;
+
+        // 6. Convertir blob a Base64
+        const reader = new FileReader();
+        const base64Promise = new Promise((resolve) => {
+             reader.onloadend = () => resolve(reader.result);
+             reader.readAsDataURL(blob);
+        });
+        const base64Data = await base64Promise;
+
+        // 7. Guardar datos en el objeto task
+        task.icsFileUrl = base64Data;  // Ahora es Base64 en lugar de blob URL
         task.icsFileName = `evento_${eventData.date}_${eventData.time.replace(':', '')}.ics`;
         
         console.log('✅ Archivo .ics generado para:', task.id);
@@ -460,13 +465,61 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function downloadICSFile(blobUrl, filename) {
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+async function downloadICSFile(dataUrl, filename) {
+    const isBase64 = dataUrl.startsWith('data:');
+    
+    // OPCIÓN 1: Intentar Web Share API (nativo en móvil)
+    if (isBase64 && navigator.share) {
+        try {
+            // Extraer el contenido Base64
+            const base64Content = dataUrl.split(',')[1];
+            const binaryData = atob(base64Content);
+            const arrayBuffer = new Uint8Array(binaryData.length);
+            
+            for (let i = 0; i < binaryData.length; i++) {
+                arrayBuffer[i] = binaryData.charCodeAt(i);
+            }
+            
+            const blob = new Blob([arrayBuffer], { type: 'text/calendar' });
+            const file = new File([blob], filename, { type: 'text/calendar' });
+            
+            // Intentar compartir (nativo en móvil)
+            await navigator.share({
+                files: [file],
+                title: 'Evento de calendario',
+                text: 'Agregar evento al calendario'
+            });
+            
+            console.log('✅ Evento compartido:', filename);
+            return;
+        } catch (err) {
+            console.log('ℹ️ Share API no disponible, usando descarga estándar');
+        }
+    }
+    
+    // OPCIÓN 2: Descarga estándar (fallback)
+    if (isBase64) {
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        setTimeout(() => {
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+            }, 100);
+        }, 100);
+    } else {
+        // Método legacy para blob URLs (web)
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
     
     console.log('✅ Descargando:', filename);
 }
