@@ -792,7 +792,7 @@ function updateTaskList(container, tasks, taskType, emptyMessage) {
     <div class="task-item" data-task-id="${task.id}">
         <div class="task-content">${escapeHtml(displayContent)}</div>
         <div class="task-time">Creado: ${task.created_at}</div>
-        ${taskType === 'calendar' && task.icsFileUrl ? `
+        ${false && taskType === 'calendar' && task.icsFileUrl ? `
         <button class="task-download" onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')" title="Descargar evento">
             <i class="fas fa-download"></i>
         </button>
@@ -1033,3 +1033,4 @@ console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 1
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cToken Limit:', 'color: #28a745; font-weight: bold;', TOKEN_CONFIG.MAX_TOKENS);
 console.log('%cReady to chat!', 'color: #28a745;');
+
