@@ -120,7 +120,7 @@ nav.sidebar.active {
 }
 
 .sidebar-logo img {
-    max-width: 100%;
+     max-width: 150px;
     height: auto;
     object-fit: contain;
 }

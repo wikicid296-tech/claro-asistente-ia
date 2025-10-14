@@ -792,7 +792,7 @@ function updateTaskList(container, tasks, taskType, emptyMessage) {
     <div class="task-item" data-task-id="${task.id}">
         <div class="task-content">${escapeHtml(displayContent)}</div>
         <div class="task-time">Creado: ${task.created_at}</div>
-        ${taskType === 'calendar' && task.icsFileUrl ? `
+        ${false && taskType === 'calendar' && task.icsFileUrl ? `
         <button class="task-download" onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')" title="Descargar evento">
             <i class="fas fa-download"></i>
         </button>
