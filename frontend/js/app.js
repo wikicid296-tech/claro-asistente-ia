@@ -314,7 +314,7 @@ function selectAction(e) {
         'aprende': 'Pregunta sobre cursos de aprende.org',
         'busqueda': 'Pregunta lo que quieras',
         'tareas': 'Crea o asigna una tarea...',
-        'aprende-estudia': 'Pide un resumen o lección...',
+        'capacitate': 'Pregunta sobre capacitate...',
         'productividad': 'Organiza tu trabajo...'
     };
     
@@ -323,7 +323,7 @@ function selectAction(e) {
         'aprende': 'Aprende.org',
         'busqueda': 'Búsqueda Inteligente',
         'tareas': 'Asigna tareas',
-        'aprende-estudia': 'Aprende y estudia',
+        'capacitate': 'Capacitate',
         'productividad': 'Productividad'
     };
     
@@ -364,7 +364,7 @@ function showModeChip(modeName, modeAction) {
             'aprende': '<div class="mode-chip-icon-letter">A</div>',
             'busqueda': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
             'tareas': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-            'aprende-estudia': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+            'capacitate': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
             'productividad': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
         };
         
