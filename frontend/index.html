@@ -132,6 +132,18 @@
             </div>
 
             <div class="input-section">
+                   <!-- 🆕 CHIP DE MODO ACTIVO -->
+                 <div id="modeChipContainer" class="mode-chip-container" style="display: none;">
+                    <div class="mode-chip">
+                        <div id="modeChipIcon" class="mode-chip-icon-container">
+                <!-- El ícono se insertará dinámicamente aquí -->
+                        </div>
+                        <span id="modeChipText">Aprende.org</span>
+                    <button id="modeChipClose" class="mode-chip-close" title="Cerrar modo">
+                    ✕
+                    </button>
+                </div>
+            </div>
                 <div class="input-wrapper">
                     <span class="add-btn" id="addBtn">+</span>
                     <input id="userInput" type="text" placeholder="Pregunta lo que quieras">
@@ -151,7 +163,7 @@
 
     <div class="action-menu" id="actionMenu">
         <div class="action-item" data-action="aprende">
-            <div class="icon red">A</div>
+            <div class="mode-chip-icon-letter">A</div>
             <span>Aprende.org</span>
         </div>
 

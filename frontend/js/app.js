@@ -69,7 +69,12 @@ const elements = {
     // Task lists
     remindersList: document.getElementById('reminders-list'),
     notesList: document.getElementById('notes-list'),
-    calendarList: document.getElementById('calendar-list')
+    calendarList: document.getElementById('calendar-list'),
+
+    // Mode Chip - NUEVO
+    modeChipContainer: document.getElementById('modeChipContainer'),
+    modeChipText: document.getElementById('modeChipText'),
+    modeChipClose: document.getElementById('modeChipClose')
 };
 
 // ==================== FUNCIONES DE TOKENS ====================
@@ -182,6 +187,11 @@ function initializeEventListeners() {
     elements.suggestionCards.forEach(card => {
         card.addEventListener('click', handleSuggestionClick);
     });
+
+    // Mode Chip Close Button - NUEVO
+    if (elements.modeChipClose) {
+    elements.modeChipClose.addEventListener('click', hideModeChip);
+    }
     
     // Input de usuario - actualizar tokens en tiempo real
     elements.userInput.addEventListener('input', function() {
@@ -308,11 +318,99 @@ function selectAction(e) {
         'productividad': 'Organiza tu trabajo...'
     };
     
+    // Nombres visuales para el chip
+    const modeNames = {
+        'aprende': 'Aprende.org',
+        'busqueda': 'Búsqueda Inteligente',
+        'tareas': 'Asigna tareas',
+        'aprende-estudia': 'Aprende y estudia',
+        'productividad': 'Productividad'
+    };
+    
     elements.userInput.placeholder = placeholders[action] || 'Pregunta lo que quieras';
     appState.currentMode = action;
     
+    // Mostrar u ocultar chip según el modo
+    if (action !== 'busqueda') {
+        showModeChip(modeNames[action], action);
+    } else {
+        hideModeChip();
+    }
+    
     elements.actionMenu.classList.remove('active');
 }
+
+// ==================== MODE CHIP FUNCTIONS ====================
+/**
+ * Muestra el chip de modo activo
+ */
+/**
+ * Muestra el chip de modo activo con ícono dinámico
+ */
+function showModeChip(modeName, modeAction) {
+    if (!elements.modeChipContainer || !elements.modeChipText) return;
+    
+    // Actualizar texto del chip
+    elements.modeChipText.textContent = modeName;
+    
+    // Obtener contenedor del ícono
+    const iconContainer = document.getElementById('modeChipIcon');
+    if (iconContainer) {
+        // Limpiar ícono anterior
+        iconContainer.innerHTML = '';
+        
+        // Definir íconos según el modo
+        const icons = {
+            'aprende': '<div class="mode-chip-icon-letter">A</div>',
+            'busqueda': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+            'tareas': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+            'aprende-estudia': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+            'productividad': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
+        };
+        
+        // Insertar el ícono correspondiente
+        iconContainer.innerHTML = icons[modeAction] || icons['busqueda'];
+    }
+    
+    // Mostrar contenedor con animación
+    elements.modeChipContainer.style.display = 'flex';
+    
+    // Guardar modo activo
+    appState.currentMode = modeAction;
+    
+    console.log(`✅ Chip activado: ${modeName} (${modeAction})`);
+}
+
+/**
+ * Oculta el chip de modo activo y resetea al modo búsqueda
+ */
+function hideModeChip() {
+    if (!elements.modeChipContainer) return;
+    
+    // Ocultar contenedor
+    elements.modeChipContainer.style.display = 'none';
+    
+    // Resetear al modo búsqueda
+    appState.currentMode = 'busqueda';
+    
+    // Restaurar placeholder
+    elements.userInput.placeholder = 'Pregunta lo que quieras';
+    
+    // Actualizar selección visual en el menú
+    elements.actionItems.forEach(item => {
+        if (item.getAttribute('data-action') === 'busqueda') {
+            item.classList.add('selected');
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+    
+    console.log('❌ Chip desactivado - Modo: búsqueda');
+}
+
+// Exponer funciones globalmente para testing
+window.showModeChip = showModeChip;
+window.hideModeChip = hideModeChip;
 
 function handleOutsideClick(e) {
     const menu = elements.actionMenu;
