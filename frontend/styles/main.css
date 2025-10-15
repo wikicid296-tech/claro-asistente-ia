@@ -1496,3 +1496,145 @@ main.content {
     transform: scale(1.1);
 
 }
+
+
+/* ============================================
+   CHIP DE MODO ACTIVO
+   ============================================ */
+
+.mode-chip-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 12px;
+    animation: slideDown 0.3s ease-out;
+}
+
+.mode-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #E0F7FA;
+    color: #00ACC1;
+    padding: 10px 16px;
+    border-radius: 24px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 2px 6px rgba(0, 172, 193, 0.15);
+    border: 1px solid #B2EBF2;
+    transition: all 0.3s ease;
+}
+
+.mode-chip:hover {
+    background: #B2EBF2;
+    box-shadow: 0 3px 8px rgba(0, 172, 193, 0.25);
+}
+
+.mode-chip-icon {
+    width: 18px;
+    height: 18px;
+    color: #00ACC1;
+    stroke: currentColor;
+    flex-shrink: 0;
+}
+
+#modeChipText {
+    color: #00ACC1;
+    font-weight: 500;
+    user-select: none;
+}
+
+.mode-chip-close {
+    background: transparent;
+    border: none;
+    color: #00ACC1;
+    cursor: pointer;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0;
+    margin-left: 4px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.mode-chip-close:hover {
+    background: rgba(0, 172, 193, 0.15);
+    color: #00838F;
+    transform: scale(1.1);
+}
+
+.mode-chip-close:active {
+    transform: scale(0.95);
+}
+
+/* Animación de entrada */
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive para móviles */
+@media (max-width: 600px) {
+    .mode-chip {
+        font-size: 13px;
+        padding: 8px 14px;
+        gap: 6px;
+    }
+    
+    .mode-chip-icon {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .mode-chip-close {
+        font-size: 16px;
+        width: 18px;
+        height: 18px;
+    }
+}
+
+
+/* Ícono de letra "A" para Aprende.org */
+.mode-chip-icon-letter {
+    width: 24px;
+    height: 24px;
+    background: #DA291C;
+    color: white;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+    font-family: 'Roboto', sans-serif;
+}
+
+/* Mantener el SVG original para otros modos */
+.mode-chip-icon {
+    width: 18px;
+    height: 18px;
+    color: #00ACC1;
+    stroke: currentColor;
+    flex-shrink: 0;
+}
+
+
+/* Contenedor flexible para íconos dinámicos */
+.mode-chip-icon-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
