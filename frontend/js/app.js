@@ -272,6 +272,22 @@ function startNewConversation() {
     // NUEVO: Habilitar input al iniciar nueva conversación
     removeLimitWarning();
     
+    // 🆕 RESETEO COMPLETO: Ocultar chip de modo y resetear a búsqueda
+    hideModeChip();
+    
+    // 🆕 Resetear placeholder y modo
+    elements.userInput.placeholder = 'Pregunta lo que quieras';
+    appState.currentMode = 'busqueda';
+    
+    // 🆕 Resetear selección visual en el menú de acciones
+    elements.actionItems.forEach(item => {
+        if (item.getAttribute('data-action') === 'busqueda') {
+            item.classList.add('selected');
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+    
     saveToLocalStorage();
     
     elements.navItems.forEach(item => item.classList.remove('active'));
@@ -283,6 +299,8 @@ function startNewConversation() {
     if (window.innerWidth < 900) {
         closeSidebar();
     }
+    
+    console.log('🆕 Nueva conversación iniciada - Modo resetado a búsqueda');
 }
 
 function toggleTaskCard(e) {
