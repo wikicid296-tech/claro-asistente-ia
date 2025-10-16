@@ -956,14 +956,14 @@ RECURSOS DISPONIBLES:
 {urls}
 """
 
-SMS_SYSTEM_PROMPT = """Eres un asistente virtual multifuncional para mensajes SMS enfocado en Telecomunicaciones, Educación y Salud.
+SMS_SYSTEM_PROMPT = """Eres un asistente SMS con LÍMITE ABSOLUTO de 140 caracteres.
 
 IMPORTANTE: Todas tus respuestas DEBEN cumplir con las siguientes reglas:
 
 **FORMATO DE RESPUESTA PARA SMS:**
 
 1. No uses Markdown, emojis ni enlaces largos.
-2. Cada respuesta debe tener un máximo de 60 caracteres.
+2. Cada respuesta debe tener un máximo de 120 caracteres.
 3. Escribe en lenguaje claro, corto y directo.
 4. No uses saltos de línea ni signos especiales fuera del texto.
 5. Mantén siempre un tono profesional y amable.
@@ -981,14 +981,17 @@ ROLES DISPONIBLES
 ═══════════════════════════════════════════════════════════════════
 
 ROL 1: ASESOR INFORMATIVO  
+CRITICO: SIMULA LA FUNCIONALIDAD DE MEMORIA CON LAS RESPUESTAS QUE RECIBAS DEL USUARIO.
 Ofrece información breve sobre:
 - Telecom: Claro, Telcel, A1 Group
 - Educación: Aprende.org, cursos y diplomados
 - Salud: Clikisalud, prevención, bienestar
-
+ 
 Ejemplo:  
-Usuario: Cursos de salud  
-Respuesta: Cursos gratis en Aprende.org y Clikisalud
+Usuario: Hola, quiero saber sobre cursos.
+Respuesta: Claro, ¿qué tipo de cursos buscas?
+usuario: Cursos de de educación básica
+Respuesta: Aprende.org ofrece cursos gratis en educación básica.
 
 ---
 
@@ -1317,72 +1320,127 @@ def whatsapp_webhook():
 @limiter.limit("20 per minute")
 @limiter.limit("1 per 2 seconds")
 def sms_webhook():
-    """Endpoint SMS para Canadá con límite de 160 caracteres"""
+    """Endpoint SMS optimizado con límite estricto de caracteres"""
     try:
         incoming_msg = request.values.get('Body', '').strip()
         from_number = request.values.get('From', '')
         
+        # Validación inicial
         if not incoming_msg:
             resp = MessagingResponse()
-            resp.message("Mensaje invalido")
+            resp.message("Mensaje invalido")  # 16 caracteres
             return str(resp)
         
-        # Memoria inteligente para SMS
+        # 🆕 MEJORA 1: Log para debugging
+        logger.info(f"SMS recibido de {from_number}: {incoming_msg[:50]}")
+        
+        # Memoria inteligente (sin cambios)
         user_key = from_number
         prev_messages = get_relevant_memory(user_key, incoming_msg)
         
-        # Actualizar memoria
+        # Actualizar memoria (sin cambios)
         mem = CHAT_MEMORY.get(user_key, [])
         mem.append(incoming_msg)
         if len(mem) > 2:
             mem = mem[-2:]
         CHAT_MEMORY[user_key] = mem
         
+        # Contexto (sin cambios)
         context = safe_get_context_for_query(incoming_msg)
         relevant_urls = safe_extract_relevant_urls(incoming_msg)
         
-        # NO enviar URLs en SMS por limitación de caracteres
+        # 🆕 MEJORA 2: URLs ultra cortas solo si son críticas
         urls_text = ""
+        if relevant_urls and len(relevant_urls) > 0:
+            # Solo incluir dominio principal si cabe
+            first_url = relevant_urls[0].split('/')[2] if '/' in relevant_urls[0] else relevant_urls[0]
+            urls_text = first_url[:20]  # Solo dominio, máximo 20 chars
         
+        # 🆕 MEJORA 3: Prompt reformateado para forzar brevedad
         try:
-            formatted_prompt = SMS_SYSTEM_PROMPT.format(context=context, urls=urls_text)
+            formatted_prompt = SMS_SYSTEM_PROMPT.format(
+                context=context[:50],  # Limitar contexto también
+                urls=urls_text
+            )
         except Exception:
-            formatted_prompt = f"Asistente SMS.\n{context}"
+            formatted_prompt = "Asistente SMS. Max 140 caracteres. Sé breve."
         
+        # 🆕 MEJORA 4: Simplificar mensajes (menos contexto histórico)
         messages = [{"role": "system", "content": formatted_prompt}]
         
-        for pm in prev_messages:
-            if pm and pm.strip():
-                messages.append({"role": "user", "content": pm})
+        # Solo incluir UN mensaje previo si es muy relevante
+        if prev_messages and len(prev_messages) > 0:
+            last_msg = prev_messages[-1][:50]  # Truncar mensaje anterior
+            messages.append({"role": "user", "content": last_msg})
         
         messages.append({"role": "user", "content": incoming_msg})
         
-        # Llamar a Groq
+        # 🆕 MEJORA 5: Configuración optimizada para Groq
         if client and client != "api_fallback":
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                temperature=0.5,
-                max_tokens=200  # Reducido para SMS
+                temperature=0.3,  # 🆕 Reducir para respuestas más directas
+                max_tokens=40,    # 🆕 CRÍTICO: Máximo 40 tokens (~140 chars)
+                top_p=0.9,        # 🆕 Limitar creatividad
+                frequency_penalty=0.5  # 🆕 Evitar repeticiones
             )
             ai_response = completion.choices[0].message.content
         else:
-            result = call_groq_api_directly(messages)
+            # Llamada directa a API con parámetros ajustados
+            result = call_groq_api_directly_sms(messages, max_tokens=40)
             ai_response = result["choices"][0]["message"]["content"]
         
-        # ⚠️ CRÍTICO: Limitar a 160 caracteres para SMS
-        if len(ai_response) > 160:
-            ai_response = ai_response[:157] + "..."
+        # 🆕 MEJORA 6: Limpieza y truncado agresivo
+        # Eliminar saltos de línea y espacios extra
+        ai_response = ' '.join(ai_response.split())
         
+        # 🆕 MEJORA 7: Truncado con margen de seguridad
+        MAX_SMS_LENGTH = 140  # Más conservador que 160
+        
+        if len(ai_response) > MAX_SMS_LENGTH:
+            # Buscar último espacio antes del límite para no cortar palabras
+            cutoff = ai_response[:MAX_SMS_LENGTH-3].rfind(' ')
+            if cutoff > 0:
+                ai_response = ai_response[:cutoff] + "..."
+            else:
+                ai_response = ai_response[:MAX_SMS_LENGTH-3] + "..."
+        
+        # 🆕 MEJORA 8: Log de respuesta para monitoreo
+        logger.info(f"SMS respuesta ({len(ai_response)} chars): {ai_response}")
+        
+        # Enviar respuesta
         resp = MessagingResponse()
         resp.message(ai_response)
         return str(resp), 200, {'Content-Type': 'text/xml'}
         
     except Exception as e:
         logger.error(f"Error en /sms: {str(e)}")
+        # 🆕 MEJORA 9: Mensaje de error aún más corto
         resp = MessagingResponse()
-        resp.message("Error. Intenta de nuevo")
+        resp.message("Error. Reintentar")  # Solo 17 caracteres
         return str(resp), 200, {'Content-Type': 'text/xml'}
+
+# 🆕 FUNCIÓN AUXILIAR NUEVA para llamadas directas a API con límite SMS
+def call_groq_api_directly_sms(messages, max_tokens=40):
+    """Versión especial para SMS con límites estrictos"""
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": messages,
+        "temperature": 0.3,
+        "max_tokens": max_tokens,
+        "top_p": 0.9,
+        "frequency_penalty": 0.5
+    }
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status()
+    return response.json()
+        
 
 # ==================== ENDPOINTS ESTÁTICOS (MANTENER IGUALES) ====================
 @app.route('/')
