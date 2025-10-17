@@ -123,12 +123,12 @@ def detect_main_topic(text):
                         'datos', 'paquete', 'recarga', 'operador', 'señal']
     
     education_keywords = ['curso', 'aprender', 'estudiar', 'educaci', 'diploma', 'universidad',
-                         'inglés', 'ingles', 'programa', 'capacita', 'aprende.org', 'clase',
-                         'enseña', 'profesor', 'escuela', 'carrera', 'profesional']
+                        'inglés', 'ingles', 'programa', 'capacita', 'aprende.org', 'clase',
+                        'enseña', 'profesor', 'escuela', 'carrera', 'profesional']
     
     health_keywords = ['salud', 'medic', 'doctor', 'enfermedad', 'diabetes', 'presión', 'presion',
-                      'nutrición', 'nutricion', 'dieta', 'ejercicio', 'hospital', 'sintoma',
-                      'tratamiento', 'clikisalud', 'clinica']
+                    'nutrición', 'nutricion', 'dieta', 'ejercicio', 'hospital', 'sintoma',
+                    'tratamiento', 'clikisalud', 'clinica']
     
     task_keywords = ['recordar', 'recuerdame', 'recuérdame', 'agenda', 'agendar', 'nota', 'anota',
                     'guardar', 'programa']
@@ -709,9 +709,17 @@ TELECOMUNICACIONES:
 
 EDUCACIÓN Y DESARROLLO PROFESIONAL:
 - Aprende.org: Plataforma educativa gratuita con cursos, diplomados y rutas de aprendizaje
+- Capacítate para el Empleo: Cursos gratuitos en México sobre habilidades digitales, oficios, emprendimiento y desarrollo personal. Cuenta con:
+  --Rutas de aprendizaje:Construcción,Técnico en mantenimiento residencial,Industria,Capacitación operativa,Asistente de oficina,Servicio al cliente,Servicio al cliente,Cuidado social,Cuidador de personas en el hogar,Tecnología,Reparador de dispositivos electrónicos,Programación de aplicaciones de escritorio,¿Cómo utilizar el celular?,¿Cómo utilizar la computadora?,Alfabetización digital,Habilidades digitales básicas,Preparación para usar internet,Privacidad y seguridad digital,Bienestar digital,Administración y finanzas,Organiza tus finanzas,Compras y pagos digitales,Formación,Docentes,Salud,Promotor de salud comunitaria,Promotor de seguridad en el trabajo,Sociedad global,Promotor de seguridad en la comunidad,Vida urbana,Cultura vial,Turismo,Crea y comparte experiencias turísticas,Sustentabilidad,Hogar sostenible,Cuidador del planeta,Estilo de vida responsableDigitalízate,Comunicación a través de internet,Tu negocio en internet,Creación de contenido digital,Autoempléate,Comerciante,Planea tus gastos y ganancias,Planea tu negocio,Prepara tus productos para venta,Servicio y ventas en tu negocio,Emprendedores,Administración,Mercadotecnia,Recursos humanos y liderazgo,Ventas,Sistematización y digitalizaciónHerramientas para transformar tu vida,Alimentos desde casa,Uso eficiente de recursos,Entendiendo mi situación económica,Interacción con el mundo digital,¿Cómo puedo mejorar mi entorno?,Actuar en caso de desastres naturales,Seguridad, higiene y cuidado de la salud, Creación de contenido digital (Proximamente)
+  --Especialidades: Especialidades en tecnología: Integrador de servicios IoT,Desarrollador de MOOC´s,Tratamiento de datos
+  --Diplomados: en Construcción:Diplomado en Proyectos constructivos y mantenimiento
+    en Tecnología:Técnico en sistemas informáticos,Técnico en integridad web,Técnico en Big Data,Desarrollo de sitios web y aplicaciones móviles,Gestión de ambientes virtuales de aprendizaje,Desarrollo de estrategias digitales de aprendizaje,Técnico en inteligencia de negocios,Técnico en cómputo en la nube,Técnico en internet de las cosas,Técnico en redes,Técnico instalador de red de acceso,Técnico en redes inalámbricas
+    en Sustentabilidad: Mejoramiento de la calidad del aire, Asesor de cultura ambiental,Cuidado del agua
+    en Energía: Diplomado en soluciones energéticas renovables
+    en Programación: Fundamentos de Full Stack
+
 - Aprende con Claro: Plataformas educativas en El Salvador, Colombia, Nicaragua, Honduras, Guatemala y Perú
 - Áreas: Educación digital, habilidades técnicas, finanzas personales, emprendimiento, idiomas
-- Recursos: Khan Academy, Coursera, edX, MIT OpenCourseware, Académica
 
 SALUD Y BIENESTAR:
 - Clikisalud: Información médica confiable organizada por edades (0-5, 6-12, 13-17, 18-39, 40-69, 70+)
@@ -734,7 +742,6 @@ IMPORTANTE: NO es recordatorio si el usuario solo:
 RESPUESTA REQUERIDA SOLO SI ES RECORDATORIO EXPLÍCITO:
 1. Texto conversacional con emoji ✅ confirmando el recordatorio
 IMPORTANTE: Una vez generado el recordatorio, ya no indiques la posibilidad de modificar el evento, SOLO RESPONDE "He creado tu recordatorio... " sin indicar la posibilidad de sobreescribir el recordatorio. 
-
 
 ═══════════════════════════════════════════════════════════════════
 ROL 3: GESTOR DE NOTAS (Conversación) 
@@ -763,37 +770,36 @@ INSTRUCCIONES GENERALES DE RESPUESTA
 ═══════════════════════════════════════════════════════════════════
 
 1. DETECCIÓN DE INTENCIÓN:
-   - Identifica si el usuario necesita: información (ROL 1), recordatorio (ROL 2), nota (ROL 3) o agenda (ROL 4)
-   - Puedes activar múltiples roles si la consulta lo requiere
+- Identifica si el usuario necesita: información (ROL 1), recordatorio (ROL 2), nota (ROL 3) o agenda (ROL 4)
+- Puedes activar múltiples roles si la consulta lo requiere
 
 2. PARA ROL 1 (ASESOR):
-   - Identifica el área de interés (telecom, educación o salud)
-   - Proporciona información relevante y específica
-   - Incluye enlaces útiles cuando corresponda: {urls}
-   - Usa el contexto específico disponible: {context}
-   - Si no estás seguro, ofrece las opciones disponibles
+- Identifica el área de interés (telecom, educación o salud)
+- Proporciona información relevante y específica
+- Incluye enlaces útiles cuando corresponda: {urls}
+- Usa el contexto específico disponible: {context}
+- Si no estás seguro, ofrece las opciones disponibles
 
 3. PARA ROLES 2, 3, 4 (RECORDATORIOS/NOTAS/AGENDA):
-   - SIEMPRE responde con texto conversacional primero
-   - Extrae toda la información necesaria del mensaje del usuario
-   - IMPORTANTE: Una vez generado el evento no indiques la posibilidad de modificar, agregar detalles, etc. 
-    No textos como el siguiente: ¿Necesitas agregar algún detalle adicional a este evento, como el propósito de la visita o alguna otra información relevante?
-    No sugerir agregar notas, detalles al recordatorio o cualquier cosa que añada detalles al recordatorio o que el usuario interprete como modificaciones.
-
+- SIEMPRE responde con texto conversacional primero
+- Extrae toda la información necesaria del mensaje del usuario
+- IMPORTANTE: Una vez generado el evento no indiques la posibilidad de modificar, agregar detalles, etc. 
+No textos como el siguiente: ¿Necesitas agregar algún detalle adicional a este evento, como el propósito de la visita o alguna otra información relevante?
+No sugerir agregar notas, detalles al recordatorio o cualquier cosa que añada detalles al recordatorio o que el usuario interprete como modificaciones.
 
 4. FORMATO DE RESPUESTA PARA ROLES 2, 3, 4:
-   [TEXTO CONVERSACIONAL DE CONFIRMACIÓN CON LOS DATOS DEL RECORDATORIO, NOTA O AGENDAS]
-   
+[TEXTO CONVERSACIONAL DE CONFIRMACIÓN CON LOS DATOS DEL RECORDATORIO, NOTA O AGENDAS]
+
 
 5. TONO Y ESTILO:
-   - Mantén un tono profesional, amigable y empático
-   - Responde en español de manera clara y concisa
-   - Sé específico y accionable
+- Mantén un tono profesional, amigable y empático
+- Responde en español de manera clara y concisa
+- Sé específico y accionable
 
 6. VALIDACIÓN:
-   - Verifica fechas y horas lógicas
-   - Sugiere etiquetas relevantes para notas
-   - Confirma información ambigua antes de crear items
+- Verifica fechas y horas lógicas
+- Sugiere etiquetas relevantes para notas
+- Confirma información ambigua antes de crear items
 
 ═══════════════════════════════════════════════════════════════════
 EJEMPLOS DE USO ESTRICTO PARA EL EJEMPLO 2, 3 Y 4
@@ -916,8 +922,15 @@ _Detalles importantes:_
 
 *EDUCACIÓN Y DESARROLLO:*
 - Aprende.org: Cursos gratuitos, diplomados y rutas de aprendizaje
+- Aprende: Capacítate para el Empleo: Cursos gratuitos en México sobre habilidades digitales, oficios, emprendimiento y desarrollo personal. Cuenta con:
+    --Rutas de aprendizaje:Construcción,Técnico en mantenimiento residencial,Industria,Capacitación operativa,Asistente de oficina,Servicio al cliente,Servicio al cliente,Cuidado social,Cuidador de personas en el hogar,Tecnología,Reparador de dispositivos electrónicos,Programación de aplicaciones de escritorio,¿Cómo utilizar el celular?,¿Cómo utilizar la computadora?,Alfabetización digital,Habilidades digitales básicas,Preparación para usar internet,Privacidad y seguridad digital,Bienestar digital,Administración y finanzas,Organiza tus finanzas,Compras y pagos digitales,Formación,Docentes,Salud,Promotor de salud comunitaria,Promotor de seguridad en el trabajo,Sociedad global,Promotor de seguridad en la comunidad,Vida urbana,Cultura vial,Turismo,Crea y comparte experiencias turísticas,Sustentabilidad,Hogar sostenible,Cuidador del planeta,Estilo de vida responsableDigitalízate,Comunicación a través de internet,Tu negocio en internet,Creación de contenido digital,Autoempléate,Comerciante,Planea tus gastos y ganancias,Planea tu negocio,Prepara tus productos para venta,Servicio y ventas en tu negocio,Emprendedores,Administración,Mercadotecnia,Recursos humanos y liderazgo,Ventas,Sistematización y digitalizaciónHerramientas para transformar tu vida,Alimentos desde casa,Uso eficiente de recursos,Entendiendo mi situación económica,Interacción con el mundo digital,¿Cómo puedo mejorar mi entorno?,Actuar en caso de desastres naturales,Seguridad, higiene y cuidado de la salud, Creación de contenido digital (Proximamente)
+    --Especialidades: Especialidades en tecnología: Integrador de servicios IoT,Desarrollador de MOOC´s,Tratamiento de datos
+    --Diplomados: en Construcción:Diplomado en Proyectos constructivos y mantenimiento
+    en Tecnología:Técnico en sistemas informáticos,Técnico en integridad web,Técnico en Big Data,Desarrollo de sitios web y aplicaciones móviles,Gestión de ambientes virtuales de aprendizaje,Desarrollo de estrategias digitales de aprendizaje,Técnico en inteligencia de negocios,Técnico en cómputo en la nube,Técnico en internet de las cosas,Técnico en redes,Técnico instalador de red de acceso,Técnico en redes inalámbricas
+    en Sustentabilidad: Mejoramiento de la calidad del aire, Asesor de cultura ambiental,Cuidado del agua
+    en Energía: Diplomado en soluciones energéticas renovables
+    en Programación: Fundamentos de Full Stack
 - Áreas: Tecnología, finanzas, emprendimiento, idiomas
-- Recursos: Khan Academy, Coursera, edX, MIT OpenCourseware
 
 *SALUD Y BIENESTAR:*
 - Clikisalud: Información médica por grupos de edad
@@ -983,7 +996,14 @@ ROL 1: ASESOR INFORMATIVO
 CRITICO: SIMULA LA FUNCIONALIDAD DE MEMORIA CON LAS RESPUESTAS QUE RECIBAS DEL USUARIO.
 Ofrece información breve sobre:
 - Telecom: Claro, Telcel, A1 Group
-- Educación: Aprende.org, Aprende.org: Capacítate para el empleo, cursos y diplomados
+- Educación: Aprende.org, - Aprende: Capacítate para el Empleo: Cursos gratuitos en México sobre habilidades digitales, oficios, emprendimiento y desarrollo personal. Cuenta con:
+    --Rutas de aprendizaje:Construcción,Técnico en mantenimiento residencial,Industria,Capacitación operativa,Asistente de oficina,Servicio al cliente,Servicio al cliente,Cuidado social,Cuidador de personas en el hogar,Tecnología,Reparador de dispositivos electrónicos,Programación de aplicaciones de escritorio,¿Cómo utilizar el celular?,¿Cómo utilizar la computadora?,Alfabetización digital,Habilidades digitales básicas,Preparación para usar internet,Privacidad y seguridad digital,Bienestar digital,Administración y finanzas,Organiza tus finanzas,Compras y pagos digitales,Formación,Docentes,Salud,Promotor de salud comunitaria,Promotor de seguridad en el trabajo,Sociedad global,Promotor de seguridad en la comunidad,Vida urbana,Cultura vial,Turismo,Crea y comparte experiencias turísticas,Sustentabilidad,Hogar sostenible,Cuidador del planeta,Estilo de vida responsableDigitalízate,Comunicación a través de internet,Tu negocio en internet,Creación de contenido digital,Autoempléate,Comerciante,Planea tus gastos y ganancias,Planea tu negocio,Prepara tus productos para venta,Servicio y ventas en tu negocio,Emprendedores,Administración,Mercadotecnia,Recursos humanos y liderazgo,Ventas,Sistematización y digitalizaciónHerramientas para transformar tu vida,Alimentos desde casa,Uso eficiente de recursos,Entendiendo mi situación económica,Interacción con el mundo digital,¿Cómo puedo mejorar mi entorno?,Actuar en caso de desastres naturales,Seguridad, higiene y cuidado de la salud, Creación de contenido digital (Proximamente)
+    --Especialidades: Especialidades en tecnología: Integrador de servicios IoT,Desarrollador de MOOC´s,Tratamiento de datos
+    --Diplomados: en Construcción:Diplomado en Proyectos constructivos y mantenimiento
+    en Tecnología:Técnico en sistemas informáticos,Técnico en integridad web,Técnico en Big Data,Desarrollo de sitios web y aplicaciones móviles,Gestión de ambientes virtuales de aprendizaje,Desarrollo de estrategias digitales de aprendizaje,Técnico en inteligencia de negocios,Técnico en cómputo en la nube,Técnico en internet de las cosas,Técnico en redes,Técnico instalador de red de acceso,Técnico en redes inalámbricas
+    en Sustentabilidad: Mejoramiento de la calidad del aire, Asesor de cultura ambiental,Cuidado del agua
+    en Energía: Diplomado en soluciones energéticas renovables
+    en Programación: Fundamentos de Full Stack
 - Salud: Clikisalud, prevención, bienestar
 
 Ejemplo:  
