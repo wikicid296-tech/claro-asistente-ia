@@ -28,6 +28,12 @@ const appState = {
         reminders: [],
         notes: [],
         calendar: []
+     },
+    // 🆕 AGREGAR ESTO:
+    mediaViewer: {
+        isActive: false,
+        currentMedia: null,
+        mediaType: null
     }
 };
 
@@ -578,6 +584,16 @@ function addMessage(type, content) {
     contentDiv.appendChild(messageDiv);
     messageContainer.appendChild(avatarDiv);
     messageContainer.appendChild(contentDiv);
+
+    // 🆕 AGREGAR VISOR SI ES MODO APRENDE Y ES MENSAJE DEL BOT
+if (type === 'bot' && appState.currentMode === 'aprende') {
+    // URL de prueba - luego se reemplazará con la del backend
+    const testVideoUrl = 'https://cdn1.capacitateparaelempleo.org/vidhosting/eRBE4a9zR1E.mp4';
+    const mediaViewer = createMediaViewer(testVideoUrl, 'video');
+    contentDiv.appendChild(mediaViewer);
+    
+    console.log('✅ Visor de video agregado al mensaje');
+}
     
     // Agregar al chat
     elements.chatHistory.appendChild(messageContainer);
@@ -715,6 +731,95 @@ function formatMessage(content) {
     html = html.replace(/😊/g, '<span style="font-size: 1.2em;">😊</span>');
     
     return html;
+}
+
+
+// ==================== CREAR VISOR DE MEDIOS ====================
+function createMediaViewer(url, type) {
+    const viewerDiv = document.createElement('div');
+    viewerDiv.className = 'message-media-viewer';
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'media-content';
+    
+    if (type === 'video') {
+        const video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.controlsList = 'nodownload';
+        video.disablePictureInPicture = true;
+        video.preload = 'metadata';
+        
+        contentDiv.appendChild(video);
+
+        // 🆕 Aplicar protección completa
+         applyMediaProtection(video);
+
+         // 🆕 Agregar overlay invisible de protección
+        const overlay = document.createElement('div');
+        overlay.className = 'media-protection-overlay';
+        contentDiv.appendChild(overlay);
+        
+    } else if (type === 'pdf') {
+        const iframe = document.createElement('iframe');
+        iframe.src = url + '#toolbar=0&navpanes=0&scrollbar=0';
+        iframe.setAttribute('sandbox', 'allow-same-origin');
+        
+        contentDiv.appendChild(iframe);
+        
+    } else if (type === 'image') {
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = 'Contenido de Aprende.org';
+        
+        // Protección
+        img.addEventListener('contextmenu', (e) => e.preventDefault());
+        img.addEventListener('dragstart', (e) => e.preventDefault());
+        
+        contentDiv.appendChild(img);
+    }
+    
+    viewerDiv.appendChild(contentDiv);
+    return viewerDiv;
+}
+
+
+// ==================== PROTECCIÓN ANTI-DESCARGA AVANZADA ====================
+function applyMediaProtection(mediaElement) {
+    if (!mediaElement) return;
+    
+    // 1. Prevenir clic derecho
+    mediaElement.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    });
+    
+    // 2. Prevenir arrastre
+    mediaElement.addEventListener('dragstart', (e) => {
+        e.preventDefault();
+        return false;
+    });
+    
+    // 3. Deshabilitar selección
+    mediaElement.style.userSelect = 'none';
+    mediaElement.style.webkitUserSelect = 'none';
+    
+    // 4. Bloquear combinaciones de teclado
+    document.addEventListener('keydown', (e) => {
+        // Bloquear Ctrl+S, Ctrl+P, PrtScn, F12
+        if (
+            (e.ctrlKey && (e.key === 's' || e.key === 'p')) ||
+            e.key === 'PrintScreen' ||
+            e.keyCode === 44 ||
+            e.keyCode === 123
+        ) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    console.log('🔒 Protección anti-descarga activada');
 }
 
 // ==================== TASK MANAGEMENT ====================
