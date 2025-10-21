@@ -429,6 +429,7 @@ main.content {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 20px;
+    padding-bottom: 80px;
     display: flex;
     flex-direction: column;
     gap: 12px;
@@ -472,6 +473,81 @@ main.content {
     border-radius: 16px 16px 16px 4px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
 }
+
+/* Contenedor del visor de medios integrado */
+.message-media-viewer {
+    margin-top: 12px;
+    width: 100%;
+     max-width: 100%;
+}
+
+.media-content {
+    position: relative;
+    width: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.media-content video {
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 400px;
+    object-fit: contain;
+}
+
+.media-content iframe {
+    width: 100%;
+    height: 500px;
+    border: none;
+    display: block;
+}
+
+.media-content img {
+    width: 100%;
+    height: auto;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+    pointer-events: none;
+}
+
+.media-protection-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 999;
+    background: transparent;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+
+/* Activar overlay solo cuando se intenta interactuar */
+.media-content:active .media-protection-overlay {
+    pointer-events: auto;
+}
+
+@media (max-width: 768px) {
+    .message-media-viewer {
+        max-width: 100%;
+    }
+    
+    .media-content video {
+        max-height: 300px;
+    }
+    
+    .media-content iframe {
+        height: 350px;
+    }
+}
+
+
 
 /* ==================== INPUT SECTION ==================== */
 .input-section {
@@ -1169,6 +1245,17 @@ main.content {
       min-width: 0; 
 }
 
+/* NUEVO: Expandir el contenedor cuando tiene video */
+.message-content:has(.message-media-viewer) {
+    max-width: 90%;
+}
+
+@media (max-width: 768px) {
+    .message-content:has(.message-media-viewer) {
+        max-width: 95%;
+    }
+}
+
 /* Ajustar el estilo de los mensajes */
 .msg {
     padding: 12px 16px;
@@ -1507,6 +1594,8 @@ main.content {
     align-items: center;
     margin-bottom: 12px;
     animation: slideDown 0.3s ease-out;
+    position: relative;
+    z-index: 10;
 }
 
 .mode-chip {
@@ -1515,9 +1604,9 @@ main.content {
     gap: 8px;
     background: #E0F7FA;
     color: #00ACC1;
-    padding: 10px 16px;
+    padding: 8px 14px;
     border-radius: 24px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     box-shadow: 0 2px 6px rgba(0, 172, 193, 0.15);
     border: 1px solid #B2EBF2;
