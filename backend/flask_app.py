@@ -119,7 +119,7 @@ def detect_main_topic(text):
     text_lower = text.lower()
     
     # Palabras clave específicas por tema
-    telecom_keywords = ['claro', 'telcel', 'a1', 'plan', 'internet', 'telefon', 'móvil', 'movil', 
+    telecom_keywords = ['claro', 'telcel', 'Telcel', 'a1', 'plan', 'internet', 'telefon', 'móvil', 'movil', 
                         'datos', 'paquete', 'recarga', 'operador', 'señal']
     
     education_keywords = ['curso', 'aprender', 'estudiar', 'educaci', 'diploma', 'universidad',
@@ -263,8 +263,19 @@ URLS = {
             "https://www.telcel.com/personas/planes-de-renta/tarifas-y-opciones",
             "https://www.telcel.com/personas/amigo/paquetes/paquetes-amigo-sin-limite",
             "https://www.telcel.com/personas/amigo/paquetes/mb-para-tu-amigo",
+            "https://www.telcel.com/personas/la-red-de-mayor-cobertura/red-tecnologia/5g",
+            "https://www.telcel.com/personas/la-red-de-mayor-cobertura/red-tecnologia/4-5g-gigared",
+            "https://www.telcel.com/personas/la-red-de-mayor-cobertura/red-tecnologia/4g",
             "https://www.telcel.com/personas/amigo/paquetes/internet-por-tiempo",
             "https://www.telcel.com/personas/amigo/paquetes/internet-mas-juegos",
+            "https://www.telcel.com/personas/planes-de-renta/tarifas-y-opciones/telcel-libre?utm_source=gg&utm_medium=sem&utm_campaign=52025_gg_AONPTL2025_visitas_pospago_planlibre_brand&utm_content=gg_planestelcel_nacional___intereses_texto&utm_term=gg_planestelcel_nacional___intereses_texto&gclsrc=aw.ds&&campaignid=22494109880&network=g&device=c&gad_source=1&gad_campaignid=22494109880&gclid=CjwKCAjwx-zHBhBhEiwA7Kjq6y8hVnI8pPXPan2Okx6AZg6C39HJ2J-hcJjHihttlWjQfI8UWcy9uhoCuLYQAvD_BwE",
+            "https://www.telcel.com/personas/planes-de-renta/comparador-de-planes.f_familyPlan=147.f_plan=6126",
+            "https://www.telcel.com/personas/planes-de-renta/comparador-de-planes.f_familyPlan=147.f_plan=6126",
+            "https://www.telcel.com/personas/portate/hazlo-ahora",
+            "https://www.telcel.com/personas/portate/requisitos",
+            "https://www.telcel.com/personas/amigo/tarifas-y-opciones/amigo-sin-limite",
+            "https://www.telcel.com/personas/quien-es-telcel",
+            "https://www.telcel.com/personas/compra-paquetes-y-recargas"
     ],
     "a1": {
         "austria": ["https://a1.group/a1-group-and-markets/a1-in-austria/"],
