@@ -1726,3 +1726,197 @@ main.content {
     justify-content: center;
     flex-shrink: 0;
 }
+
+
+
+/* ==================== CARRUSEL DE SUGERENCIAS ==================== */
+.suggestions-carousel {
+    position: fixed;
+    bottom: 160px;
+    left: 0;
+    right: 0;
+    width: 100%;
+    background: transparent;
+    padding: 0 16px 12px 16px;
+    z-index: 15;
+    pointer-events: none;
+}
+
+.carousel-container {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 8px;
+    scrollbar-width: none;
+    cursor: grab;
+    pointer-events: auto;
+}
+
+.carousel-container:active {
+    cursor: grabbing;
+}
+
+.carousel-container::-webkit-scrollbar {
+    display: none;
+}
+
+.carousel-card {
+    min-width: 170px;
+    max-width: 170px;
+    background: var(--blanco);
+    border: 1px solid var(--gris-borde);
+    border-radius: 12px;
+    padding: 12px;
+    transition: all 0.25s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    cursor: default;
+    user-select: none;
+}
+
+.carousel-card:hover {
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+.carousel-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    color: var(--blanco);
+}
+
+.carousel-icon.cyan {
+    background: linear-gradient(135deg, #00BCD4, #0097A7);
+}
+
+.carousel-icon.red {
+    background: linear-gradient(135deg, #DA291C, #FF6B6B);
+}
+
+.carousel-icon.yellow {
+    background: linear-gradient(135deg, #FFC107, #FF9800);
+}
+
+.carousel-icon svg {
+    width: 18px;
+    height: 18px;
+}
+
+.icon-letter {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--blanco);
+}
+
+.carousel-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--texto-oscuro);
+    margin-bottom: 4px;
+    line-height: 1.2;
+}
+
+.carousel-desc {
+    font-size: 9px;
+    color: #999;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ==================== RESPONSIVE DESKTOP ==================== */
+@media (min-width: 900px) {
+    .suggestions-carousel {
+        position: fixed;
+        bottom: 160px;
+        top: auto;
+        transform: none;
+        left: 280px;
+        right: 0;
+        padding: 0 60px;
+    }
+    
+    .carousel-container {
+        gap: 14px;
+        justify-content: flex-start; /* ⬅️ VOLVER A flex-start */
+        overflow-x: visible;
+        cursor: default;
+        flex-wrap: nowrap;
+        padding-left: 180px;  /* ⬅️ Entre 60px y 120px */
+    }
+    
+    .carousel-card {
+        min-width: 160px;
+        max-width: 160px;
+        padding: 12px;
+    }
+    
+    .carousel-icon {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .carousel-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .icon-letter {
+        font-size: 16px;
+    }
+    
+    .carousel-title {
+        font-size: 11px;
+        margin-bottom: 4px;
+    }
+    
+    .carousel-desc {
+        font-size: 9px;
+        color: #888;
+        -webkit-line-clamp: 2;
+    }
+}
+
+/* ==================== PANTALLAS MUY GRANDES (>1400px) ==================== */
+@media (min-width: 1400px) {
+    .suggestions-carousel {
+        bottom: 180px;
+        padding: 0 60px 0 100px;
+    }
+    
+    .carousel-container {
+        gap: 16px;
+        padding-left: 40px;
+    }
+    
+    .carousel-card {
+        min-width: 170px;
+        max-width: 170px;
+        padding: 14px;
+    }
+    
+    .carousel-icon {
+        width: 38px;
+        height: 38px;
+    }
+    
+    .carousel-title {
+        font-size: 12px;
+    }
+    
+    .carousel-desc {
+        font-size: 10px;
+    }
+}
