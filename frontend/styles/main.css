@@ -1893,12 +1893,13 @@ main.content {
 @media (min-width: 1400px) {
     .suggestions-carousel {
         bottom: 180px;
-        padding: 0 60px 0 100px;
+        padding: 0 60px;
     }
     
     .carousel-container {
         gap: 16px;
-        padding-left: 40px;
+        justify-content: center; /* ⬅️ CENTRADO en pantallas grandes */
+        padding-left: 0; /* ⬅️ SIN padding extra */
     }
     
     .carousel-card {
@@ -1918,5 +1919,48 @@ main.content {
     
     .carousel-desc {
         font-size: 10px;
+    }
+}
+
+/* ==================== PANTALLAS EXTRA GRANDES (>1920px - TV/4K) ==================== */
+@media (min-width: 1920px) {
+    .suggestions-carousel {
+        bottom: 200px;
+        padding: 0 100px;
+    }
+    
+    .carousel-container {
+        gap: 20px;
+        justify-content: center;
+        padding-right: 180px;
+    }
+    
+    .carousel-card {
+        min-width: 200px;
+        max-width: 200px;
+        padding: 16px;
+    }
+    
+    .carousel-icon {
+        width: 42px;
+        height: 42px;
+    }
+    
+    .carousel-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .icon-letter {
+        font-size: 20px;
+    }
+    
+    .carousel-title {
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+    
+    .carousel-desc {
+        font-size: 11px;
     }
 }
