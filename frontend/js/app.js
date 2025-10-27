@@ -132,6 +132,85 @@ function updateTokenCounter(tokens) {
     }
 }
 
+
+// ==================== DETECCIÓN AUTOMÁTICA DE MODO ====================
+/**
+ * Detecta palabras clave en el texto y activa el modo correspondiente
+ */
+function detectModeFromText(text) {
+    const lowerText = text ? text.toLowerCase().trim() : '';
+    
+    // Definir palabras clave para cada modo
+    const modeKeywords = {
+        'aprende': ['aprende', 'aprende.org']
+    };
+    
+    // Si el texto está vacío o muy corto
+    if (!text || text.length < 3) {
+        // Desactivar modo automático si estaba activo
+        if (appState.currentMode === 'aprende') {
+            hideModeChip();
+        }
+        return;
+    }
+    
+    // Buscar coincidencias
+    let foundKeyword = false;
+    
+    for (const [mode, keywords] of Object.entries(modeKeywords)) {
+        for (const keyword of keywords) {
+            if (lowerText.includes(keyword)) {
+                foundKeyword = true;
+                
+                // Solo activar si no está ya en ese modo
+                if (appState.currentMode !== mode) {
+                    activateModeAutomatically(mode);
+                }
+                return; // Salir después de la primera coincidencia
+            }
+        }
+    }
+    
+    // Si NO se encontró ninguna palabra clave pero el modo actual es "aprende"
+    // significa que el usuario borró la palabra clave
+    if (!foundKeyword && appState.currentMode === 'aprende') {
+        hideModeChip();
+    }
+}
+
+/**
+ * Activa un modo automáticamente y actualiza la UI
+ */
+function activateModeAutomatically(mode) {
+    const modeNames = {
+        'aprende': 'Aprende.org'
+    };
+    
+    const placeholders = {
+        'aprende': 'Pregunta sobre cursos de aprende.org'  
+    };
+    
+    // Actualizar placeholder
+    elements.userInput.placeholder = placeholders[mode] || 'Pregunta lo que quieras';
+    
+    // Actualizar modo en el estado
+    appState.currentMode = mode;
+    
+    // Mostrar chip
+    showModeChip(modeNames[mode], mode);
+    
+    // Actualizar selección en el menú de acciones
+    elements.actionItems.forEach(item => {
+        if (item.getAttribute('data-action') === mode) {
+            item.classList.add('selected');
+        } else {
+            item.classList.remove('selected');
+        }
+    });
+    
+    console.log(`🤖 Modo "${mode}" activado automáticamente`);
+}
+
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', function() {
     initializeEventListeners();
@@ -199,11 +278,14 @@ function initializeEventListeners() {
     elements.modeChipClose.addEventListener('click', hideModeChip);
     }
     
-    // Input de usuario - actualizar tokens en tiempo real
-    elements.userInput.addEventListener('input', function() {
-        const tokens = estimateTokens(this.value);
-        updateTokenCounter(tokens);
-    });
+    // Input de usuario - actualizar tokens Y detectar modo
+elements.userInput.addEventListener('input', function() {
+    const tokens = estimateTokens(this.value);
+    updateTokenCounter(tokens);
+    
+    // 🆕 DETECTAR MODO AUTOMÁTICAMENTE
+    detectModeFromText(this.value);
+});
 
     // ===== NUEVO: Detectar clic en input cuando está en límite =====
 elements.userInput.addEventListener('click', function() {
