@@ -274,6 +274,12 @@ function startNewConversation() {
     elements.chatHistory.innerHTML = '';
     elements.welcomePage.style.display = 'flex';
     elements.chatPage.style.display = 'none';
+
+    // Mostrar carrusel en pantalla de bienvenida
+const carousel = document.getElementById('suggestionsCarousel');
+if (carousel) {
+    carousel.style.display = 'block';
+}
     
     // NUEVO: Habilitar input al iniciar nueva conversación
     removeLimitWarning();
@@ -399,6 +405,12 @@ function showModeChip(modeName, modeAction) {
     // Mostrar contenedor con animación
     elements.modeChipContainer.style.display = 'flex';
     
+    // 🆕 OCULTAR CARRUSEL cuando hay chip activo
+    const carousel = document.getElementById('suggestionsCarousel');
+    if (carousel) {
+        carousel.style.display = 'none';
+    }
+    
     // Guardar modo activo
     appState.currentMode = modeAction;
     
@@ -413,6 +425,12 @@ function hideModeChip() {
     
     // Ocultar contenedor
     elements.modeChipContainer.style.display = 'none';
+    
+    // 🆕 MOSTRAR CARRUSEL cuando se cierra el chip
+    const carousel = document.getElementById('suggestionsCarousel');
+    if (carousel && elements.welcomePage.style.display !== 'none') {
+        carousel.style.display = 'block';
+    }
     
     // Resetear al modo búsqueda
     appState.currentMode = 'busqueda';
@@ -550,6 +568,12 @@ async function callAPI(message) {
 function showChatView() {
     elements.welcomePage.style.display = 'none';
     elements.chatPage.style.display = 'flex';
+
+    // Ocultar carrusel cuando hay chat activo
+    const carousel = document.getElementById('suggestionsCarousel');
+    if (carousel) {
+        carousel.style.display = 'none';
+    }
 }
 
 function addMessage(type, content) {
@@ -1168,6 +1192,43 @@ function closePremiumModal() {
         overlay.classList.remove('active');
     }
 }
+
+
+// ==================== CARRUSEL DE SUGERENCIAS ====================
+document.addEventListener('DOMContentLoaded', function() {
+    // Solo funcionalidad de scroll con arrastre (SIN clics)
+    const carouselContainer = document.querySelector('.carousel-container');
+    if (carouselContainer) {
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+        
+        carouselContainer.addEventListener('mousedown', (e) => {
+            isDown = true;
+            startX = e.pageX - carouselContainer.offsetLeft;
+            scrollLeft = carouselContainer.scrollLeft;
+            carouselContainer.style.cursor = 'grabbing';
+        });
+        
+        carouselContainer.addEventListener('mouseleave', () => {
+            isDown = false;
+            carouselContainer.style.cursor = 'grab';
+        });
+        
+        carouselContainer.addEventListener('mouseup', () => {
+            isDown = false;
+            carouselContainer.style.cursor = 'grab';
+        });
+        
+        carouselContainer.addEventListener('mousemove', (e) => {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - carouselContainer.offsetLeft;
+            const walk = (x - startX) * 2;
+            carouselContainer.scrollLeft = scrollLeft - walk;
+        });
+    }
+});
 
 
 // ==================== FUNCIONES PARA DESHABILITAR INPUT ====================
