@@ -693,12 +693,9 @@ function addMessage(type, content) {
 
     // 🆕 AGREGAR VISOR SI ES MODO APRENDE Y ES MENSAJE DEL BOT
 if (type === 'bot' && appState.currentMode === 'aprende') {
-    // URL de prueba - luego se reemplazará con la del backend
-    const testVideoUrl = 'https://cdn1.capacitateparaelempleo.org/vidhosting/eRBE4a9zR1E.mp4';
-    const mediaViewer = createMediaViewer(testVideoUrl, 'video');
+    const testPageUrl = 'https://aprende.org/cursos/8?resourceId=254';
+    const mediaViewer = createMediaViewer(testPageUrl, 'webpage');
     contentDiv.appendChild(mediaViewer);
-    
-    console.log('✅ Visor de video agregado al mensaje');
 }
     
     // Agregar al chat
@@ -884,6 +881,23 @@ function createMediaViewer(url, type) {
         
         contentDiv.appendChild(img);
     }
+
+    // 🆕 NUEVO: SOPORTE PARA PÁGINAS WEB
+    else if (type === 'webpage') {
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.className = 'webpage-iframe';
+        iframe.style.width = '100%';
+        iframe.style.height = '600px';
+        iframe.style.border = 'none';
+        iframe.style.borderRadius = '8px';
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('loading', 'lazy');
+        
+        contentDiv.appendChild(iframe);
+    }
+
+
     
     viewerDiv.appendChild(contentDiv);
     return viewerDiv;
