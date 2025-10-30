@@ -46959,36 +46959,6 @@ recursos_por_curso = {
     }
 }
 
-def extraer_detalles_de_recursos(datos):
-    id_a_consultar = input("Ingresa el ID del curso (ej. 2) para ver sus recursos: ")
-    if id_a_consultar not in datos:
-        print(f" Error: El ID de curso '{id_a_consultar}' no se encontró en los datos.")
-        return
-
-    datos_curso = datos[id_a_consultar]
-    nombre_curso = datos_curso.get("courseName", "Curso Desconocido")
-    
-    lista_de_recursos = datos_curso.get("recursos_por_curso", [])
-
-    print(f"\n--- Extrayendo recursos de: {nombre_curso} (ID: {id_a_consultar}) ---")
-
-    if not lista_de_recursos:
-        print("Este curso no tiene recursos asociados para mostrar.")
-        return
-
-    for i, recurso in enumerate(lista_de_recursos):
-        nombre = recurso.get("resourceName", "N/A")
-        descripcion = recurso.get("resourceDescription", "N/A")
-        redireccion = recurso.get("resourceRedirection", "N/A")
-
-        print(f"\n[Recurso #{i + 1}]")
-        print(f'resourceName: "{nombre}"')
-        print(f'resourceDescription: "{descripcion}"')
-        print(f'resourceRedirection: "{redireccion}"')
-        print("-" * 20)
-
-extraer_detalles_de_recursos(recursos_por_curso)
-
 id_curso_cursos = {
     "2": "Técnico en redes de datos",
     "4": "Carpintero",
@@ -47460,19 +47430,237 @@ id_curso_cursos = {
     "100837": "Calentamiento antes del ejercicio",
     "100839": "Ansiedad: Claves para recuperar la calma"
 }
-def consultar_curso():
-    clave_a_consultar = input("Por favor, ingresa la clave (ID) del curso que deseas consultar (ej. 2): ")
-    nombre_del_curso = id_curso_cursos.get(clave_a_consultar)
 
-    if nombre_del_curso:
-        print("\n--- Resultado de la consulta ---")
-        print(f'Clave solicitada: "{clave_a_consultar}"')
-        print(f'Curso encontrado: "{nombre_del_curso}"')
-        print(f'Formato Clave: Curso: "{clave_a_consultar}": "{nombre_del_curso}"')
-        print("-------------------------------")
-        return clave_a_consultar, nombre_del_curso 
-    else:
-        print("ERROR: La clave ingresada no corresponde a ningún curso registrado.")
-        return None, None 
 
-consultar_curso()
+
+
+# #!PASO 4: Implementar la Función de Búsqueda Inteligente de Cursos:
+# def buscar_cursos_por_criterio(tipo_curso, perfil_usuario, id_curso_cursos):
+#     """
+#     Busca cursos relevantes basándose en palabras clave y perfil
+#     """
+#     criterios_busqueda = {
+#         "oficios": ["carpintero", "albañil", "planchador", "mecánico"],
+#         "tecnologia": ["redes", "técnico", "programación"],
+#         "servicio": ["mesero", "aseador"],
+#         "salud": ["ansiedad", "bienestar"],
+#         "fitness": ["acondicionamiento", "físico"]
+#     }
+    
+#     # Buscar por categoría
+#     cursos_encontrados = []
+#     keywords = criterios_busqueda.get(tipo_curso.lower(), [])
+    
+#     for id_curso, nombre_curso in id_curso_cursos.items():
+#         for keyword in keywords:
+#             if keyword.lower() in nombre_curso.lower():
+#                 cursos_encontrados.append({
+#                     "id": id_curso,
+#                     "nombre": nombre_curso
+#                 })
+#                 break
+    
+#     # Si menciona habilidades manuales, priorizar oficios
+#     if perfil_usuario.get("habilidades"):
+#         if "manual" in " ".join(perfil_usuario["habilidades"]).lower():
+#             cursos_encontrados = [c for c in cursos_encontrados 
+#                                  if any(k in c["nombre"].lower() 
+#                                        for k in ["carpintero", "mecánico", "albañil"])]
+    
+#     return cursos_encontrados[:4]  # Máximo 4 sugerencias
+
+
+# #!: PASO 5: Implementar la Función de Búsqueda de Recurso Específico
+# def buscar_recurso_especifico(id_curso, tema, recursos_por_curso):
+#     """
+#     Busca un recurso específico dentro de un curso
+#     """
+#     if id_curso not in recursos_por_curso:
+#         return None
+    
+#     recursos = recursos_por_curso[id_curso]["recursos_por_curso"]
+    
+#     # Búsqueda por coincidencia en nombre o descripción
+#     for idx, recurso in enumerate(recursos):
+#         nombre = recurso["resourceName"].lower()
+#         descripcion = recurso["resourceDescription"].lower()
+        
+#         if tema.lower() in nombre or tema.lower() in descripcion:
+#             return idx, recurso
+    
+#     return None
+
+
+
+# # ============================================================
+# #  Función para consultar el nombre del curso por ID
+# # ============================================================
+
+# def consultar_curso():
+#     """
+#     Permite al usuario ingresar un ID y consultar el nombre del curso asociado.
+#     """
+#     clave_a_consultar = input("Por favor, ingresa la clave (ID) del curso que deseas consultar (ej. 2): ")
+#     nombre_del_curso = id_curso_cursos.get(clave_a_consultar)
+
+#     if nombre_del_curso:
+#         print("\n--- Resultado de la consulta ---")
+#         print(f'Clave solicitada: "{clave_a_consultar}"')
+#         print(f'Curso encontrado: "{nombre_del_curso}"')
+#         print(f'Formato Clave: Curso: "{clave_a_consultar}": "{nombre_del_curso}"')
+#         print("-------------------------------")
+#         return clave_a_consultar, nombre_del_curso
+#     else:
+#         print("❌ ERROR: La clave ingresada no corresponde a ningún curso registrado.")
+#         return None, None
+
+
+# # ============================================================
+# #  Función para extraer todos los recursos de un curso (listado completo)
+# # ============================================================
+
+# def extraer_detalles_de_recursos(datos):
+#     """
+#     Muestra todos los recursos asociados a un curso de forma completa.
+#     """
+#     id_a_consultar = input("Ingresa el ID del curso (ej. 2) para ver sus recursos: ")
+#     if id_a_consultar not in datos:
+#         print(f"❌ Error: El ID de curso '{id_a_consultar}' no se encontró en los datos.")
+#         return
+
+#     datos_curso = datos[id_a_consultar]
+#     nombre_curso = datos_curso.get("courseName", "Curso Desconocido")
+#     lista_de_recursos = datos_curso.get("recursos_por_curso", [])
+
+#     print(f"\n--- Extrayendo recursos de: {nombre_curso} (ID: {id_a_consultar}) ---")
+
+#     if not lista_de_recursos:
+#         print("⚠️ Este curso no tiene recursos asociados para mostrar.")
+#         return
+
+#     for i, recurso in enumerate(lista_de_recursos):
+#         nombre = recurso.get("resourceName", "N/A")
+#         descripcion = recurso.get("resourceDescription", "N/A")
+#         redireccion = recurso.get("resourceRedirection", "N/A")
+
+#         print(f"\n[Recurso #{i + 1}]")
+#         print(f'resourceName: "{nombre}"')
+#         print(f'resourceDescription: "{descripcion}"')
+#         print(f'resourceRedirection: "{redireccion}"')
+#         print("-" * 20)
+
+
+# # ============================================================
+# #  Función central: obtener un recurso específico (uno por uno)
+# # ============================================================
+
+# def obtener_siguiente_recurso(idCourse: str, indiceActual: int) -> dict:
+#     """
+#     Recupera un recurso específico de un curso y maneja validaciones.
+#     """
+#     # Validar existencia del curso
+#     if idCourse not in id_curso_cursos:
+#         return {"status": "ERROR", "message": f"El ID '{idCourse}' no existe en la lista de cursos."}
+
+#     nombre_curso = id_curso_cursos[idCourse]
+
+#     # Validar si hay recursos
+#     if idCourse not in recursos_por_curso:
+#         return {"status": "SIN_RECURSOS", "courseName": nombre_curso,
+#                 "message": f"El curso '{nombre_curso}' existe, pero aún no tiene recursos disponibles."}
+
+#     datos_curso = recursos_por_curso[idCourse]
+#     lista_recursos = datos_curso.get("recursos_por_curso", [])
+#     total_recursos = len(lista_recursos)
+
+#     if indiceActual < 0:
+#         return {"status": "ERROR", "message": "El índice no puede ser negativo."}
+
+#     if indiceActual >= total_recursos:
+#         return {"status": "COMPLETADO", "courseName": nombre_curso,
+#                 "message": f"✅ Has revisado todos los {total_recursos} recursos del curso '{nombre_curso}'."}
+
+#     recurso = lista_recursos[indiceActual]
+
+#     return {
+#         "status": "OK",
+#         "indice": indiceActual,
+#         "nextIndex": indiceActual + 1 if indiceActual + 1 < total_recursos else None,
+#         "has_more": indiceActual + 1 < total_recursos,
+#         "total_recursos": total_recursos,
+#         "courseName": nombre_curso,
+#         "resourceName": recurso.get("resourceName", "N/A"),
+#         "resourceDescription": recurso.get("resourceDescription", "N/A"),
+#         "resourcePoster": recurso.get("resourcePoster", None),
+#         "resourceRedirection": recurso.get("resourceRedirection", "N/A")
+#     }
+
+
+# # ============================================================
+# #  Flujo conversacional: recorrer recursos uno por uno
+# # ============================================================
+
+# def recorrer_recursos_interactivo():
+#     """
+#     Permite al usuario consultar un curso y avanzar por sus recursos paso a paso.
+#     """
+#     id_curso, nombre_curso = consultar_curso()
+#     if not id_curso:
+#         return
+
+#     indice = 0
+#     print(f"\n--- Iniciando recursos del curso '{nombre_curso}' ---")
+
+#     while True:
+#         resultado = obtener_siguiente_recurso(id_curso, indice)
+
+#         if resultado["status"] == "ERROR":
+#             print("❌", resultado["message"])
+#             break
+
+#         elif resultado["status"] == "SIN_RECURSOS":
+#             print("⚠️", resultado["message"])
+#             break
+
+#         elif resultado["status"] == "COMPLETADO":
+#             print("🏁", resultado["message"])
+#             break
+
+#         elif resultado["status"] == "OK":
+#             print(f"\n📘 [Recurso {indice + 1}/{resultado['total_recursos']}] — {resultado['resourceName']}")
+#             print(f"Descripción: {resultado['resourceDescription']}")
+#             print(f"Enlace: {resultado['resourceRedirection']}")
+#             print("-" * 60)
+
+#             if resultado["has_more"]:
+#                 seguir = input("¿Deseas ver el siguiente recurso? (s/n): ").strip().lower()
+#                 if seguir == "s":
+#                     indice = resultado["nextIndex"]
+#                     continue
+#                 else:
+#                     print("Saliste del flujo de recursos.")
+#                     break
+#             else:
+#                 print("Este fue el último recurso del curso.")
+#                 break
+
+
+# # ============================================================
+# # 🚀 Punto de entrada principal
+# # ============================================================
+
+# if __name__ == "__main__":
+#     print("=== Sistema Interactivo de Cursos Aprende.org ===")
+#     print("1 Consultar curso")
+#     print("2 Ver todos los recursos de un curso")
+#     print("3 Recorrer recursos paso a paso")
+#     opcion = input("Selecciona una opción (1, 2 o 3): ").strip()
+
+#     if opcion == "1":
+#         consultar_curso()
+#     elif opcion == "2":
+#         extraer_detalles_de_recursos(recursos_por_curso)
+#     elif opcion == "3":
+#         recorrer_recursos_interactivo()
+#     else:
+#         print("Opción no válida.")
