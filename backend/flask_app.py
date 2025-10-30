@@ -1474,9 +1474,7 @@ def call_groq_api_directly_sms(messages, max_tokens=40):
     response.raise_for_status()
     return response.json()
 
-
-
-    # ==================== ENDPOINT RCS (NUEVO) ====================
+# ==================== ENDPOINT RCS (NUEVO) ====================
 @app.route('/rcs', methods=['POST'])
 @limiter.limit("20 per minute")
 @limiter.limit("1 per 2 seconds")
