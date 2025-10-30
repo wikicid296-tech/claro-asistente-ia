@@ -1473,6 +1473,127 @@ def call_groq_api_directly_sms(messages, max_tokens=40):
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
     return response.json()
+
+
+
+    # ==================== ENDPOINT RCS (NUEVO) ====================
+@app.route('/rcs', methods=['POST'])
+@limiter.limit("20 per minute")
+@limiter.limit("1 per 2 seconds")
+def rcs_webhook():
+    """Endpoint RCS con capacidades enriquecidas"""
+    try:
+        # RCS puede recibir datos en JSON o form-data
+        if request.is_json:
+            data = request.get_json()
+            incoming_msg = data.get('Body', '').strip()
+            from_number = data.get('From', '')
+        else:
+            incoming_msg = request.values.get('Body', '').strip()
+            from_number = request.values.get('From', '')
+        
+        # Validación inicial
+        if not incoming_msg:
+            resp = MessagingResponse()
+            resp.message("Por favor envía un mensaje válido.")
+            return str(resp)
+        
+        # Log para debugging
+        logger.info(f"RCS recibido de {from_number}: {incoming_msg[:50]}")
+        
+        # Memoria inteligente para RCS
+        user_key = from_number
+        prev_messages = get_relevant_memory(user_key, incoming_msg)
+        
+        # Actualizar memoria
+        mem = CHAT_MEMORY.get(user_key, [])
+        mem.append(incoming_msg)
+        if len(mem) > 2:
+            mem = mem[-2:]
+        CHAT_MEMORY[user_key] = mem
+        
+        # Contexto
+        context = safe_get_context_for_query(incoming_msg)
+        relevant_urls = safe_extract_relevant_urls(incoming_msg)
+        
+        # URLs para RCS (más ricas que SMS)
+        urls_text = ""
+        if relevant_urls:
+            urls_text = "\n\n📎 *Enlaces útiles:*\n" + "\n".join([f"• {url}" for url in relevant_urls[:3]])
+        
+        # Usar el prompt específico de RCS
+        try:
+            formatted_prompt = RCS_SYSTEM_PROMPT.format(context=context, urls=urls_text)
+        except Exception:
+            formatted_prompt = f"Asistente RCS.\n{context}\n{urls_text}"
+        
+        # Construir mensajes
+        messages = [{"role": "system", "content": formatted_prompt}]
+        
+        # Incluir contexto previo
+        for pm in prev_messages:
+            if pm and pm.strip():
+                messages.append({"role": "user", "content": pm})
+        
+        messages.append({"role": "user", "content": incoming_msg})
+        
+        # Llamar a Groq
+        if client and client != "api_fallback":
+            completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=messages,
+                temperature=0.5,
+                max_tokens=500  # RCS soporta más caracteres que SMS
+            )
+            ai_response = completion.choices[0].message.content
+        else:
+            result = call_groq_api_directly(messages)
+            ai_response = result["choices"][0]["message"]["content"]
+        
+        # RCS soporta ~1024 caracteres
+        if len(ai_response) > 1000:
+            ai_response = ai_response[:997] + "..."
+        
+        logger.info(f"RCS respuesta ({len(ai_response)} chars): {ai_response[:100]}")
+        
+        # Enviar respuesta
+        resp = MessagingResponse()
+        resp.message(ai_response)
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+        
+    except Exception as e:
+        logger.error(f"Error en /rcs: {str(e)}")
+        resp = MessagingResponse()
+        resp.message("❌ Error al procesar mensaje. Intenta nuevamente.")
+        return str(resp), 200, {'Content-Type': 'text/xml'}
+
+
+# ==================== ENDPOINT STATUS CALLBACK (OPCIONAL) ====================
+@app.route('/rcs/status', methods=['POST'])
+@limiter.exempt
+def rcs_status_callback():
+    """Recibe actualizaciones de estado de mensajes RCS"""
+    try:
+        message_sid = request.values.get('MessageSid')
+        message_status = request.values.get('MessageStatus')
+        to_number = request.values.get('To')
+        from_number = request.values.get('From')
+        error_code = request.values.get('ErrorCode')
+        
+        logger.info(f"📊 RCS Status Update:")
+        logger.info(f"   MessageSid: {message_sid}")
+        logger.info(f"   Status: {message_status}")
+        logger.info(f"   To: {to_number}")
+        logger.info(f"   From: {from_number}")
+        
+        if error_code:
+            logger.error(f"   Error Code: {error_code}")
+        
+        return '', 200
+        
+    except Exception as e:
+        logger.error(f"Error en /rcs/status: {str(e)}")
+        return '', 200
         
 
 # ==================== ENDPOINTS ESTÁTICOS (MANTENER IGUALES) ====================
