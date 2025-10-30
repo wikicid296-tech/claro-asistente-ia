@@ -1278,6 +1278,7 @@ def chat():
         logger.error(f"Error en /chat: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+
 @app.route('/whatsapp', methods=['POST'])
 @limiter.limit("20 per minute")
 @limiter.limit("1 per 2 seconds")
@@ -1347,6 +1348,7 @@ def whatsapp_webhook():
         resp = MessagingResponse()
         resp.message("❌ Error. Intenta nuevamente.")
         return str(resp), 200, {'Content-Type': 'text/xml'}
+
 
 # ==================== ENDPOINT SMS (NUEVO) ====================
 @app.route('/sms', methods=['POST'])
@@ -1454,6 +1456,7 @@ def sms_webhook():
         resp.message("Error. Reintentar")  # Solo 17 caracteres
         return str(resp), 200, {'Content-Type': 'text/xml'}
 
+
 # 🆕 FUNCIÓN AUXILIAR NUEVA para llamadas directas a API con límite SMS
 def call_groq_api_directly_sms(messages, max_tokens=40):
     """Versión especial para SMS con límites estrictos"""
@@ -1474,32 +1477,46 @@ def call_groq_api_directly_sms(messages, max_tokens=40):
     response.raise_for_status()
     return response.json()
 
+
 # ==================== ENDPOINT RCS (NUEVO) ====================
-@app.route('/rcs', methods=['POST'])
+@app.route('/rcs', methods=['POST', 'GET'])
 @limiter.limit("20 per minute")
 @limiter.limit("1 per 2 seconds")
 def rcs_webhook():
-    """Endpoint RCS con capacidades enriquecidas"""
+    """Endpoint RCS con logging mejorado"""
     try:
-        # RCS puede recibir datos en JSON o form-data
+        # Log del método HTTP
+        logger.info(f"=== RCS REQUEST ===")
+        logger.info(f"Method: {request.method}")
+        logger.info(f"Content-Type: {request.content_type}")
+        logger.info(f"Headers: {dict(request.headers)}")
+        
+        # Manejar GET (para verificación de Twilio)
+        if request.method == 'GET':
+            logger.info("GET request recibido - probablemente verificación de webhook")
+            return "RCS Webhook activo", 200
+        
+        # Extraer datos del mensaje
         if request.is_json:
             data = request.get_json()
+            logger.info(f"JSON data: {data}")
             incoming_msg = data.get('Body', '').strip()
             from_number = data.get('From', '')
         else:
+            logger.info(f"Form data: {request.values}")
             incoming_msg = request.values.get('Body', '').strip()
             from_number = request.values.get('From', '')
         
-        # Validación inicial
+        logger.info(f"📱 RCS de {from_number}: {incoming_msg}")
+        
+        # Validación
         if not incoming_msg:
+            logger.warning("Mensaje vacío recibido")
             resp = MessagingResponse()
             resp.message("Por favor envía un mensaje válido.")
-            return str(resp)
+            return str(resp), 200, {'Content-Type': 'text/xml'}
         
-        # Log para debugging
-        logger.info(f"RCS recibido de {from_number}: {incoming_msg[:50]}")
-        
-        # Memoria inteligente para RCS
+        # Memoria inteligente
         user_key = from_number
         prev_messages = get_relevant_memory(user_key, incoming_msg)
         
@@ -1514,21 +1531,21 @@ def rcs_webhook():
         context = safe_get_context_for_query(incoming_msg)
         relevant_urls = safe_extract_relevant_urls(incoming_msg)
         
-        # URLs para RCS (más ricas que SMS)
+        # URLs para RCS
         urls_text = ""
         if relevant_urls:
             urls_text = "\n\n📎 *Enlaces útiles:*\n" + "\n".join([f"• {url}" for url in relevant_urls[:3]])
         
-        # Usar el prompt específico de RCS
+        # Prompt
         try:
             formatted_prompt = RCS_SYSTEM_PROMPT.format(context=context, urls=urls_text)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error formateando prompt: {e}")
             formatted_prompt = f"Asistente RCS.\n{context}\n{urls_text}"
         
         # Construir mensajes
         messages = [{"role": "system", "content": formatted_prompt}]
         
-        # Incluir contexto previo
         for pm in prev_messages:
             if pm and pm.strip():
                 messages.append({"role": "user", "content": pm})
@@ -1536,31 +1553,36 @@ def rcs_webhook():
         messages.append({"role": "user", "content": incoming_msg})
         
         # Llamar a Groq
+        logger.info("Llamando a Groq API...")
         if client and client != "api_fallback":
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
                 temperature=0.5,
-                max_tokens=500  # RCS soporta más caracteres que SMS
+                max_tokens=500
             )
             ai_response = completion.choices[0].message.content
         else:
             result = call_groq_api_directly(messages)
             ai_response = result["choices"][0]["message"]["content"]
         
-        # RCS soporta ~1024 caracteres
+        # Limitar longitud
         if len(ai_response) > 1000:
             ai_response = ai_response[:997] + "..."
         
-        logger.info(f"RCS respuesta ({len(ai_response)} chars): {ai_response[:100]}")
+        logger.info(f"✅ RCS respuesta ({len(ai_response)} chars): {ai_response[:100]}")
         
         # Enviar respuesta
         resp = MessagingResponse()
         resp.message(ai_response)
-        return str(resp), 200, {'Content-Type': 'text/xml'}
+        
+        response_xml = str(resp)
+        logger.info(f"Response XML: {response_xml}")
+        
+        return response_xml, 200, {'Content-Type': 'text/xml'}
         
     except Exception as e:
-        logger.error(f"Error en /rcs: {str(e)}")
+        logger.error(f"❌ Error en /rcs: {str(e)}", exc_info=True)
         resp = MessagingResponse()
         resp.message("❌ Error al procesar mensaje. Intenta nuevamente.")
         return str(resp), 200, {'Content-Type': 'text/xml'}
@@ -1603,6 +1625,7 @@ def serve_frontend():
     except Exception as e:
         return f"Error: {str(e)}", 500
 
+
 @app.route('/images/<path:filename>')
 @limiter.exempt
 def serve_images(filename):
@@ -1619,6 +1642,7 @@ def serve_images(filename):
     except Exception as e:
         logger.error(f"❌ Error sirviendo imagen {filename}: {str(e)}")
         return "Imagen no encontrada", 404
+
 
 @app.route('/<path:path>')
 @limiter.exempt
@@ -1640,6 +1664,7 @@ def serve_static(path):
     except Exception as e:
         logger.error(f"❌ Error sirviendo {path}: {str(e)}")
         return f"Error sirviendo archivo: {path}", 500
+
 
 @app.route('/urls', methods=['POST'])
 def get_urls():
@@ -1671,8 +1696,8 @@ def get_urls():
             "error": str(e)
         }), 500
 
+
 if __name__ == '__main__':
     logger.info(f"🚀 Telecom Copilot v2.1 - Context-Aware en puerto {PORT}")
     logger.info("✨ Mejoras: Detección automática de cambio de contexto")
     app.run(host='0.0.0.0', port=PORT, debug=False)
-
