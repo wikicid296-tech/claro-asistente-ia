@@ -11,3 +11,4 @@ requests-html
 pyppeteer         
 asyncio
 lxml[html_clean]
+pyppeteer==0.2.2
