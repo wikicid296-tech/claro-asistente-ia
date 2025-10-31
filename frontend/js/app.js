@@ -1,5 +1,7 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
-const API_URL = 'https://claro-asistente-ia.onrender.com'; // Tu URL de Render
+const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8000'  // Desarrollo local
+    : 'https://claro-asistente-ia.onrender.com';  // Producción
 
 
 // ==================== CONFIGURACIÓN DE LÍMITE DE MENSAJES ====================
@@ -28,13 +30,15 @@ const appState = {
         reminders: [],
         notes: [],
         calendar: []
-     },
-    // 🆕 AGREGAR ESTO:
+    },
     mediaViewer: {
         isActive: false,
         currentMedia: null,
         mediaType: null
-    }
+    },
+    lastAprendeResource: null,
+    // 🆕 AGREGAR ESTA LÍNEA
+    modeActivatedManually: false  // Flag para saber si el modo fue activado manualmente
 };
 
 // Elementos del DOM
@@ -145,6 +149,11 @@ function detectModeFromText(text) {
         'aprende': ['aprende', 'aprende.org']
     };
     
+    // 🆕 SI EL MODO FUE ACTIVADO MANUALMENTE, NO HACER NADA
+    if (appState.modeActivatedManually) {
+        return; // Salir inmediatamente, no desactivar
+    }
+    
     // Si el texto está vacío o muy corto
     if (!text || text.length < 3) {
         // Desactivar modo automático si estaba activo
@@ -195,6 +204,9 @@ function activateModeAutomatically(mode) {
     
     // Actualizar modo en el estado
     appState.currentMode = mode;
+
+    // 🆕 MARCAR QUE NO FUE MANUAL (fue automático)
+    appState.modeActivatedManually = false;
     
     // Mostrar chip
     showModeChip(modeNames[mode], mode);
@@ -442,6 +454,9 @@ function selectAction(e) {
     elements.userInput.placeholder = placeholders[action] || 'Pregunta lo que quieras';
     appState.currentMode = action;
     
+    // 🆕 MARCAR QUE FUE ACTIVADO MANUALMENTE
+    appState.modeActivatedManually = (action !== 'busqueda');
+    
     // Mostrar u ocultar chip según el modo
     if (action !== 'busqueda') {
         showModeChip(modeNames[action], action);
@@ -516,6 +531,9 @@ function hideModeChip() {
     
     // Resetear al modo búsqueda
     appState.currentMode = 'busqueda';
+
+    // 🆕 RESETEAR FLAG DE MODO MANUAL
+    appState.modeActivatedManually = false;
     
     // Restaurar placeholder
     elements.userInput.placeholder = 'Pregunta lo que quieras';
@@ -624,7 +642,7 @@ async function callAPI(message) {
             })
         });
         
-        // ===== NUEVO: MANEJAR ERROR 429 (RATE LIMIT) =====
+        // ===== MANEJAR ERROR 429 (RATE LIMIT) =====
         if (response.status === 429) {
             const errorData = await response.json();
             throw new Error(errorData.message || '⏱️ Por favor espera unos segundos antes de enviar otro mensaje');
@@ -637,6 +655,36 @@ async function callAPI(message) {
         const data = await response.json();
         
         if (data.success) {
+            // 🆕 NUEVA LÓGICA: Priorizar Video > PDF > Página completa
+            if (data.aprende_ia_used) {
+                // PRIORIDAD 1: Si hay video, usar el video
+                if (data.url_video) {
+                    appState.lastAprendeResource = {
+                        url: data.url_video,
+                        tipo: 'video'  // Forzar tipo video
+                    };
+                    console.log('🎥 Video de Aprende.org detectado:', appState.lastAprendeResource);
+                } 
+                // PRIORIDAD 2: Si hay PDF, usar el PDF
+                else if (data.url_pdf) {
+                    appState.lastAprendeResource = {
+                        url: data.url_pdf,
+                        tipo: 'pdf'  // Forzar tipo PDF
+                    };
+                    console.log('📄 PDF de Aprende.org detectado:', appState.lastAprendeResource);
+                } 
+                // PRIORIDAD 3: Si no hay ni video ni PDF, usar la página completa
+                else if (data.url_recurso) {
+                    appState.lastAprendeResource = {
+                        url: data.url_recurso,
+                        tipo: data.tipo_recurso || 'curso'  // Página completa del curso
+                    };
+                    console.log('📚 Página de Aprende.org detectada:', appState.lastAprendeResource);
+                }
+            } else {
+                appState.lastAprendeResource = null;
+            }
+            
             return data.response;
         } else {
             throw new Error(data.error || 'Error desconocido');
@@ -691,11 +739,17 @@ function addMessage(type, content) {
     messageContainer.appendChild(avatarDiv);
     messageContainer.appendChild(contentDiv);
 
-    // 🆕 AGREGAR VISOR SI ES MODO APRENDE Y ES MENSAJE DEL BOT
-if (type === 'bot' && appState.currentMode === 'aprende') {
-    const testPageUrl = 'https://aprende.org/cursos/8?resourceId=254';
-    const mediaViewer = createMediaViewer(testPageUrl, 'webpage');
+    // 🆕 AGREGAR VISOR SI HAY RECURSO DE APRENDE.ORG
+if (type === 'bot' && appState.lastAprendeResource) {
+    const { url, tipo } = appState.lastAprendeResource;
+    
+    console.log('📺 Creando visor para:', url, '- Tipo:', tipo);
+    
+    const mediaViewer = createMediaViewer(url, tipo);
     contentDiv.appendChild(mediaViewer);
+    
+    // Limpiar después de usar para no mostrarlo en mensajes posteriores
+    appState.lastAprendeResource = null;
 }
     
     // Agregar al chat
@@ -846,22 +900,46 @@ function createMediaViewer(url, type) {
     contentDiv.className = 'media-content';
     
     if (type === 'video') {
-        const video = document.createElement('video');
-        video.src = url;
-        video.controls = true;
-        video.controlsList = 'nodownload';
-        video.disablePictureInPicture = true;
-        video.preload = 'metadata';
-        
-        contentDiv.appendChild(video);
+    const video = document.createElement('video');
+    video.src = url;
+    video.controls = true;
+    video.controlsList = 'nodownload';
+    video.disablePictureInPicture = true;
+    video.preload = 'metadata';
+    video.style.width = '100%';
+    video.style.maxHeight = '500px';
+    video.style.borderRadius = '8px';
+    video.style.backgroundColor = '#000';
+    
+    // 🆕 Event listeners para debugging
+    video.addEventListener('loadstart', () => {
+        console.log('🎬 Video: Iniciando carga...');
+    });
+    
+    video.addEventListener('loadedmetadata', () => {
+        console.log('✅ Video: Metadata cargada');
+    });
+    
+    video.addEventListener('error', (e) => {
+        console.error('❌ Error cargando video:', e);
+        console.error('Error code:', video.error?.code);
+        console.error('Error message:', video.error?.message);
+    });
+    
+    video.addEventListener('canplay', () => {
+        console.log('✅ Video: Listo para reproducir');
+    });
+    
+    contentDiv.appendChild(video);
 
-        // 🆕 Aplicar protección completa
-         applyMediaProtection(video);
+    // ✅ Aplicar solo protección anti-clic derecho (SIN overlay)
+    applyMediaProtection(video);
+    
+    // ❌ ELIMINADO: Ya no crear overlay que bloquea clics
+    // const overlay = document.createElement('div');
+    // overlay.className = 'media-protection-overlay';
+    // contentDiv.appendChild(overlay);
 
-         // 🆕 Agregar overlay invisible de protección
-        const overlay = document.createElement('div');
-        overlay.className = 'media-protection-overlay';
-        contentDiv.appendChild(overlay);
         
     } else if (type === 'pdf') {
         const iframe = document.createElement('iframe');
@@ -881,8 +959,26 @@ function createMediaViewer(url, type) {
         
         contentDiv.appendChild(img);
     }
+    
+    // 🆕 NUEVO: SOPORTE PARA CURSOS DE APRENDE.ORG
+    else if (type === 'curso' || type === 'diplomado' || type === 'ruta' || type === 'especialidad') {
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.className = 'aprende-iframe';
+        iframe.style.width = '100%';
+        iframe.style.height = '600px';
+        iframe.style.border = 'none';
+        iframe.style.borderRadius = '8px';
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('loading', 'lazy');
+        
+        // Log para debugging
+        console.log('✅ Iframe de curso creado:', url);
+        
+        contentDiv.appendChild(iframe);
+    }
 
-    // 🆕 NUEVO: SOPORTE PARA PÁGINAS WEB
+    // CASO GENÉRICO: PÁGINAS WEB
     else if (type === 'webpage') {
         const iframe = document.createElement('iframe');
         iframe.src = url;
@@ -896,8 +992,22 @@ function createMediaViewer(url, type) {
         
         contentDiv.appendChild(iframe);
     }
-
-
+    
+    // CASO POR DEFECTO: Si no coincide con ningún tipo, crear iframe genérico
+    else {
+        console.warn('⚠️ Tipo desconocido:', type, '- Creando iframe genérico');
+        const iframe = document.createElement('iframe');
+        iframe.src = url;
+        iframe.className = 'generic-iframe';
+        iframe.style.width = '100%';
+        iframe.style.height = '600px';
+        iframe.style.border = 'none';
+        iframe.style.borderRadius = '8px';
+        iframe.setAttribute('allowfullscreen', 'true');
+        iframe.setAttribute('loading', 'lazy');
+        
+        contentDiv.appendChild(iframe);
+    }
     
     viewerDiv.appendChild(contentDiv);
     return viewerDiv;
