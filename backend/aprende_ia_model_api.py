@@ -3,7 +3,7 @@ from openai import OpenAI
 import os
 import re
 import asyncio
-from playwright.async_api import async_playwright
+from requests_html import AsyncHTMLSession
 import logging
 
 # Configurar logging
@@ -21,11 +21,12 @@ vector_store_id = os.getenv("VECTOR_STORE_ID")
 
 
 # ---------------------------------------------------------------------------
-# 🔹 FUNCIÓN: Extraer contenido multimedia con Playwright
+# 🔹 FUNCIÓN: Extraer contenido multimedia con requests-html
 # ---------------------------------------------------------------------------
 async def extraer_contenido_multimedia(resource_url: str) -> dict:
     """
-    Intenta extraer contenido multimedia de la página de Aprende.org usando Playwright.
+    Intenta extraer contenido multimedia de la página de Aprende.org usando requests-html.
+    Compatible con Render Free Tier.
     Prioridad: Video > PDF > Página completa
     
     Retorna un diccionario con:
@@ -34,128 +35,114 @@ async def extraer_contenido_multimedia(resource_url: str) -> dict:
         "url": "URL del contenido encontrado"
     }
     """
+    session = AsyncHTMLSession()
     logger.info(f"🔍 Accediendo a: {resource_url}")
     
-    async with async_playwright() as p:
-        browser = None
+    try:
+        # Hacer la petición HTTP
+        logger.info("📡 Realizando petición HTTP...")
+        response = await session.get(resource_url, timeout=20)
+        logger.info(f"✅ Status code: {response.status_code}")
+        
+        if response.status_code != 200:
+            logger.warning(f"⚠️ Status code no exitoso: {response.status_code}")
+            await session.close()
+            return {"tipo": "webpage", "url": resource_url}
+        
+        # Renderizar JavaScript para contenido dinámico
+        logger.info("🎬 Renderizando JavaScript...")
         try:
-            # Lanzar navegador headless
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            
-            # Navegar a la URL
-            logger.info("📡 Navegando a la página...")
-            await page.goto(resource_url, wait_until="networkidle", timeout=20000)
-            logger.info(f"✅ Página cargada exitosamente")
-            
-            # Esperar un poco más para que el contenido dinámico se cargue
-            await page.wait_for_timeout(3000)
-            
-            # Obtener el HTML completo
-            html = await page.content()
-            logger.info(f"📄 HTML obtenido. Longitud: {len(html)} caracteres")
-            
-            # ============ PASO 1: BUSCAR VIDEOS EN ELEMENTOS DOM ============
-            logger.info("🎥 Buscando videos en elementos DOM...")
-            
-            # Buscar elemento <video>
-            video_element = await page.query_selector('video')
-            if video_element:
-                logger.info("✅ Encontrado elemento <video>")
-                
-                # Intentar obtener src del elemento video
-                video_src = await video_element.get_attribute('src')
-                if video_src:
-                    logger.info(f"✅ Video encontrado en atributo src: {video_src}")
-                    await browser.close()
-                    return {"tipo": "video", "url": video_src}
-                
-                # Buscar en elementos <source> dentro del <video>
-                sources = await video_element.query_selector_all('source')
-                for source in sources:
-                    src = await source.get_attribute('src')
-                    if src:
-                        logger.info(f"✅ Video encontrado en elemento <source>: {src}")
-                        await browser.close()
-                        return {"tipo": "video", "url": src}
-            else:
-                logger.info("❌ No se encontró elemento <video>")
-            
-            # ============ PASO 2: BUSCAR VIDEOS CON REGEX EN HTML ============
-            logger.info("🔍 Buscando videos con regex en HTML...")
-            
-            video_patterns = {
-                'mp4_directo': r'https://[^\s\'"<>]+\.mp4(?:\?[^\s\'"<>]*)?',
-                'm3u8_streaming': r'https://[^\s\'"<>]+\.m3u8(?:\?[^\s\'"<>]*)?',
-                'vimeo_embed': r'https://player\.vimeo\.com/video/\d+',
-                'youtube_embed': r'https://www\.youtube\.com/embed/[\w-]+',
-                'youtube_watch': r'https://www\.youtube\.com/watch\?v=[\w-]+',
-                'jwplayer': r'https://[^\s\'"<>]+\.mpd',
-            }
-            
-            for nombre_patron, patron in video_patterns.items():
-                match = re.search(patron, html, re.IGNORECASE)
-                if match:
-                    url_video = match.group(0)
-                    logger.info(f"✅ Video encontrado con regex ({nombre_patron}): {url_video}")
-                    await browser.close()
-                    return {"tipo": "video", "url": url_video}
-            
-            logger.info("❌ No se encontraron videos con regex")
-            
-            # ============ PASO 3: BUSCAR PDFs ============
-            logger.info("📄 Buscando PDFs...")
-            
-            pdf_patterns = [
-                r'https://[^\s\'"<>]+\.pdf(?:\?[^\s\'"<>]*)?',
-                r'https://[^\s\'"<>]+/api/[^\s\'"<>]*\.pdf',
-            ]
-            
-            for patron in pdf_patterns:
-                match = re.search(patron, html, re.IGNORECASE)
-                if match:
-                    url_pdf = match.group(0)
-                    logger.info(f"✅ PDF encontrado: {url_pdf}")
-                    await browser.close()
-                    return {"tipo": "pdf", "url": url_pdf}
-            
-            logger.info("❌ No se encontraron PDFs")
-            
-            # ============ PASO 4: BUSCAR IFRAMES EMBEBIDOS ============
-            logger.info("🖼️ Buscando iframes embebidos...")
-            
-            iframes = await page.query_selector_all('iframe')
-            logger.info(f"📊 Encontrados {len(iframes)} iframes en la página")
+            await response.html.arender(timeout=20, sleep=3)
+            logger.info("✅ JavaScript renderizado exitosamente")
+        except Exception as render_error:
+            logger.warning(f"⚠️ No se pudo renderizar JavaScript: {str(render_error)}")
+            # Continuar con el HTML sin renderizar
+        
+        # Obtener el HTML completo
+        html = response.html.html
+        logger.info(f"📄 HTML obtenido. Longitud: {len(html)} caracteres")
+        
+        # ============ PASO 1: BUSCAR VIDEOS ============
+        logger.info("🎥 Buscando videos en el HTML...")
+        
+        video_patterns = {
+            'mp4_directo': r'https://[^\s\'"<>]+\.mp4(?:\?[^\s\'"<>]*)?',
+            'm3u8_streaming': r'https://[^\s\'"<>]+\.m3u8(?:\?[^\s\'"<>]*)?',
+            'vimeo_embed': r'https://player\.vimeo\.com/video/\d+',
+            'vimeo_api': r'https://vimeo\.com/api/[^\s\'"<>]+',
+            'youtube_embed': r'https://www\.youtube\.com/embed/[\w-]+',
+            'youtube_watch': r'https://www\.youtube\.com/watch\?v=[\w-]+',
+            'jwplayer': r'https://[^\s\'"<>]+\.mpd',
+        }
+        
+        for nombre_patron, patron in video_patterns.items():
+            match = re.search(patron, html, re.IGNORECASE)
+            if match:
+                url_video = match.group(0)
+                logger.info(f"✅ Video encontrado con patrón '{nombre_patron}': {url_video}")
+                await session.close()
+                return {"tipo": "video", "url": url_video}
+        
+        logger.info("❌ No se encontraron videos")
+        
+        # ============ PASO 2: BUSCAR PDFs ============
+        logger.info("📄 Buscando PDFs...")
+        
+        pdf_patterns = [
+            r'https://[^\s\'"<>]+\.pdf(?:\?[^\s\'"<>]*)?',
+            r'https://[^\s\'"<>]+/api/[^\s\'"<>]*\.pdf',
+        ]
+        
+        for patron in pdf_patterns:
+            match = re.search(patron, html, re.IGNORECASE)
+            if match:
+                url_pdf = match.group(0)
+                logger.info(f"✅ PDF encontrado: {url_pdf}")
+                await session.close()
+                return {"tipo": "pdf", "url": url_pdf}
+        
+        logger.info("❌ No se encontraron PDFs")
+        
+        # ============ PASO 3: BUSCAR IFRAMES CON SELECTORES CSS ============
+        logger.info("🖼️ Buscando iframes embebidos...")
+        
+        try:
+            iframes = response.html.find('iframe')
+            logger.info(f"📊 Encontrados {len(iframes)} iframes")
             
             for idx, iframe in enumerate(iframes):
-                iframe_src = await iframe.get_attribute('src')
+                iframe_src = iframe.attrs.get('src', '')
                 if iframe_src:
                     logger.info(f"   Iframe {idx+1}: {iframe_src[:100]}...")
                     
                     # Filtrar iframes que probablemente contengan videos
-                    if any(keyword in iframe_src.lower() for keyword in ['vimeo', 'youtube', 'player', 'video', 'wistia']):
+                    video_keywords = ['vimeo', 'youtube', 'player', 'video', 'wistia', 'embed']
+                    if any(keyword in iframe_src.lower() for keyword in video_keywords):
                         logger.info(f"✅ Iframe de video encontrado: {iframe_src}")
-                        await browser.close()
+                        await session.close()
                         return {"tipo": "video", "url": iframe_src}
-            
-            logger.info("❌ No se encontraron iframes de video")
-            
-            # ============ PASO 5: PÁGINA COMPLETA ============
-            logger.info("📋 No se encontró contenido multimedia, usando página completa")
-            await browser.close()
-            return {"tipo": "webpage", "url": resource_url}
-            
-        except asyncio.TimeoutError:
-            logger.error("⏱️ Timeout al cargar la página")
-            if browser:
-                await browser.close()
-            return {"tipo": "webpage", "url": resource_url}
-            
-        except Exception as e:
-            logger.error(f"💥 Error al extraer contenido: {str(e)}")
-            if browser:
-                await browser.close()
-            return {"tipo": "webpage", "url": resource_url}
+        except Exception as iframe_error:
+            logger.warning(f"⚠️ Error al buscar iframes: {str(iframe_error)}")
+        
+        logger.info("❌ No se encontraron iframes de video")
+        
+        # ============ PASO 4: FALLBACK - PÁGINA COMPLETA ============
+        logger.info("📋 No se encontró contenido multimedia, usando página completa")
+        await session.close()
+        return {"tipo": "webpage", "url": resource_url}
+        
+    except asyncio.TimeoutError:
+        logger.error("⏱️ Timeout al cargar la página")
+        await session.close()
+        return {"tipo": "webpage", "url": resource_url}
+        
+    except Exception as e:
+        logger.error(f"💥 Error al extraer contenido: {str(e)}")
+        try:
+            await session.close()
+        except:
+            pass
+        return {"tipo": "webpage", "url": resource_url}
 
 
 # ---------------------------------------------------------------------------
