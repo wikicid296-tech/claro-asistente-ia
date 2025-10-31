@@ -11,4 +11,3 @@ requests-html
 pyppeteer         
 asyncio
 lxml[html_clean]
-playwright
