@@ -21,6 +21,15 @@ app.register_blueprint(calendar_bp)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ✅ AHORA SÍ IMPORTAR CON LOGGER DISPONIBLE
+try:
+    from aprende_ia_model_api import ask_about_vector_store
+    aprende_ia_available = True
+    logger.info("✅ Módulo de Aprende.org IA cargado correctamente")
+except Exception as e:
+    aprende_ia_available = False
+    logger.warning(f"⚠️ Módulo de Aprende.org IA no disponible: {str(e)}")
+
 # ==================== CONFIGURAR RATE LIMITER ====================
 limiter = Limiter(
     get_remote_address,  # ✅ Solo la función key_func como primer argumento
@@ -208,6 +217,69 @@ def detect_education_topic(text):
             return topic
     return None
 
+# ==================== NUEVAS FUNCIONES PARA APRENDE IA ====================
+
+def should_use_aprende_ia(message, current_mode):
+    """
+    Determina si debe usar el modelo especializado de Aprende.org
+    
+    Returns: bool
+    """
+    # 🆕 LOG 1: Verificar que la función se ejecuta
+    logger.info(f"🔍 Verificando Aprende IA - Modo: '{current_mode}', Módulo disponible: {aprende_ia_available}")
+    
+    if not aprende_ia_available:
+        logger.warning("⚠️ Módulo Aprende IA no disponible")
+        return False
+    
+    # Solo usar si el modo actual es 'aprende'
+    if current_mode != 'aprende':
+        logger.info(f"⏭️ Modo '{current_mode}' no es 'aprende', saltando Aprende IA")
+        return False
+    
+    message_lower = message.lower()
+    
+    # Palabras clave que indican búsqueda de cursos/recursos
+    aprende_keywords = [
+        'curso', 'cursos', 'aprender', 'estudiar', 'capacitación', 'capacitacion',
+        'diplomado', 'especialidad', 'ruta', 'aprende.org', 'aprende',
+        'enseñar', 'educación', 'educacion', 'formación', 'formacion', 
+        'certificado', 'programa', 'clase', 'aprendizaje'
+    ]
+    
+    # Si contiene alguna palabra clave, usar Aprende IA
+    has_keyword = any(keyword in message_lower for keyword in aprende_keywords)
+    
+    # 🆕 LOG 2: Verificar detección de palabras clave
+    if has_keyword:
+        logger.info(f"✅ Palabras clave DETECTADAS en: '{message[:50]}...'")
+    else:
+        logger.warning(f"❌ NO se detectaron palabras clave en: '{message[:50]}...'")
+    
+    return has_keyword
+
+
+def detect_resource_type(url):
+    """
+    Detecta el tipo de recurso basándose en la URL
+    Returns: 'curso', 'diplomado', 'ruta', 'especialidad', 'webpage'
+    """
+    if not url:
+        return 'general'
+    
+    url_lower = url.lower()
+    
+    if '/cursos/' in url_lower or '/curso/' in url_lower:
+        return 'curso'
+    elif '/diplomado/' in url_lower:
+        return 'diplomado'
+    elif '/ruta/' in url_lower:
+        return 'ruta'
+    elif '/especialidad/' in url_lower:
+        return 'especialidad'
+    else:
+        return 'webpage'
+
 def extract_relevant_urls(prompt):
     """Extrae URLs relevantes basándose en la consulta del usuario"""
     relevant_urls = []
@@ -281,6 +353,7 @@ def health_check():
         "ai_ready": client is not None or GROQ_API_KEY is not None
     })
 
+
 @app.route('/chat', methods=['POST'])
 @limiter.limit("10 per minute")
 @limiter.limit("1 per 3 seconds")
@@ -292,60 +365,95 @@ def chat():
         
         data = request.get_json()
         user_message = data.get('message', '')
+        current_mode = data.get('action', 'busqueda')
+        
+        # 🆕 LOGS PARA DEBUGGING
+        logger.info("="*50)
+        logger.info(f"📨 Mensaje recibido: '{user_message[:100]}'")
+        logger.info(f"📊 Modo recibido del frontend: '{current_mode}'")
+        logger.info(f"🔧 Aprende IA disponible: {aprende_ia_available}")
+        logger.info("="*50)
         
         if not user_message:
             return jsonify({"success": False, "error": "Mensaje vacío"}), 400
         
-        # ================= MEMORIA INTELIGENTE =================
+        # 🆕 NUEVA LÓGICA: Detectar si usar Aprende IA
+        use_aprende = should_use_aprende_ia(user_message, current_mode)
+        logger.info(f"🎯 Resultado should_use_aprende_ia: {use_aprende}")
+        
+        if use_aprende:
+            try:
+                logger.info(f"🎓 Usando Aprende IA para: {user_message[:50]}...")
+                resultado = ask_about_vector_store(user_message)
+                
+                logger.info(f"✅ Respuesta de Aprende IA recibida")
+                logger.info(f"📍 URL recurso: {resultado.get('url_recurso', 'Sin URL')}")
+                logger.info(f"🎥 URL video: {resultado.get('url_video', 'Sin video')}")
+                logger.info(f"📄 URL PDF: {resultado.get('url_pdf', 'Sin PDF')}")
+                logger.info(f"📦 Tipo contenido: {resultado.get('tipo_contenido', 'webpage')}")
+                
+                return jsonify({
+                    "success": True,
+                    "response": resultado["respuesta"],
+                    "url_recurso": resultado["url_recurso"],
+                    "url_video": resultado.get("url_video", ""),
+                    "url_pdf": resultado.get("url_pdf", ""),
+                    "tipo_contenido": resultado.get("tipo_contenido", "webpage"),
+                    "tipo_recurso": resultado.get("tipo_recurso", "curso"),
+                    "context": "📚 ÁREA: EDUCACIÓN Y DESARROLLO PROFESIONAL (Aprende.org)",
+                    "relevant_urls": [resultado["url_recurso"]] if resultado["url_recurso"] else [],
+                    "memory_used": 0,
+                    "context_reset": False,
+                    "aprende_ia_used": True
+                })
+            except Exception as e:
+                logger.error(f"❌ Error en Aprende IA: {str(e)}")
+                logger.info("↩️ Fallback a Groq API")
+        
+        # 🔄 FLUJO ORIGINAL (Groq)
+        logger.info("📡 Usando Groq API (flujo normal)")
+        
         try:
             user_key = _get_user_key()
-            # Usar la nueva función de memoria relevante
             prev_messages = get_relevant_memory(user_key, user_message)
         except Exception:
             prev_messages = []
             user_key = None
         
-        # Actualizar memoria
         try:
             if user_key is not None:
                 mem = CHAT_MEMORY.get(user_key, [])
                 mem.append(user_message)
-                # Reducir memoria a solo 2 mensajes (antes eran 3)
                 if len(mem) > 2:
                     mem = mem[-2:]
                 CHAT_MEMORY[user_key] = mem
         except Exception:
             pass
         
-        # Obtener contexto SOLO del mensaje actual
         context = safe_get_context_for_query(user_message)
         relevant_urls = safe_extract_relevant_urls(user_message)
         
-        # Formatear URLs
         urls_text = ""
         if relevant_urls:
             urls_text = "Enlaces útiles:\n" + "\n".join([f"- {url}" for url in relevant_urls[:5]])
         else:
             urls_text = "Explora: aprende.org | clikisalud.net"
+        
         try:
             formatted_prompt = SYSTEM_PROMPT.format(context=context, urls=urls_text)
         except Exception:
             formatted_prompt = f"Eres un asistente. Contexto:\n{context}\n\n{urls_text}"
         
-        # Construir mensajes
         messages = [{"role": "system", "content": formatted_prompt}]
         
-        # Solo incluir mensaje anterior si es del MISMO contexto
         for pm in prev_messages:
             if pm and pm.strip() and pm.strip() != user_message.strip():
                 messages.append({"role": "user", "content": pm})
         
-        # Mensaje actual
         messages.append({"role": "user", "content": user_message})
         
-        logger.info(f"📊 Mensajes enviados a Groq: {len(messages)} (1 system + {len(prev_messages)} context + 1 current)")
+        logger.info(f"📊 Mensajes enviados a Groq: {len(messages)}")
         
-        # Llamar a Groq
         if client and client != "api_fallback":
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
@@ -368,8 +476,11 @@ def chat():
         })
         
     except Exception as e:
-        logger.error(f"Error en /chat: {str(e)}")
+        logger.error(f"❌ Error en /chat: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
         return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route('/whatsapp', methods=['POST'])
 @limiter.limit("20 per minute")
@@ -440,6 +551,7 @@ def whatsapp_webhook():
         resp = MessagingResponse()
         resp.message("❌ Error. Intenta nuevamente.")
         return str(resp), 200, {'Content-Type': 'text/xml'}
+
 
 # ==================== ENDPOINT SMS (NUEVO) ====================
 @app.route('/sms', methods=['POST'])
@@ -545,6 +657,7 @@ def sms_webhook():
         resp.message("Error. Reintentar")  # Solo 17 caracteres
         return str(resp), 200, {'Content-Type': 'text/xml'}
 
+
 # 🆕 FUNCIÓN AUXILIAR NUEVA para llamadas directas a API con límite SMS
 def call_groq_api_directly_sms(messages, max_tokens=40):
     """Versión especial para SMS con límites estrictos"""
@@ -564,6 +677,7 @@ def call_groq_api_directly_sms(messages, max_tokens=40):
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
     return response.json()
+
 
 # ==================== ENDPOINT RCS (NUEVO) ====================
 @app.route('/rcs', methods=['POST', 'GET'])
@@ -674,6 +788,7 @@ def rcs_webhook():
         resp.message("❌ Error al procesar mensaje. Intenta nuevamente.")
         return str(resp), 200, {'Content-Type': 'text/xml'}
 
+
 # ==================== ENDPOINT STATUS CALLBACK (OPCIONAL) ====================
 @app.route('/rcs/status', methods=['POST'])
 @limiter.exempt
@@ -701,6 +816,7 @@ def rcs_status_callback():
         logger.error(f"Error en /rcs/status: {str(e)}")
         return '', 200
         
+
 # ==================== ENDPOINTS ESTÁTICOS (MANTENER IGUALES) ====================
 @app.route('/')
 def serve_frontend():
@@ -709,6 +825,7 @@ def serve_frontend():
             return f.read()
     except Exception as e:
         return f"Error: {str(e)}", 500
+
 
 @app.route('/images/<path:filename>')
 @limiter.exempt
@@ -726,6 +843,7 @@ def serve_images(filename):
     except Exception as e:
         logger.error(f"❌ Error sirviendo imagen {filename}: {str(e)}")
         return "Imagen no encontrada", 404
+
 
 @app.route('/<path:path>')
 @limiter.exempt
@@ -747,6 +865,7 @@ def serve_static(path):
     except Exception as e:
         logger.error(f"❌ Error sirviendo {path}: {str(e)}")
         return f"Error sirviendo archivo: {path}", 500
+
 
 @app.route('/urls', methods=['POST'])
 def get_urls():
@@ -777,6 +896,7 @@ def get_urls():
             "success": False,
             "error": str(e)
         }), 500
+
 
 if __name__ == '__main__':
     logger.info(f"🚀 Telecom Copilot v2.1 - Context-Aware en puerto {PORT}")
