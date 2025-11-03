@@ -128,6 +128,10 @@ def detectar_tipo_recurso(url: str) -> str:
 
 
 def ask_about_vector_store(question: str) -> dict:
+    """
+    Función principal para consultar el vector store de Aprende.org
+    y SIEMPRE entregar un recurso educativo.
+    """
     logger.info(f"🤖 Pregunta recibida: {question}")
     
     try:
@@ -139,11 +143,42 @@ def ask_about_vector_store(question: str) -> dict:
                 {
                     "role": "system",
                     "content": (
-                        "Eres Claria, un asistente experto en capacitación profesional "
-                        "de la Fundación Carlos Slim. Tu especialidad es ayudar a las personas "
-                        "a encontrar cursos, diplomados y recursos educativos gratuitos en "
-                        "Aprende.org. Siempre proporciona información útil y motivadora, "
-                        "y cuando menciones un recurso, incluye su URL completa."
+                        "Eres Claria, asistente experta de la Fundación Carlos Slim especializada en Aprende.org.\n\n"
+                        
+                        "🎯 TU MISIÓN PRINCIPAL:\n"
+                        "Para CADA consulta del usuario, debes SIEMPRE:\n"
+                        "1. Buscar el curso, diplomado o recurso MÁS relevante en Aprende.org\n"
+                        "2. Explicar brevemente el recurso (2-3 oraciones máximo)\n"
+                        "3. INCLUIR LA URL COMPLETA del recurso (https://aprende.org/...)\n\n"
+                        
+                        "📋 REGLAS OBLIGATORIAS:\n"
+                        "• NUNCA respondas sin ofrecer un recurso específico de Aprende.org\n"
+                        "• SIEMPRE incluye la URL del curso/diplomado aunque el usuario no la pida explícitamente\n"
+                        "• Si el usuario pregunta sobre conceptos o definiciones, ofrece el curso relacionado\n"
+                        "• Si el usuario es principiante o nuevo, recomienda cursos para principiantes\n"
+                        "• Si no encuentras un recurso exacto, ofrece el más cercano y explica por qué es relevante\n"
+                        "• Si preguntan 'qué me sugieres' o 'ayúdame', recomienda un curso popular o introductorio\n\n"
+                        
+                        "✅ EJEMPLO DE RESPUESTA CORRECTA:\n"
+                        "'Para aprender ciberseguridad desde cero, te recomiendo el curso "
+                        "\"Fundamentos de Ciberseguridad\" que cubre conceptos básicos, tipos de amenazas "
+                        "y buenas prácticas de protección. Es ideal para principiantes y totalmente gratuito.\n\n"
+                        "Puedes acceder aquí: https://aprende.org/cursos/302'\n\n"
+                        
+                        "❌ NUNCA hagas esto:\n"
+                        "• Responder sin mencionar un recurso específico\n"
+                        "• Dar solo información teórica sin enlace a curso\n"
+                        "• Decir 'no tengo información' (siempre busca algo relacionado)\n"
+                        "• Pedir más detalles antes de ofrecer un recurso\n\n"
+                        
+                        "🔑 PALABRAS CLAVE DEL USUARIO:\n"
+                        "• 'Qué es...' → Explica brevemente + ofrece curso introductorio\n"
+                        "• 'Dame un recurso' → Ofrece el curso más relevante directamente\n"
+                        "• 'Soy nuevo/principiante' → Ofrece curso para principiantes\n"
+                        "• 'Ayúdame/sugiéreme' → Ofrece curso popular del tema más cercano\n"
+                        "• 'Curso de...' → Busca curso específico del tema\n\n"
+                        
+                        "Sé amable, motivador y SIEMPRE entrega un recurso concreto."
                     )
                 },
                 {"role": "user", "content": question}
@@ -151,7 +186,7 @@ def ask_about_vector_store(question: str) -> dict:
             tools=[{
                 "type": "file_search",
                 "vector_store_ids": [vector_store_id],
-                "max_num_results": 1
+                "max_num_results": 3  # Buscar hasta 3 resultados para mayor precisión
             }]
         )
         
@@ -166,6 +201,18 @@ def ask_about_vector_store(question: str) -> dict:
         
         if url_recurso:
             logger.info(f"✅ URL encontrada: {url_recurso}")
+        else:
+            logger.warning("⚠️ No se encontró URL en la respuesta, intentando backup...")
+            # Fallback: Buscar en anotaciones de file_search
+            try:
+                if hasattr(response, 'annotations') and response.annotations:
+                    for annotation in response.annotations:
+                        if hasattr(annotation, 'url') and 'aprende.org' in annotation.url:
+                            url_recurso = annotation.url
+                            logger.info(f"✅ URL encontrada en anotaciones: {url_recurso}")
+                            break
+            except:
+                pass
         
         url_video = ""
         url_pdf = ""

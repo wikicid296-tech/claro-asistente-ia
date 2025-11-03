@@ -219,44 +219,7 @@ def detect_education_topic(text):
 
 # ==================== NUEVAS FUNCIONES PARA APRENDE IA ====================
 
-def should_use_aprende_ia(message, current_mode):
-    """
-    Determina si debe usar el modelo especializado de Aprende.org
-    
-    Returns: bool
-    """
-    # 🆕 LOG 1: Verificar que la función se ejecuta
-    logger.info(f"🔍 Verificando Aprende IA - Modo: '{current_mode}', Módulo disponible: {aprende_ia_available}")
-    
-    if not aprende_ia_available:
-        logger.warning("⚠️ Módulo Aprende IA no disponible")
-        return False
-    
-    # Solo usar si el modo actual es 'aprende'
-    if current_mode != 'aprende':
-        logger.info(f"⏭️ Modo '{current_mode}' no es 'aprende', saltando Aprende IA")
-        return False
-    
-    message_lower = message.lower()
-    
-    # Palabras clave que indican búsqueda de cursos/recursos
-    aprende_keywords = [
-        'curso', 'cursos', 'aprender', 'estudiar', 'capacitación', 'capacitacion',
-        'diplomado', 'especialidad', 'ruta', 'aprende.org', 'aprende',
-        'enseñar', 'educación', 'educacion', 'formación', 'formacion', 
-        'certificado', 'programa', 'clase', 'aprendizaje'
-    ]
-    
-    # Si contiene alguna palabra clave, usar Aprende IA
-    has_keyword = any(keyword in message_lower for keyword in aprende_keywords)
-    
-    # 🆕 LOG 2: Verificar detección de palabras clave
-    if has_keyword:
-        logger.info(f"✅ Palabras clave DETECTADAS en: '{message[:50]}...'")
-    else:
-        logger.warning(f"❌ NO se detectaron palabras clave en: '{message[:50]}...'")
-    
-    return has_keyword
+
 
 
 def detect_resource_type(url):
@@ -377,11 +340,10 @@ def chat():
         if not user_message:
             return jsonify({"success": False, "error": "Mensaje vacío"}), 400
         
-        # 🆕 NUEVA LÓGICA: Detectar si usar Aprende IA
-        use_aprende = should_use_aprende_ia(user_message, current_mode)
-        logger.info(f"🎯 Resultado should_use_aprende_ia: {use_aprende}")
-        
-        if use_aprende:
+        # ✅ LÓGICA SIMPLIFICADA: Si el modo es 'aprende', SIEMPRE usar Aprende IA
+        if current_mode == 'aprende' and aprende_ia_available:
+            logger.info(f"🎯 Modo Aprende activado - Usando Aprende IA SIEMPRE")
+            
             try:
                 logger.info(f"🎓 Usando Aprende IA para: {user_message[:50]}...")
                 resultado = ask_about_vector_store(user_message)
@@ -409,6 +371,7 @@ def chat():
             except Exception as e:
                 logger.error(f"❌ Error en Aprende IA: {str(e)}")
                 logger.info("↩️ Fallback a Groq API")
+                # No hacer return, continuar con Groq abajo
         
         # 🔄 FLUJO ORIGINAL (Groq)
         logger.info("📡 Usando Groq API (flujo normal)")
