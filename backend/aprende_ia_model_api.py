@@ -115,6 +115,7 @@ async def extraer_contenido_multimedia(resource_url: str) -> dict:
 
 
 def detectar_tipo_recurso(url: str) -> str:
+    """Detecta el tipo de recurso según la URL"""
     url_lower = url.lower()
     if '/cursos/' in url_lower or '/curso/' in url_lower:
         return 'curso'
@@ -130,7 +131,7 @@ def detectar_tipo_recurso(url: str) -> str:
 def ask_about_vector_store(question: str) -> dict:
     """
     Función principal para consultar el vector store de Aprende.org
-    y SIEMPRE entregar un recurso educativo.
+    y entregar recursos educativos relevantes.
     """
     logger.info(f"🤖 Pregunta recibida: {question}")
     
@@ -143,42 +144,10 @@ def ask_about_vector_store(question: str) -> dict:
                 {
                     "role": "system",
                     "content": (
-                        "Eres Claria, asistente experta de la Fundación Carlos Slim especializada en Aprende.org.\n\n"
-                        
-                        "🎯 TU MISIÓN PRINCIPAL:\n"
-                        "Para CADA consulta del usuario, debes SIEMPRE:\n"
-                        "1. Buscar el curso, diplomado o recurso MÁS relevante en Aprende.org\n"
-                        "2. Explicar brevemente el recurso (2-3 oraciones máximo)\n"
-                        "3. INCLUIR LA URL COMPLETA del recurso (https://aprende.org/...)\n\n"
-                        
-                        "📋 REGLAS OBLIGATORIAS:\n"
-                        "• NUNCA respondas sin ofrecer un recurso específico de Aprende.org\n"
-                        "• SIEMPRE incluye la URL del curso/diplomado aunque el usuario no la pida explícitamente\n"
-                        "• Si el usuario pregunta sobre conceptos o definiciones, ofrece el curso relacionado\n"
-                        "• Si el usuario es principiante o nuevo, recomienda cursos para principiantes\n"
-                        "• Si no encuentras un recurso exacto, ofrece el más cercano y explica por qué es relevante\n"
-                        "• Si preguntan 'qué me sugieres' o 'ayúdame', recomienda un curso popular o introductorio\n\n"
-                        
-                        "✅ EJEMPLO DE RESPUESTA CORRECTA:\n"
-                        "'Para aprender ciberseguridad desde cero, te recomiendo el curso "
-                        "\"Fundamentos de Ciberseguridad\" que cubre conceptos básicos, tipos de amenazas "
-                        "y buenas prácticas de protección. Es ideal para principiantes y totalmente gratuito.\n\n"
-                        "Puedes acceder aquí: https://aprende.org/cursos/302'\n\n"
-                        
-                        "❌ NUNCA hagas esto:\n"
-                        "• Responder sin mencionar un recurso específico\n"
-                        "• Dar solo información teórica sin enlace a curso\n"
-                        "• Decir 'no tengo información' (siempre busca algo relacionado)\n"
-                        "• Pedir más detalles antes de ofrecer un recurso\n\n"
-                        
-                        "🔑 PALABRAS CLAVE DEL USUARIO:\n"
-                        "• 'Qué es...' → Explica brevemente + ofrece curso introductorio\n"
-                        "• 'Dame un recurso' → Ofrece el curso más relevante directamente\n"
-                        "• 'Soy nuevo/principiante' → Ofrece curso para principiantes\n"
-                        "• 'Ayúdame/sugiéreme' → Ofrece curso popular del tema más cercano\n"
-                        "• 'Curso de...' → Busca curso específico del tema\n\n"
-                        
-                        "Sé amable, motivador y SIEMPRE entrega un recurso concreto."
+                        "Eres Claria, un asistente experto en capacitación profesional e identificación de recursos de aprendizaje adecuados disponibles en la plataforma Aprende.org. "
+                        "Tu tarea es recomendar recursos y cursos útiles al usuario basándote en su pregunta, además de responder a posibles dudas que pueda tener. "
+                        "Siempre incluye una URL directa al recurso o curso que recomiendas. Si es una duda del usuario, responde su duda y sugiere un recurso relacionado. "
+                        "Mantén un tono cordial, amigable y accesible. Nunca respondas con una pregunta para el usuario."
                     )
                 },
                 {"role": "user", "content": question}
@@ -186,13 +155,14 @@ def ask_about_vector_store(question: str) -> dict:
             tools=[{
                 "type": "file_search",
                 "vector_store_ids": [vector_store_id],
-                "max_num_results": 3  # Buscar hasta 3 resultados para mayor precisión
+                "max_num_results": 5
             }]
         )
         
         texto_respuesta = response.output_text.strip()
         logger.info(f"💬 Respuesta generada ({len(texto_respuesta)} caracteres)")
         
+        # Extraer URL del recurso
         logger.info("🔗 Extrayendo URL del recurso...")
         patron_url = r'https?://[^\s\)\]\}\>\,\;\"\']+'
         coincidencias = re.findall(patron_url, texto_respuesta)
@@ -218,6 +188,7 @@ def ask_about_vector_store(question: str) -> dict:
         url_pdf = ""
         tipo_contenido = "webpage"
         
+        # Extraer contenido multimedia si hay URL
         if url_recurso:
             try:
                 logger.info("🎬 Extrayendo contenido multimedia...")
@@ -232,11 +203,13 @@ def ask_about_vector_store(question: str) -> dict:
                     logger.info(f"✅ PDF extraído: {url_pdf}")
                     
             except Exception as e:
-                logger.error(f"❌ Error al extraer: {str(e)}")
+                logger.error(f"❌ Error al extraer multimedia: {str(e)}")
                 tipo_contenido = "webpage"
         
+        # Detectar tipo de recurso
         tipo_recurso = detectar_tipo_recurso(url_recurso) if url_recurso else "general"
         
+        # Construir resultado
         resultado = {
             "respuesta": texto_respuesta,
             "url_recurso": url_recurso,
@@ -250,5 +223,5 @@ def ask_about_vector_store(question: str) -> dict:
         return resultado
         
     except Exception as e:
-        logger.error(f"💥 Error: {str(e)}")
+        logger.error(f"💥 Error en ask_about_vector_store: {str(e)}")
         raise
