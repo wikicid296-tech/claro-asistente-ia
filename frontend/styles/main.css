@@ -1074,6 +1074,7 @@ main.content {
     align-items: center;
     justify-content: center;
     z-index: 10000;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 .premium-overlay.active {
@@ -1085,32 +1086,33 @@ main.content {
     border-radius: 20px;
     max-width: 500px;
     width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 188, 212, 0.3);
-    overflow: hidden;
     animation: slideUp 0.4s ease;
 }
 
 .premium-header {
     background: linear-gradient(135deg, #00BCD4, #0097A7);
-    padding: 30px 20px;
+    padding: 20px 20px;
     text-align: center;
     color: white;
 }
 
 .premium-icon {
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
     background: rgba(255, 255, 255, 0.2);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 0 auto 15px;
+    margin: 0 auto 10px;
     border: 3px solid rgba(255, 255, 255, 0.3);
 }
 
 .premium-icon .material-symbols-outlined {
-    font-size: 48px;
+    font-size: 36px;
     color: white;
     font-variation-settings: 'FILL' 1;
 }
@@ -1122,7 +1124,7 @@ main.content {
 }
 
 .premium-body {
-    padding: 30px 25px;
+    padding: 20px 20px;
     text-align: center;
 }
 
@@ -1209,6 +1211,8 @@ main.content {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .btn-close-premium:hover {
@@ -1416,5 +1420,26 @@ main.content {
         font-size: 16px;
         width: 18px;
         height: 18px;
+    }
+}
+
+
+/* ==================== FIX ESPECÍFICO PARA iOS ==================== */
+@supports (padding: env(safe-area-inset-top)) {
+    .premium-modal {
+        max-height: 70vh;
+        margin: 20px;
+    }
+    
+    .premium-header {
+        padding: 15px 15px;
+    }
+    
+    .premium-body {
+        padding: 15px 15px;
+    }
+    
+    .premium-footer {
+        padding: 15px 20px 20px;
     }
 }
