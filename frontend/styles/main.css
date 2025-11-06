@@ -797,13 +797,14 @@ main.content {
 .input-wrapper input {
     border: 0;
     outline: none;
-    font-size: var(--font-md);
+    font-size: 16px;  /* ← CAMBIO CRÍTICO: de var(--font-md) a 16px */
     width: 100%;
     color: var(--texto-oscuro);
 }
 
 .input-wrapper input::placeholder {
     color: #999;
+     font-size: 16px;  /* ← AGREGAR ESTA LÍNEA */
 }
 
 .input-wrapper input:disabled {
@@ -1090,11 +1091,22 @@ main.content {
     overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0, 188, 212, 0.3);
     animation: slideUp 0.4s ease;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Ocultar scrollbar en el modal pero mantener funcionalidad */
+.premium-modal::-webkit-scrollbar {
+    display: none;
+}
+
+.premium-modal {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
 }
 
 .premium-header {
     background: linear-gradient(135deg, #00BCD4, #0097A7);
-    padding: 20px 20px;
+    padding: 15px 20px;  /* ← CAMBIO: de 20px a 15px arriba */
     text-align: center;
     color: white;
 }
@@ -1117,10 +1129,13 @@ main.content {
     font-variation-settings: 'FILL' 1;
 }
 
+
+
 .premium-header h2 {
-    font-size: 24px;
+    font-size: 20px;  /* ← Ya estaba en responsive, pero agrégalo aquí también */
     font-weight: 700;
     margin: 0;
+    line-height: 1.2; 
 }
 
 .premium-body {
@@ -1129,17 +1144,17 @@ main.content {
 }
 
 .premium-message {
-    font-size: 16px;
+    font-size: 14px;  /* ← CAMBIO: de 16px a 14px */
     color: var(--texto-oscuro);
-    margin-bottom: 10px;
-    line-height: 1.6;
+    margin-bottom: 8px;  /* ← CAMBIO: de 10px a 8px */
+    line-height: 1.5;  /* ← CAMBIO: de 1.6 a 1.5 */
 }
 
 .premium-subtitle {
-    font-size: 14px;
+    font-size: 13px;  /* ← CAMBIO: de 14px a 13px */
     color: var(--texto-claro);
-    margin-bottom: 25px;
-    line-height: 1.5;
+    margin-bottom: 15px;  /* ← CAMBIO: de 25px a 15px */
+    line-height: 1.4;  /* ← CAMBIO: de 1.5 a 1.4 */
 }
 
 .premium-features {
@@ -1152,11 +1167,11 @@ main.content {
 .feature-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 10px;
+    gap: 6px;  /* ← CAMBIO: de 8px a 6px */
+    padding: 8px;  /* ← CAMBIO: de 10px a 8px */
     background: #E0F7FA;
-    border-radius: 10px;
-    font-size: 13px;
+    border-radius: 8px;  /* ← CAMBIO: de 10px a 8px */
+    font-size: 12px;  /* ← CAMBIO: de 13px a 12px */
     color: #006064;
     font-weight: 500;
 }
@@ -1442,4 +1457,33 @@ main.content {
     .premium-footer {
         padding: 15px 20px 20px;
     }
+}
+
+
+/* ==================== FIX ADICIONAL ZOOM iOS ==================== */
+
+/* Prevenir zoom en inputs - CRÍTICO para iOS */
+@supports (-webkit-touch-callout: none) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
+    
+    input::placeholder, textarea::placeholder {
+        font-size: 16px !important;
+    }
+    
+    .input-wrapper input {
+        font-size: 16px !important;
+    }
+    
+    .input-wrapper input::placeholder {
+        font-size: 16px !important;
+    }
+}
+
+/* Ocultar completamente scrollbar del modal */
+.premium-modal::-webkit-scrollbar {
+    width: 0 !important;
+    height: 0 !important;
+    display: none !important;
 }
