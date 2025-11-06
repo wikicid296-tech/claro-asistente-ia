@@ -144,46 +144,52 @@ function updateTokenCounter(tokens) {
 function detectModeFromText(text) {
     const lowerText = text ? text.toLowerCase().trim() : '';
     
-    // Definir palabras clave para cada modo
     const modeKeywords = {
         'aprende': ['aprende', 'aprende.org']
     };
     
-    // 🆕 SI EL MODO FUE ACTIVADO MANUALMENTE, NO HACER NADA
     if (appState.modeActivatedManually) {
-        return; // Salir inmediatamente, no desactivar
-    }
-    
-    // Si el texto está vacío o muy corto
-    if (!text || text.length < 3) {
-        // Desactivar modo automático si estaba activo
-        if (appState.currentMode === 'aprende') {
-            hideModeChip();
-        }
         return;
     }
     
-    // Buscar coincidencias
-    let foundKeyword = false;
+    const isEmptyInput = !text || text.length === 0;
+    const hasShortText = text && text.length < 3;
+    
+    if (appState.currentMode === 'aprende') {
+        if (isEmptyInput) {
+            return;
+        }
+        
+        if (hasShortText) {
+            return;
+        }
+        
+        let foundKeyword = false;
+        for (const [mode, keywords] of Object.entries(modeKeywords)) {
+            for (const keyword of keywords) {
+                if (lowerText.includes(keyword)) {
+                    foundKeyword = true;
+                    break;
+                }
+            }
+            if (foundKeyword) break;
+        }
+        
+        if (!foundKeyword) {
+            hideModeChip();
+            return;
+        }
+    }
     
     for (const [mode, keywords] of Object.entries(modeKeywords)) {
         for (const keyword of keywords) {
             if (lowerText.includes(keyword)) {
-                foundKeyword = true;
-                
-                // Solo activar si no está ya en ese modo
                 if (appState.currentMode !== mode) {
                     activateModeAutomatically(mode);
                 }
-                return; // Salir después de la primera coincidencia
+                return;
             }
         }
-    }
-    
-    // Si NO se encontró ninguna palabra clave pero el modo actual es "aprende"
-    // significa que el usuario borró la palabra clave
-    if (!foundKeyword && appState.currentMode === 'aprende') {
-        hideModeChip();
     }
 }
 
@@ -582,6 +588,11 @@ if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
     
     showChatView();
     addMessage('user', text);
+
+     // 🆕 NUEVO: Si el modo aprende está activo, convertirlo en "manual" después de enviar
+    if (appState.currentMode === 'aprende') {
+        appState.modeActivatedManually = true;
+    }
     
     // Incrementar contador de mensajes del usuario
     if (!userState.isPro) {
