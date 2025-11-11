@@ -444,7 +444,7 @@ function selectAction(e) {
         'aprende': 'Pregunta sobre cursos de aprende.org',
         'busqueda': 'Pregunta lo que quieras',
         'tareas': 'Crea o asigna una tarea...',
-        'capacitate': 'Pregunta sobre capacitate....',
+        'capacitate': 'Pregunta sobre capacítate....',
         'productividad': 'Organiza tu trabajo...'
     };
     
@@ -453,7 +453,7 @@ function selectAction(e) {
         'aprende': 'Aprende.org',
         'busqueda': 'Búsqueda Inteligente',
         'tareas': 'Asigna tareas',
-        'capacitate': 'Capacitate',
+        'capacitate': 'Capacítate',
         'productividad': 'Productividad'
     };
     
