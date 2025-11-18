@@ -17,15 +17,22 @@
     <div class="app">
         <!-- ==================== TOPBAR ==================== -->
         <header class="topbar">
-            <button class="menu-toggle" id="menuToggle">☰</button>
-            <div class="brand">
-                <span class="logo-mark">
-                   <img src="images/logo_claro.png" alt="Claro" width="24" height="24">
-                </span>
-                <span>ClarIA</span>
-            </div>
-            <div style="width:40px"></div>
-        </header>
+    <button class="menu-toggle" id="menuToggle">☰</button>
+    <div class="brand">
+        <span class="logo-mark">
+           <img src="images/logo_claro.png" alt="Claro" width="24" height="24">
+        </span>
+        <span>ClarIA</span>
+    </div>
+    
+    <!-- 🆕 BARRA DE CONSUMO -->
+    <div class="usage-meter" id="usageMeter" style="display: none;">
+        <div class="usage-bar">
+            <div class="usage-fill" id="usageFill" style="width: 0%"></div>
+        </div>
+        <span class="usage-text" id="usageText">$0/$10</span>
+    </div>
+</header>
 
         <!-- ==================== SIDEBAR ==================== -->
         <nav class="sidebar" id="sidebar">

@@ -5,6 +5,20 @@ import re
 import asyncio
 from playwright.async_api import async_playwright
 import logging
+import sys
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Precios de OpenAI (duplicados aquí por si acaso)
+OPENAI_PRICES = {
+    "input": 2.50,
+    "output": 10.00
+}
+
+def calculate_openai_cost(input_tokens, output_tokens):
+    """Calcula costo de OpenAI localmente"""
+    input_cost = (input_tokens / 1_000_000) * OPENAI_PRICES["input"]
+    output_cost = (output_tokens / 1_000_000) * OPENAI_PRICES["output"]
+    return input_cost + output_cost
 
 # Configurar logging
 logging.basicConfig(
@@ -160,9 +174,55 @@ def ask_about_vector_store(question: str) -> dict:
                 "max_num_results": 7
             }]
         )
-        
+
         texto_respuesta = response.output_text.strip()
         logger.info(f"💬 Respuesta generada ({len(texto_respuesta)} caracteres)")
+
+        # 🆕 TRACKEAR TOKENS DE OPENAI
+        try:
+            # Intentar extraer usage de diferentes formas según la API de OpenAI
+            usage = None
+            
+            # Forma 1: Atributo directo
+            if hasattr(response, 'usage'):
+                usage = response.usage
+            
+            # Forma 2: En metadata
+            elif hasattr(response, 'metadata') and hasattr(response.metadata, 'usage'):
+                usage = response.metadata.usage
+            
+            # Forma 3: Método get (si es dict-like)
+            elif hasattr(response, 'get'):
+                usage = response.get('usage')
+            
+            if usage:
+                input_tokens = getattr(usage, 'input_tokens', 0) or getattr(usage, 'prompt_tokens', 0)
+                output_tokens = getattr(usage, 'output_tokens', 0) or getattr(usage, 'completion_tokens', 0)
+                
+                if input_tokens > 0 or output_tokens > 0:
+                    cost = calculate_openai_cost(input_tokens, output_tokens)
+                    logger.info(f"📊 OpenAI Tokens: {input_tokens} in + {output_tokens} out | Costo: ${cost:.6f}")
+                    
+                    # Intentar actualizar el consumo global
+                    try:
+                        from flask_app import add_usage
+                        add_usage(cost)
+                    except ImportError:
+                        logger.warning("⚠️ No se pudo importar add_usage, guardando costo localmente")
+                        # Guardar en variable de entorno directamente
+                        current = float(os.getenv("USAGE_CONSUMED", "0.00"))
+                        new_total = current + cost
+                        os.environ["USAGE_CONSUMED"] = str(round(new_total, 4))
+                        logger.info(f"💸 Costo OpenAI agregado: ${cost:.6f} | Total: ${new_total:.4f}")
+                else:
+                    logger.warning("⚠️ No se encontraron tokens en usage de OpenAI")
+            else:
+                logger.warning("⚠️ No se pudo extraer usage de la respuesta de OpenAI")
+                
+        except Exception as e:
+            logger.error(f"❌ Error trackeando tokens de OpenAI: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
         
         # Extraer URL del recurso
         logger.info("🔗 Extrayendo URL del recurso...")

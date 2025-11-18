@@ -13,6 +13,86 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from prompts import URLS, SYSTEM_PROMPT, SMS_SYSTEM_PROMPT,RCS_SYSTEM_PROMPT,WHATSAPP_SYSTEM_PROMPT
 
+# ==================== CONFIGURACIÓN DE TRACKING DE COSTOS ====================
+# Precios por 1M de tokens (USD)
+GROQ_PRICES = {
+    "input": 0.59,   # $0.59 por 1M tokens
+    "output": 0.79   # $0.79 por 1M tokens
+}
+
+OPENAI_PRICES = {
+    "input": 2.50,   # $2.50 por 1M tokens
+    "output": 10.00  # $10.00 por 1M tokens
+}
+
+USAGE_LIMIT = float(os.getenv("USAGE_LIMIT", "10.00"))  # Límite en USD
+WARNING_THRESHOLD = float(os.getenv("WARNING_THRESHOLD", "9.00"))  # Alerta en $9
+
+# ==================== FUNCIONES DE TRACKING ====================
+def get_usage_consumed():
+    """Lee el consumo actual desde variables de entorno"""
+    try:
+        consumed = float(os.getenv("USAGE_CONSUMED", "0.00"))
+        return round(consumed, 4)
+    except Exception as e:
+        logger.error(f"Error leyendo USAGE_CONSUMED: {e}")
+        return 0.00
+
+def set_usage_consumed(amount):
+    """
+    IMPORTANTE: En producción, esto NO actualiza el .env automáticamente.
+    Solo actualiza la variable en memoria durante la ejecución.
+    Para resetear, debes editar manualmente las variables en Render dashboard.
+    """
+    os.environ["USAGE_CONSUMED"] = str(round(amount, 4))
+    logger.info(f"💰 Consumo actualizado en memoria: ${amount:.4f}")
+
+def add_usage(cost):
+    """Suma un costo al consumo total"""
+    current = get_usage_consumed()
+    new_total = current + cost
+    set_usage_consumed(new_total)
+    logger.info(f"💸 Costo agregado: ${cost:.6f} | Total: ${new_total:.4f}")
+    return new_total
+
+def calculate_cost(input_tokens, output_tokens, api_type="groq"):
+    """Calcula el costo en USD basándose en tokens"""
+    if api_type.lower() == "groq":
+        prices = GROQ_PRICES
+    elif api_type.lower() == "openai":
+        prices = OPENAI_PRICES
+    else:
+        logger.warning(f"Tipo de API desconocido: {api_type}, usando Groq")
+        prices = GROQ_PRICES
+    
+    input_cost = (input_tokens / 1_000_000) * prices["input"]
+    output_cost = (output_tokens / 1_000_000) * prices["output"]
+    total_cost = input_cost + output_cost
+    
+    logger.info(f"📊 Tokens: {input_tokens} in + {output_tokens} out | Costo: ${total_cost:.6f} ({api_type})")
+    return total_cost
+
+def is_usage_blocked():
+    """Verifica si se alcanzó el límite de uso"""
+    consumed = get_usage_consumed()
+    return consumed >= USAGE_LIMIT
+
+def get_usage_status():
+    """Retorna el estado actual del uso"""
+    consumed = get_usage_consumed()
+    percentage = (consumed / USAGE_LIMIT) * 100
+    blocked = consumed >= USAGE_LIMIT
+    warning = consumed >= WARNING_THRESHOLD and not blocked
+    
+    return {
+        "consumed": round(consumed, 2),
+        "limit": round(USAGE_LIMIT, 2),
+        "percentage": round(percentage, 1),
+        "blocked": blocked,
+        "warning": warning,
+        "remaining": round(USAGE_LIMIT - consumed, 2)
+    }
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -307,6 +387,28 @@ def call_groq_api_directly(messages):
     return response.json()
 
 # ==================== ENDPOINTS MEJORADOS ====================
+# ==================== ENDPOINT DE CONSUMO ====================
+@app.route('/usage', methods=['GET'])
+@limiter.exempt
+def get_usage():
+    """Retorna el estado actual del consumo de APIs"""
+    try:
+        status = get_usage_status()
+        return jsonify({
+            "success": True,
+            **status
+        })
+    except Exception as e:
+        logger.error(f"Error en /usage: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "consumed": 0.00,
+            "limit": 10.00,
+            "blocked": False
+        }), 500
+
+
 @app.route('/health', methods=['GET'])
 @limiter.exempt
 def health_check():
@@ -339,6 +441,17 @@ def chat():
         
         if not user_message:
             return jsonify({"success": False, "error": "Mensaje vacío"}), 400
+
+        # 🆕 VALIDAR LÍMITE DE USO ANTES DE PROCESAR
+        if is_usage_blocked():
+            status = get_usage_status()
+            logger.warning(f"🚫 Petición bloqueada: Límite alcanzado (${status['consumed']})")
+            return jsonify({
+                "success": False,
+                "error": "Límite mensual alcanzado",
+                "message": "Has alcanzado el límite de $10 USD para este mes. Por favor espera al próximo mes o contacta al administrador.",
+                "usage": status
+            }), 429
         
         # ✅ LÓGICA SIMPLIFICADA: Si el modo es 'aprende', SIEMPRE usar Aprende IA
         if current_mode == 'aprende' and aprende_ia_available:
@@ -425,9 +538,31 @@ def chat():
                 max_tokens=2048
             )
             response = completion.choices[0].message.content
+            
+            # 🆕 TRACKEAR TOKENS DE GROQ
+            try:
+                usage = completion.usage
+                input_tokens = usage.prompt_tokens
+                output_tokens = usage.completion_tokens
+                cost = calculate_cost(input_tokens, output_tokens, "groq")
+                add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens de Groq: {e}")
+                
         else:
             result = call_groq_api_directly(messages)
             response = result["choices"][0]["message"]["content"]
+            
+            # 🆕 TRACKEAR TOKENS DE GROQ (API directa)
+            try:
+                usage = result.get("usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+                if input_tokens > 0 or output_tokens > 0:
+                    cost = calculate_cost(input_tokens, output_tokens, "groq")
+                    add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens de Groq (API): {e}")
         
         return jsonify({
             "success": True,
@@ -498,9 +633,29 @@ def whatsapp_webhook():
                 max_tokens=1000
             )
             ai_response = completion.choices[0].message.content
+            
+            # 🆕 TRACKEAR TOKENS
+            try:
+                usage = completion.usage
+                cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens, "groq")
+                add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens (WhatsApp): {e}")
+                
         else:
             result = call_groq_api_directly(messages)
             ai_response = result["choices"][0]["message"]["content"]
+            
+            # 🆕 TRACKEAR TOKENS
+            try:
+                usage = result.get("usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+                if input_tokens > 0 or output_tokens > 0:
+                    cost = calculate_cost(input_tokens, output_tokens, "groq")
+                    add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens (WhatsApp API): {e}")
         
         if len(ai_response) > 1500:
             ai_response = ai_response[:1497] + "..."
@@ -579,16 +734,35 @@ def sms_webhook():
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                temperature=0.5,  # 🆕 Reducir para respuestas más directas
-                max_tokens=50,    # 🆕 CRÍTICO: Máximo 40 tokens (~140 chars)
-                top_p=0.9,        # 🆕 Limitar creatividad
-                frequency_penalty=0.5  # 🆕 Evitar repeticiones
+                temperature=0.5,
+                max_tokens=50,
+                top_p=0.9,
+                frequency_penalty=0.5
             )
             ai_response = completion.choices[0].message.content
+            
+            # 🆕 TRACKEAR TOKENS
+            try:
+                usage = completion.usage
+                cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens, "groq")
+                add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens (SMS): {e}")
+                
         else:
-            # Llamada directa a API con parámetros ajustados
             result = call_groq_api_directly_sms(messages, max_tokens=40)
             ai_response = result["choices"][0]["message"]["content"]
+            
+            # 🆕 TRACKEAR TOKENS
+            try:
+                usage = result.get("usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+                if input_tokens > 0 or output_tokens > 0:
+                    cost = calculate_cost(input_tokens, output_tokens, "groq")
+                    add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens (SMS API): {e}")
         
         # 🆕 MEJORA 6: Limpieza y truncado agresivo
         # Eliminar saltos de línea y espacios extra
@@ -726,9 +900,29 @@ def rcs_webhook():
                 max_tokens=500
             )
             ai_response = completion.choices[0].message.content
+            
+            # 🆕 TRACKEAR TOKENS
+            try:
+                usage = completion.usage
+                cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens, "groq")
+                add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens (RCS): {e}")
+                
         else:
             result = call_groq_api_directly(messages)
             ai_response = result["choices"][0]["message"]["content"]
+            
+            # 🆕 TRACKEAR TOKENS
+            try:
+                usage = result.get("usage", {})
+                input_tokens = usage.get("prompt_tokens", 0)
+                output_tokens = usage.get("completion_tokens", 0)
+                if input_tokens > 0 or output_tokens > 0:
+                    cost = calculate_cost(input_tokens, output_tokens, "groq")
+                    add_usage(cost)
+            except Exception as e:
+                logger.error(f"Error trackeando tokens (RCS API): {e}")
         
         # Limitar longitud
         if len(ai_response) > 1000:
