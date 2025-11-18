@@ -87,6 +87,123 @@ const elements = {
     modeChipClose: document.getElementById('modeChipClose')
 };
 
+// 🆕 ELEMENTOS DE CONSUMO
+elements.usageMeter = document.getElementById('usageMeter');
+elements.usageFill = document.getElementById('usageFill');
+elements.usageText = document.getElementById('usageText');
+
+// 🆕 ESTADO DE CONSUMO
+const usageState = {
+    consumed: 0,
+    limit: 10,
+    percentage: 0,
+    blocked: false,
+    warning: false
+};
+
+// ==================== FUNCIONES DE CONSUMO ====================
+/**
+ * Consulta el endpoint /usage y actualiza el estado
+ */
+async function fetchUsageStatus() {
+    try {
+        const response = await fetch(`${API_URL}/usage`);
+        
+        if (!response.ok) {
+            console.error('Error consultando /usage:', response.status);
+            return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            usageState.consumed = data.consumed;
+            usageState.limit = data.limit;
+            usageState.percentage = data.percentage;
+            usageState.blocked = data.blocked;
+            usageState.warning = data.warning;
+            
+            updateUsageMeter();
+            
+            // Si está bloqueado, deshabilitar input
+            if (usageState.blocked) {
+                blockInputDueToUsage();
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching usage:', error);
+    }
+}
+
+/**
+ * Actualiza la barra visual de consumo
+ */
+function updateUsageMeter() {
+    if (!elements.usageMeter || !elements.usageFill || !elements.usageText) return;
+    
+    // Mostrar el medidor
+    elements.usageMeter.style.display = 'flex';
+    
+    // Actualizar ancho de la barra
+    elements.usageFill.style.width = `${usageState.percentage}%`;
+    
+    // Actualizar texto
+    elements.usageText.textContent = `$${usageState.consumed}/$${usageState.limit}`;
+    
+    // Cambiar color según porcentaje
+    elements.usageFill.classList.remove('warning', 'danger');
+    
+    if (usageState.percentage >= 100) {
+        elements.usageFill.classList.add('danger');
+    } else if (usageState.percentage >= 90) {
+        elements.usageFill.classList.add('warning');
+    }
+    
+    console.log(`💰 Consumo: $${usageState.consumed}/$${usageState.limit} (${usageState.percentage}%)`);
+}
+
+/**
+ * Bloquea el input cuando se alcanza el límite
+ */
+function blockInputDueToUsage() {
+    elements.userInput.value = '';
+    elements.userInput.placeholder = '🚫 Límite mensual alcanzado ($10 USD)';
+    elements.userInput.disabled = true;
+    elements.userInput.style.cursor = 'not-allowed';
+    elements.userInput.style.color = '#dc3545';
+    elements.sendBtn.disabled = true;
+    elements.sendBtn.style.opacity = '0.5';
+    elements.sendBtn.style.cursor = 'not-allowed';
+    
+    console.warn('🚫 Input bloqueado: Límite de $10 alcanzado');
+}
+
+/**
+ * Muestra advertencia cuando está cerca del límite
+ */
+function showUsageWarning() {
+    if (usageState.warning && !usageState.blocked) {
+        // Mostrar notificación temporal
+        const warningMsg = document.createElement('div');
+        warningMsg.className = 'usage-warning-toast';
+        warningMsg.innerHTML = `
+            <span style="font-size: 20px;">⚠️</span>
+            <div>
+                <strong>Casi alcanzas el límite</strong>
+                <br>
+                <small>Quedan $${(usageState.limit - usageState.consumed).toFixed(2)} de tu límite mensual</small>
+            </div>
+        `;
+        
+        document.body.appendChild(warningMsg);
+        
+        setTimeout(() => {
+            warningMsg.style.opacity = '0';
+            setTimeout(() => warningMsg.remove(), 300);
+        }, 5000);
+    }
+}
+
 // ==================== FUNCIONES DE TOKENS ====================
 /**
  * Estima tokens usando un promedio fijo de 3.5 caracteres por token
@@ -239,6 +356,9 @@ document.addEventListener('DOMContentLoaded', function() {
         elements.maxTokens.textContent = TOKEN_CONFIG.MAX_TOKENS;
     }
     updateTokenCounter(0);
+    
+    // 🆕 CONSULTAR CONSUMO AL CARGAR
+    fetchUsageStatus();
 });
 
 function initializeEventListeners() {
@@ -608,15 +728,21 @@ if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
     showLoading();
     
     callAPI(text)
-        .then(response => {
-            addMessage('bot', response);
-            
-            if (isTaskMessage(text, response)) {
-                processTask(text, response);
-            }
-            
-
-        })
+    .then(response => {
+        addMessage('bot', response);
+        
+        if (isTaskMessage(text, response)) {
+            processTask(text, response);
+        }
+        
+        // 🆕 ACTUALIZAR CONSUMO DESPUÉS DE CADA MENSAJE
+        fetchUsageStatus();
+        
+        // 🆕 MOSTRAR ADVERTENCIA SI ESTÁ CERCA DEL LÍMITE
+        setTimeout(() => {
+            showUsageWarning();
+        }, 500);
+    })
         .catch(error => {
             console.error('Error completo:', error);
             
