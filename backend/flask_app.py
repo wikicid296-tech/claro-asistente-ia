@@ -297,38 +297,59 @@ def detect_education_topic(text):
             return topic
     return None
 
-# 🆕 FUNCIÓN DE VALIDACIÓN SIMPLE PARA BACKEND
+# 🆕 REEMPLAZA la función es_pregunta_educativa_simple en flask_app.py
+
 def es_pregunta_educativa_simple(texto: str) -> bool:
     """
-    Validación simple en backend como segunda capa de protección
+    Validación en backend usando Groq también (doble verificación)
     """
+    try:
+        # Usar el mismo clasificador pero más corto
+        clasificacion_prompt = f"""Determina si esta pregunta busca APRENDIZAJE real.
+
+Pregunta: "{texto}"
+
+Responde SOLO: SI (busca aprender/capacitarse) o NO (otro tema)"""
+
+        if client and client != "api_fallback":
+            response = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[{"role": "user", "content": clasificacion_prompt}],
+                temperature=0.1,
+                max_tokens=5
+            )
+            respuesta = response.choices[0].message.content.strip().upper()
+            
+            # Trackear tokens
+            try:
+                usage = response.usage
+                cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens, "groq")
+                add_usage(cost)
+            except:
+                pass
+            
+            return "SI" in respuesta or "SÍ" in respuesta
+        else:
+            # Fallback si Groq no está disponible
+            return es_pregunta_educativa_fallback_simple(texto)
+            
+    except Exception as e:
+        logger.error(f"Error en clasificador simple: {e}")
+        return es_pregunta_educativa_fallback_simple(texto)
+
+
+def es_pregunta_educativa_fallback_simple(texto: str) -> bool:
+    """Fallback ultra simple"""
     texto_lower = texto.lower()
+    si = ['curso', 'aprender', 'estudiar', 'capacitación']
+    no = ['taylor swift', 'novio', 'esposo', 'famoso', 'noticia']
     
-    # Temas NO educativos (alta prioridad)
-    no_educativos = [
-        'tailor swift', 'taylor swift', 'novio', 'novia', 'famoso', 'famosos',
-        'celebridad', 'actor', 'actriz', 'cantante', 'música', 'película',
-        'deporte', 'fútbol', 'noticia', 'política', 'videojuego', 'juego'
-    ]
-    
-    # Temas educativos (baja prioridad)
-    educativos = [
-        'curso', 'aprender', 'estudiar', 'educación', 'capacitación', 
-        'diplomado', 'carrera', 'programación', 'inglés', 'matemática',
-        'tecnología', 'salud', 'medicina', 'finanzas', 'negocios'
-    ]
-    
-    # Si contiene temas NO educativos, rechazar inmediatamente
-    for tema in no_educativos:
-        if tema in texto_lower:
+    for palabra in no:
+        if palabra in texto_lower:
             return False
-    
-    # Si contiene temas educativos, aceptar
-    for tema in educativos:
-        if tema in texto_lower:
+    for palabra in si:
+        if palabra in texto_lower:
             return True
-    
-    # Por defecto, rechazar (ser estricto)
     return False
 
 # ==================== NUEVAS FUNCIONES PARA APRENDE IA ====================
