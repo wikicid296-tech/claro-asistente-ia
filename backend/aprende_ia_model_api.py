@@ -33,6 +33,89 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 vector_store_id = os.getenv("VECTOR_STORE_ID")
 
+# 🆕 FILTRO DE RELEVANCIA - FUNCIÓN NUEVA
+def es_pregunta_educativa(question: str) -> bool:
+    """
+    Determina si la pregunta es realmente sobre temas educativos 
+    que justifiquen buscar en Aprende.org
+    """
+    question_lower = question.lower()
+    
+    # PALABRAS CLAVE EDUCATIVAS (temas relevantes para Aprende.org)
+    temas_educativos = [
+        # Cursos y educación
+        'curso', 'cursos', 'aprender', 'estudiar', 'educación', 'educacion', 
+        'capacitación', 'capacitacion', 'formación', 'formacion', 'diplomado',
+        'carrera', 'profesional', 'técnico', 'tecnico', 'habilidad', 'habilidades',
+        'aprende.org', 'capacitate', 'clikisalud', 'capacítate',
+        
+        # Áreas de conocimiento específicas
+        'programación', 'programacion', 'inglés', 'ingles', 'matemática', 'matematica',
+        'ciencia', 'tecnología', 'tecnologia', 'digital', 'computación', 'computacion',
+        'salud', 'medicina', 'nutrición', 'nutricion', 'ejercicio', 'bienestar',
+        'finanzas', 'contabilidad', 'administración', 'administracion', 'negocios',
+        'emprendimiento', 'marketing', 'ventas', 'liderazgo', 'trabajo en equipo',
+        'idioma', 'idiomas', 'oficio', 'oficios', 'taller', 'talleres',
+        
+        # Verbos de aprendizaje
+        'enseñar', 'ensenar', 'instruir', 'capacitar', 'formar', 'preparar',
+        'desarrollar', 'mejorar', 'perfeccionar', 'aprendo', 'estudio',
+        
+        # Temas específicos de cursos
+        'excel', 'word', 'powerpoint', 'office', 'programar', 'código', 'codigo',
+        'web', 'página web', 'pagina web', 'diseño', 'diseno', 'photoshop',
+        'contabilidad', 'financiero', 'impuesto', 'impuestos', 'fiscal',
+        'recursos humanos', 'rrhh', 'selección', 'seleccion', 'personal',
+        'venta', 'comercial', 'cliente', 'clientes', 'atención al cliente',
+        'electricidad', 'electricista', 'plomería', 'plomeria', 'albañil', 'albanil',
+        'cocina', 'chef', 'repostería', 'reposteria', 'panadería', 'panaderia'
+    ]
+    
+    # PALABRAS CLAVE NO EDUCATIVAS (temas que NO deben usar Aprende.org)
+    temas_no_educativos = [
+        # Entretenimiento y famosos
+        'tailor swift', 'taylor swift', 'novio', 'novia', 'famoso', 'famosos',
+        'celebridad', 'celebridades', 'actor', 'actriz', 'cantante', 'música',
+        'película', 'pelicula', 'serie', 'deporte', 'deportes', 'fútbol', 'futbol',
+        'baloncesto', 'deportivo', 'artista', 'banda', 'grupo musical',
+        
+        # Preguntas personales/generales
+        'quién es', 'quien es', 'qué es', 'que es', 'cómo es', 'como es',
+        'cuándo', 'cuando', 'dónde', 'donde', 'por qué', 'porque',
+        'cuánto', 'cuanto', 'cuál', 'cual', 'cuáles', 'cuales',
+        
+        # Noticias y eventos actuales
+        'noticia', 'noticias', 'actualidad', 'política', 'politica', 'evento',
+        'elección', 'eleccion', 'presidente', 'gobierno', 'ley', 'legal',
+        
+        # Preguntas generales de conocimiento
+        'historia de', 'biografía', 'biografia', 'quién inventó', 'quien invento',
+        'qué pasó', 'que paso', 'significado de', 'definición', 'definicion',
+        
+        # Entretenimiento y cultura pop
+        'videojuego', 'videojuegos', 'juego', 'juegos', 'anime', 'manga',
+        'comics', 'cómic', 'comic', 'película', 'cine', 'televisión', 'television',
+        
+        # Preguntas personales
+        'edad de', 'años de', 'cumpleaños', 'nacimiento', 'murió', 'muriò', 'muerto'
+    ]
+    
+    # Verificar si contiene temas NO educativos
+    for tema in temas_no_educativos:
+        if tema in question_lower:
+            logger.info(f"❌ Pregunta rechazada - Contiene tema no educativo: '{tema}'")
+            return False
+    
+    # Verificar si contiene temas educativos
+    for tema in temas_educativos:
+        if tema in question_lower:
+            logger.info(f"✅ Pregunta aceptada - Contiene tema educativo: '{tema}'")
+            return True
+    
+    # Si no coincide con nada, por defecto NO usar Aprende.org
+    logger.info("❌ Pregunta rechazada - No contiene temas educativos relevantes")
+    return False
+
 
 async def extraer_contenido_multimedia(resource_url: str) -> dict:
     """
@@ -144,16 +227,28 @@ def detectar_tipo_recurso(url: str) -> str:
 
 def ask_about_vector_store(question: str) -> dict:
     """
-    Función principal para consultar el vector store de Aprende.org
-    y entregar recursos educativos relevantes.
+    Función principal MODIFICADA con filtro de relevancia
+    para consultar el vector store de Aprende.org
     """
     logger.info(f"🤖 Pregunta recibida: {question}")
     
+    # 🆕 FILTRO DE RELEVANCIA - Verificar si es pregunta educativa
+    if not es_pregunta_educativa(question):
+        logger.info("❌ Pregunta NO relevante para Aprende.org - Usando respuesta general")
+        return {
+            "respuesta": f"🤔 Veo que tu pregunta está relacionada con '{question}'. Me especializo en ayudarte con **cursos, capacitación y desarrollo profesional** de Aprende.org.\n\n💡 **¿Te gustaría buscar algún curso específico o aprender alguna habilidad nueva?** Por ejemplo, puedo ayudarte con:\n• Cursos de programación y tecnología\n• Capacitación en habilidades profesionales\n• Desarrollo personal y bienestar\n• Cursos técnicos y oficios\n\n¡Cuéntame qué te gustaría aprender! 📚",
+            "url_recurso": "",
+            "url_video": "",
+            "url_pdf": "",
+            "tipo_contenido": "general",
+            "tipo_recurso": "general"
+        }
+    
     try:
-        logger.info("📚 Consultando vector store de OpenAI...")
+        logger.info("✅ Pregunta relevante - Consultando vector store de OpenAI...")
         
         response = client.responses.create(
-            model="gpt-4o-2024-11-20",
+            model="gpt-4o-mini",
             input=[
                 {
                     "role": "system",

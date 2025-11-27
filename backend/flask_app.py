@@ -297,6 +297,40 @@ def detect_education_topic(text):
             return topic
     return None
 
+# 🆕 FUNCIÓN DE VALIDACIÓN SIMPLE PARA BACKEND
+def es_pregunta_educativa_simple(texto: str) -> bool:
+    """
+    Validación simple en backend como segunda capa de protección
+    """
+    texto_lower = texto.lower()
+    
+    # Temas NO educativos (alta prioridad)
+    no_educativos = [
+        'tailor swift', 'taylor swift', 'novio', 'novia', 'famoso', 'famosos',
+        'celebridad', 'actor', 'actriz', 'cantante', 'música', 'película',
+        'deporte', 'fútbol', 'noticia', 'política', 'videojuego', 'juego'
+    ]
+    
+    # Temas educativos (baja prioridad)
+    educativos = [
+        'curso', 'aprender', 'estudiar', 'educación', 'capacitación', 
+        'diplomado', 'carrera', 'programación', 'inglés', 'matemática',
+        'tecnología', 'salud', 'medicina', 'finanzas', 'negocios'
+    ]
+    
+    # Si contiene temas NO educativos, rechazar inmediatamente
+    for tema in no_educativos:
+        if tema in texto_lower:
+            return False
+    
+    # Si contiene temas educativos, aceptar
+    for tema in educativos:
+        if tema in texto_lower:
+            return True
+    
+    # Por defecto, rechazar (ser estricto)
+    return False
+
 # ==================== NUEVAS FUNCIONES PARA APRENDE IA ====================
 
 
@@ -453,20 +487,45 @@ def chat():
                 "usage": status
             }), 429
         
-        # ✅ LÓGICA SIMPLIFICADA: Si el modo es 'aprende', SIEMPRE usar Aprende IA
+        # ✅ LÓGICA MEJORADA: Si el modo es 'aprende', validar primero
         if current_mode == 'aprende' and aprende_ia_available:
-            logger.info(f"🎯 Modo Aprende activado - Usando Aprende IA SIEMPRE")
-            
+            logger.info(f"🎯 Modo Aprende activado - Validando relevancia...")
+
+            # 🆕 VALIDACIÓN DE RELEVANCIA EN BACKEND
             try:
-                logger.info(f"🎓 Usando Aprende IA para: {user_message[:50]}...")
+                from aprende_ia_model_api import es_pregunta_educativa
+                es_educativa = es_pregunta_educativa(user_message)
+            except ImportError:
+                logger.warning("⚠️ No se pudo importar es_pregunta_educativa, usando validación simple")
+                es_educativa = es_pregunta_educativa_simple(user_message)
+
+            if not es_educativa:
+                logger.info(f"❌ Pregunta no educativa detectada en backend: '{user_message[:50]}'")
+                return jsonify({
+                    "success": True,
+                    "response": f"🤔 Veo que tu pregunta sobre '{user_message}' está fuera del ámbito educativo. Me especializo en ayudarte con **cursos, capacitación y desarrollo profesional** de Aprende.org.\n\n💡 **¿Te gustaría buscar algún curso específico?** Por ejemplo: programación, inglés, marketing, habilidades técnicas, etc.",
+                    "url_recurso": "",
+                    "url_video": "",
+                    "url_pdf": "",
+                    "tipo_contenido": "general",
+                    "tipo_recurso": "general",
+                    "context": "🔍 Pregunta redirigida - Fuera del ámbito educativo",
+                    "relevant_urls": [],
+                    "memory_used": 0,
+                    "context_reset": False,
+                    "aprende_ia_used": False
+                })
+
+            try:
+                logger.info(f"✅ Pregunta educativa - Usando Aprende IA para: {user_message[:50]}...")
                 resultado = ask_about_vector_store(user_message)
-                
+
                 logger.info(f"✅ Respuesta de Aprende IA recibida")
                 logger.info(f"📍 URL recurso: {resultado.get('url_recurso', 'Sin URL')}")
                 logger.info(f"🎥 URL video: {resultado.get('url_video', 'Sin video')}")
                 logger.info(f"📄 URL PDF: {resultado.get('url_pdf', 'Sin PDF')}")
                 logger.info(f"📦 Tipo contenido: {resultado.get('tipo_contenido', 'webpage')}")
-                
+
                 return jsonify({
                     "success": True,
                     "response": resultado["respuesta"],
