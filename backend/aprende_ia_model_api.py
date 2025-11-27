@@ -33,87 +33,94 @@ load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 vector_store_id = os.getenv("VECTOR_STORE_ID")
 
-# 🆕 FILTRO DE RELEVANCIA - FUNCIÓN NUEVA
+# 🆕 REEMPLAZA TODA LA FUNCIÓN es_pregunta_educativa en aprende_ia_model_api.py
+
 def es_pregunta_educativa(question: str) -> bool:
     """
-    Determina si la pregunta es realmente sobre temas educativos 
-    que justifiquen buscar en Aprende.org
+    Usa Groq (barato y rápido) para determinar si la pregunta 
+    realmente busca aprendizaje/capacitación
+    """
+    try:
+        # Importar Groq (ya lo tienes configurado en flask_app)
+        import os
+        from groq import Groq
+        
+        groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+        
+        # Prompt de clasificación muy específico
+        clasificacion_prompt = f"""Eres un clasificador que determina si una pregunta busca APRENDIZAJE o CAPACITACIÓN real.
+
+Pregunta del usuario: "{question}"
+
+Responde SOLO con "SI" o "NO":
+- SI: Si busca aprender algo, tomar cursos, capacitarse, desarrollar habilidades profesionales/técnicas
+- NO: Si busca información general, chismes, entretenimiento, noticias, biografías de famosos
+
+Ejemplos:
+"quiero aprender programación" → SI
+"cursos de inglés" → SI
+"cómo hacer una página web" → SI
+"dame un curso de esposos" → NO (no busca aprendizaje real)
+"quién es el novio de Taylor Swift" → NO (chisme)
+"noticias de hoy" → NO (información general)
+"qué es Python" → SI (tema técnico educativo)
+"curso de videojuegos" → SI (capacitación técnica)
+
+Responde SOLO: SI o NO"""
+
+        # Llamada a Groq (muy rápida y barata)
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "user", "content": clasificacion_prompt}
+            ],
+            temperature=0.1,  # Muy baja para respuestas consistentes
+            max_tokens=10     # Solo necesitamos "SI" o "NO"
+        )
+        
+        respuesta = response.choices[0].message.content.strip().upper()
+        
+        logger.info(f"🤖 Clasificador IA: '{question[:50]}' → {respuesta}")
+        
+        # Trackear tokens (es muy barato, ~100 tokens input + 2 output)
+        try:
+            usage = response.usage
+            from flask_app import calculate_cost, add_usage
+            cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens, "groq")
+            add_usage(cost)
+            logger.info(f"💸 Costo clasificación: ${cost:.6f}")
+        except:
+            pass
+        
+        return "SI" in respuesta or "SÍ" in respuesta
+        
+    except Exception as e:
+        logger.error(f"❌ Error en clasificador IA: {e}")
+        # Fallback: si falla, usar validación simple
+        return es_pregunta_educativa_simple_fallback(question)
+
+
+def es_pregunta_educativa_simple_fallback(question: str) -> bool:
+    """
+    Fallback simple si el clasificador IA falla
     """
     question_lower = question.lower()
     
-    # PALABRAS CLAVE EDUCATIVAS (temas relevantes para Aprende.org)
-    temas_educativos = [
-        # Cursos y educación
-        'curso', 'cursos', 'aprender', 'estudiar', 'educación', 'educacion', 
-        'capacitación', 'capacitacion', 'formación', 'formacion', 'diplomado',
-        'carrera', 'profesional', 'técnico', 'tecnico', 'habilidad', 'habilidades',
-        'aprende.org', 'capacitate', 'clikisalud', 'capacítate',
-        
-        # Áreas de conocimiento específicas
-        'programación', 'programacion', 'inglés', 'ingles', 'matemática', 'matematica',
-        'ciencia', 'tecnología', 'tecnologia', 'digital', 'computación', 'computacion',
-        'salud', 'medicina', 'nutrición', 'nutricion', 'ejercicio', 'bienestar',
-        'finanzas', 'contabilidad', 'administración', 'administracion', 'negocios',
-        'emprendimiento', 'marketing', 'ventas', 'liderazgo', 'trabajo en equipo',
-        'idioma', 'idiomas', 'oficio', 'oficios', 'taller', 'talleres',
-        
-        # Verbos de aprendizaje
-        'enseñar', 'ensenar', 'instruir', 'capacitar', 'formar', 'preparar',
-        'desarrollar', 'mejorar', 'perfeccionar', 'aprendo', 'estudio',
-        
-        # Temas específicos de cursos
-        'excel', 'word', 'powerpoint', 'office', 'programar', 'código', 'codigo',
-        'web', 'página web', 'pagina web', 'diseño', 'diseno', 'photoshop',
-        'contabilidad', 'financiero', 'impuesto', 'impuestos', 'fiscal',
-        'recursos humanos', 'rrhh', 'selección', 'seleccion', 'personal',
-        'venta', 'comercial', 'cliente', 'clientes', 'atención al cliente',
-        'electricidad', 'electricista', 'plomería', 'plomeria', 'albañil', 'albanil',
-        'cocina', 'chef', 'repostería', 'reposteria', 'panadería', 'panaderia'
-    ]
+    # Solo palabras MUY fuertes
+    palabras_si = ['curso', 'aprender', 'estudiar', 'capacitación', 'capacitacion', 'enseñar']
+    palabras_no = ['taylor swift', 'tailor swift', 'novio de', 'novia de', 'esposo de', 
+                   'esposa de', 'famoso', 'celebridad', 'noticia']
     
-    # PALABRAS CLAVE NO EDUCATIVAS (temas que NO deben usar Aprende.org)
-    temas_no_educativos = [
-        # Entretenimiento y famosos
-        'tailor swift', 'taylor swift', 'novio', 'novia', 'famoso', 'famosos',
-        'celebridad', 'celebridades', 'actor', 'actriz', 'cantante', 'música',
-        'película', 'pelicula', 'serie', 'deporte', 'deportes', 'fútbol', 'futbol',
-        'baloncesto', 'deportivo', 'artista', 'banda', 'grupo musical',
-        
-        # Preguntas personales/generales
-        'quién es', 'quien es', 'qué es', 'que es', 'cómo es', 'como es',
-        'cuándo', 'cuando', 'dónde', 'donde', 'por qué', 'porque',
-        'cuánto', 'cuanto', 'cuál', 'cual', 'cuáles', 'cuales',
-        
-        # Noticias y eventos actuales
-        'noticia', 'noticias', 'actualidad', 'política', 'politica', 'evento',
-        'elección', 'eleccion', 'presidente', 'gobierno', 'ley', 'legal',
-        
-        # Preguntas generales de conocimiento
-        'historia de', 'biografía', 'biografia', 'quién inventó', 'quien invento',
-        'qué pasó', 'que paso', 'significado de', 'definición', 'definicion',
-        
-        # Entretenimiento y cultura pop
-        'videojuego', 'videojuegos', 'juego', 'juegos', 'anime', 'manga',
-        'comics', 'cómic', 'comic', 'película', 'cine', 'televisión', 'television',
-        
-        # Preguntas personales
-        'edad de', 'años de', 'cumpleaños', 'nacimiento', 'murió', 'muriò', 'muerto'
-    ]
-    
-    # Verificar si contiene temas NO educativos
-    for tema in temas_no_educativos:
-        if tema in question_lower:
-            logger.info(f"❌ Pregunta rechazada - Contiene tema no educativo: '{tema}'")
+    # Rechazar inmediatamente si tiene palabras prohibidas
+    for palabra in palabras_no:
+        if palabra in question_lower:
             return False
     
-    # Verificar si contiene temas educativos
-    for tema in temas_educativos:
-        if tema in question_lower:
-            logger.info(f"✅ Pregunta aceptada - Contiene tema educativo: '{tema}'")
+    # Aceptar solo si tiene palabras educativas fuertes
+    for palabra in palabras_si:
+        if palabra in question_lower:
             return True
     
-    # Si no coincide con nada, por defecto NO usar Aprende.org
-    logger.info("❌ Pregunta rechazada - No contiene temas educativos relevantes")
     return False
 
 
