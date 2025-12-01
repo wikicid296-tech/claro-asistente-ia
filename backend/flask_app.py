@@ -614,7 +614,7 @@ def chat():
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=messages,
-                temperature=0.5,
+                temperature=0.2,
                 max_tokens=2048
             )
             response = completion.choices[0].message.content
