@@ -524,7 +524,7 @@ def chat():
                 logger.info(f"❌ Pregunta no educativa detectada en backend: '{user_message[:50]}'")
                 return jsonify({
                     "success": True,
-                    "response": f"🤔 Veo que tu pregunta sobre '{user_message}' está fuera del ámbito educativo. Me especializo en ayudarte con **cursos, capacitación y desarrollo profesional** de Aprende.org.\n\n💡 **¿Te gustaría buscar algún curso específico?** Por ejemplo: programación, inglés, marketing, habilidades técnicas, etc.",
+                    "response": f"🤔 Veo que tu pregunta sobre '{user_message}' está fuera del ámbito educativo. Aprende se especializa en ayudarte con **cursos, capacitación y desarrollo profesional** de Aprende.org.\n\n💡 **¿Te gustaría buscar algún curso específico?** Por ejemplo: programación, inglés, marketing, habilidades técnicas, etc.",
                     "url_recurso": "",
                     "url_video": "",
                     "url_pdf": "",

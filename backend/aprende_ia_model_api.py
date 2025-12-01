@@ -65,7 +65,7 @@ Ejemplos:
 "noticias de hoy" → NO (información general)
 "qué es Python" → SI (tema técnico educativo)
 "curso de videojuegos" → SI (capacitación técnica)
-"ademas veras si estas palabras coinciden con los recursos de aprende.org y usando como herramienta el embedding que se te dara para ver si hay coincidencias de la busqueda con  los recursos de cruros o URL parecidas"
+"ademas veras si estas palabras coinciden con los recursos de aprende.org y usando como herramienta el embedding que se te dara para ver si hay coincidencias de la busqueda con  los recursos de cursos o URL parecidas"
 
 Responde SOLO: SI o NO"""
 
