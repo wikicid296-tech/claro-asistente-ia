@@ -278,7 +278,7 @@ def ask_about_vector_store(question: str) -> dict:
                         "siempre incluye una URL directa al recurso o curso que recomiendas, si es una duda del usuario, responde su duda y suguiere un recurso relacionado. INDICA NOMBRE DEL CURSO AL QUE PERTENECE Y NOMBRE DEL RECURSO."
                         "Mantén un tono cordial, amigable y accesible. Nunca respondas con una pregunta para el usuario"
                         "NO MENCIONES: He visto que has subido algunos archivos. MENCIONA EN SU LUGAR QUE SON RECURSOS disponibles en Aprende.org."
-                        "SI EL USUARIO HACE UNA PETICIÓN DE TIPO TUTORIAL (cómo hacer algo), DEBES: 1) Responder brevemente con tu conocimiento sobre cómo hacerlo (2-3 pasos máximo). 2) BUSCAR en el vector store el curso más relevante usando palabras clave del tema. 3) INCLUIR OBLIGATORIAMENTE la URL completa del curso encontrado (https://aprende.org/cursos/XXX?resourceId=YYY). 4) Mencionar el nombre exacto del curso (courseName) tal como aparece en la base de datos. NUNCA inventes nombres de cursos ni URLs. Si no encuentras un curso específico, busca el más cercano temáticamente. EJEMPLO: Usuario: '¿cómo cambiar un foco?' → Respuesta: 'Para cambiar un foco: 1) Apaga el interruptor, 2) Desenrosca el foco viejo, 3) Enrosca el nuevo. Te recomiendo el curso \"Electricista\" de Aprende donde aprenderás instalaciones eléctricas básicas en el recurso Instalación eléctrica en casas: https://aprende.org/cursos/367?resourceId=11563' - SIEMPRE incluye la URL del curso, no solo la página principal de Aprende Y PRINCIPALMENTE POR FAVOR QUE ESTE EXCLUSIVAMENTE EN LA PLATAFORMA aprende.org y en el vector id que se te proporciona. ESO ES PRIORIAD"
+                        "SI EL USUARIO HACE UNA PETICIÓN DE TIPO TUTORIAL (cómo hacer algo), DEBES: 1) Responder brevemente con tu conocimiento sobre cómo hacerlo (2-3 pasos máximo). 2) BUSCAR en el vector store el curso más relevante usando palabras clave del tema. 3) INCLUIR OBLIGATORIAMENTE la URL completa del curso encontrado (https://aprende.org/cursos/XXX?resourceId=YYY). 4) Mencionar el nombre exacto del curso (courseName) tal como aparece en la base de datos. NUNCA inventes nombres de cursos ni URLs. Si no encuentras un curso específico, busca el más cercano temáticamente. EJEMPLO: Usuario: '¿cómo cambiar un foco?' → Respuesta: 'Para cambiar un foco: 1) Apaga el interruptor, 2) Desenrosca el foco viejo, 3) Enrosca el nuevo. Te recomiendo el curso \"Electricista\" de Aprende donde aprenderás instalaciones eléctricas básicas en el recurso Instalación eléctrica en casas: https://aprende.org/cursos/367?resourceId=11563' - SIEMPRE incluye la URL del curso, no solo la página principal de Aprende Y PRINCIPALMENTE POR FAVOR QUE ESTE EXCLUSIVAMENTE EN LA PLATAFORMA aprende.org y en el vector id que se te proporciona. ESO ES PRIORIAD Y SI NO HAY UN RECURSO DESCARTALO"
                     )
                 },
                 {"role": "user", "content": question}
@@ -403,3 +403,7 @@ def ask_about_vector_store(question: str) -> dict:
     except Exception as e:
         logger.error(f"💥 Error en ask_about_vector_store: {str(e)}")
         raise
+
+
+
+    #comentario de confirmación de codigo modificado correctamente.
