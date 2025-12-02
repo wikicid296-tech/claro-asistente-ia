@@ -65,6 +65,7 @@ Ejemplos:
 "noticias de hoy" → NO (información general)
 "qué es Python" → SI (tema técnico educativo)
 "curso de videojuegos" → SI (capacitación técnica)
+"ademas veras si estas palabras coinciden con los recursos de aprende.org y usando como herramienta el embedding que se te dara para ver si hay coincidencias de la busqueda con  los recursos de cursos o URL parecidas"
 
 Responde SOLO: SI o NO"""
 
@@ -115,7 +116,7 @@ def es_pregunta_educativa_simple_fallback(question: str) -> bool:
     for palabra in palabras_no:
         if palabra in question_lower:
             return False
-    
+
     # Aceptar solo si tiene palabras educativas fuertes
     for palabra in palabras_si:
         if palabra in question_lower:
@@ -238,9 +239,21 @@ def ask_about_vector_store(question: str) -> dict:
     para consultar el vector store de Aprende.org
     """
     logger.info(f"🤖 Pregunta recibida: {question}")
+
+    texto_filtrado = re.sub(r'[^\w\s]', '', question.lower())
+    conectores = {"el","la","los","las","de","del","y","o","a","en","por","para","con","sin","sobre","al","lo"}
+    keywords = [word for word in texto_filtrado.split() if word not in conectores]
+
+    logger.info(f"Keywords extraídas: {keywords}")
+
+
+
+    
     
     # 🆕 FILTRO DE RELEVANCIA - Verificar si es pregunta educativa
     if not es_pregunta_educativa(question):
+
+
         logger.info("❌ Pregunta NO relevante para Aprende.org - Usando respuesta general")
         return {
             "respuesta": f"🤔 Veo que tu pregunta está relacionada con '{question}'. Me especializo en ayudarte con **cursos, capacitación y desarrollo profesional** de Aprende.org.\n\n💡 **¿Te gustaría buscar algún curso específico o aprender alguna habilidad nueva?** Por ejemplo, puedo ayudarte con:\n• Cursos de programación y tecnología\n• Capacitación en habilidades profesionales\n• Desarrollo personal y bienestar\n• Cursos técnicos y oficios\n\n¡Cuéntame qué te gustaría aprender! 📚",
@@ -265,7 +278,7 @@ def ask_about_vector_store(question: str) -> dict:
                         "siempre incluye una URL directa al recurso o curso que recomiendas, si es una duda del usuario, responde su duda y suguiere un recurso relacionado. INDICA NOMBRE DEL CURSO AL QUE PERTENECE Y NOMBRE DEL RECURSO."
                         "Mantén un tono cordial, amigable y accesible. Nunca respondas con una pregunta para el usuario"
                         "NO MENCIONES: He visto que has subido algunos archivos. MENCIONA EN SU LUGAR QUE SON RECURSOS disponibles en Aprende.org."
-                        "SI EL USUARIO HACE UNA PETICIÓN DE TIPO TUTORIAL (cómo hacer algo), DEBES: 1) Responder brevemente con tu conocimiento sobre cómo hacerlo (2-3 pasos máximo). 2) BUSCAR en el vector store el curso más relevante usando palabras clave del tema. 3) INCLUIR OBLIGATORIAMENTE la URL completa del curso encontrado (https://aprende.org/cursos/XXX?resourceId=YYY). 4) Mencionar el nombre exacto del curso (courseName) tal como aparece en la base de datos. NUNCA inventes nombres de cursos ni URLs. Si no encuentras un curso específico, busca el más cercano temáticamente. EJEMPLO: Usuario: '¿cómo cambiar un foco?' → Respuesta: 'Para cambiar un foco: 1) Apaga el interruptor, 2) Desenrosca el foco viejo, 3) Enrosca el nuevo. Te recomiendo el curso \"Electricista\" de Aprende donde aprenderás instalaciones eléctricas básicas en el recurso Instalación eléctrica en casas: https://aprende.org/cursos/367?resourceId=11563' - SIEMPRE incluye la URL del curso, no solo la página principal de Aprende"
+                        "SI EL USUARIO HACE UNA PETICIÓN DE TIPO TUTORIAL (cómo hacer algo), DEBES: 1) Responder brevemente con tu conocimiento sobre cómo hacerlo (2-3 pasos máximo). 2) BUSCAR en el vector store el curso más relevante usando palabras clave del tema. 3) INCLUIR OBLIGATORIAMENTE la URL completa del curso encontrado (https://aprende.org/cursos/XXX?resourceId=YYY). 4) Mencionar el nombre exacto del curso (courseName) tal como aparece en la base de datos. NUNCA inventes nombres de cursos ni URLs. Si no encuentras un curso específico, busca el más cercano temáticamente. EJEMPLO: Usuario: '¿cómo cambiar un foco?' → Respuesta: 'Para cambiar un foco: 1) Apaga el interruptor, 2) Desenrosca el foco viejo, 3) Enrosca el nuevo. Te recomiendo el curso \"Electricista\" de Aprende donde aprenderás instalaciones eléctricas básicas en el recurso Instalación eléctrica en casas: https://aprende.org/cursos/367?resourceId=11563' - SIEMPRE incluye la URL del curso, no solo la página principal de Aprende Y PRINCIPALMENTE POR FAVOR QUE ESTE EXCLUSIVAMENTE EN LA PLATAFORMA aprende.org y en el vector id que se te proporciona. ESO ES PRIORIAD"
                     )
                 },
                 {"role": "user", "content": question}
@@ -273,9 +286,10 @@ def ask_about_vector_store(question: str) -> dict:
             tools=[{
                 "type": "file_search",
                 "vector_store_ids": [vector_store_id],
-                "max_num_results": 7
+                "max_num_results": 6
             }]
         )
+
 
         texto_respuesta = response.output_text.strip()
         logger.info(f"💬 Respuesta generada ({len(texto_respuesta)} caracteres)")
