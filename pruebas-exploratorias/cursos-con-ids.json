@@ -1,0 +1,1878 @@
+[
+  {
+    "courseId": "2",
+    "courseName": "Técnico en redes de datos"
+  },
+  {
+    "courseId": "4",
+    "courseName": "Carpintero"
+  },
+  {
+    "courseId": "5",
+    "courseName": "Asistente de Mesero"
+  },
+  {
+    "courseId": "6",
+    "courseName": "Aseador de oficina"
+  },
+  {
+    "courseId": "8",
+    "courseName": "Planchador"
+  },
+  {
+    "courseId": "9",
+    "courseName": "Albañil"
+  },
+  {
+    "courseId": "11",
+    "courseName": "Herrero, balconero, aluminador y forjador"
+  },
+  {
+    "courseId": "12",
+    "courseName": "Plomeros, fontaneros e instaladores de tubería"
+  },
+  {
+    "courseId": "14",
+    "courseName": "Cajero de restaurante"
+  },
+  {
+    "courseId": "15",
+    "courseName": "Cuidador de adultos mayores"
+  },
+  {
+    "courseId": "16",
+    "courseName": "Asistente web"
+  },
+  {
+    "courseId": "18",
+    "courseName": "Vendedor por catálogo"
+  },
+  {
+    "courseId": "20",
+    "courseName": "Jardinero a gran escala"
+  },
+  {
+    "courseId": "21",
+    "courseName": "Almacenista-montacarguista"
+  },
+  {
+    "courseId": "22",
+    "courseName": "Técnico Minero"
+  },
+  {
+    "courseId": "23",
+    "courseName": "Instalador de pisos de loseta "
+  },
+  {
+    "courseId": "24",
+    "courseName": "Pintor"
+  },
+  {
+    "courseId": "25",
+    "courseName": "Cuidador de niños "
+  },
+  {
+    "courseId": "26",
+    "courseName": "Cocinero"
+  },
+  {
+    "courseId": "27",
+    "courseName": "Reparador de aire acondicionado"
+  },
+  {
+    "courseId": "28",
+    "courseName": "Curador de datos"
+  },
+  {
+    "courseId": "29",
+    "courseName": "Instalador de tejados"
+  },
+  {
+    "courseId": "30",
+    "courseName": "Instalador de paneles de yeso "
+  },
+  {
+    "courseId": "31",
+    "courseName": "Técnico en cultivos vegetales"
+  },
+  {
+    "courseId": "32",
+    "courseName": "Bartender"
+  },
+  {
+    "courseId": "33",
+    "courseName": "Técnico procesador de frutas y verduras"
+  },
+  {
+    "courseId": "35",
+    "courseName": "Panadero"
+  },
+  {
+    "courseId": "36",
+    "courseName": "Mecánico automotriz"
+  },
+  {
+    "courseId": "37",
+    "courseName": "Corte y confección"
+  },
+  {
+    "courseId": "38",
+    "courseName": "Lavaplatos"
+  },
+  {
+    "courseId": "39",
+    "courseName": "Empleado de comida rápida"
+  },
+  {
+    "courseId": "40",
+    "courseName": "Asesor de Belleza"
+  },
+  {
+    "courseId": "41",
+    "courseName": "Conductor de transporte público"
+  },
+  {
+    "courseId": "42",
+    "courseName": "Desarrollador de contenido digital"
+  },
+  {
+    "courseId": "43",
+    "courseName": "Finder"
+  },
+  {
+    "courseId": "44",
+    "courseName": "Gestor de Imagen Web"
+  },
+  {
+    "courseId": "45",
+    "courseName": "Visualizador de Big Data"
+  },
+  {
+    "courseId": "46",
+    "courseName": "Tester"
+  },
+  {
+    "courseId": "47",
+    "courseName": "Instalador de fibra óptica"
+  },
+  {
+    "courseId": "48",
+    "courseName": "Vendedor de piso"
+  },
+  {
+    "courseId": "49",
+    "courseName": "Técnico en seguridad informática (análisis de riesgos)"
+  },
+  {
+    "courseId": "50",
+    "courseName": "Técnico en electrónica"
+  },
+  {
+    "courseId": "51",
+    "courseName": "Agente de ventas digital"
+  },
+  {
+    "courseId": "52",
+    "courseName": "Granjero de lechería (ordeña y alimentación)"
+  },
+  {
+    "courseId": "54",
+    "courseName": "Conductor de Transporte Ejecutivo"
+  },
+  {
+    "courseId": "55",
+    "courseName": "Representante telefónico"
+  },
+  {
+    "courseId": "56",
+    "courseName": "Mesero"
+  },
+  {
+    "courseId": "57",
+    "courseName": "Trabajador doméstico"
+  },
+  {
+    "courseId": "58",
+    "courseName": "Encargado de envoltura de regalos"
+  },
+  {
+    "courseId": "62",
+    "courseName": "Banderero"
+  },
+  {
+    "courseId": "63",
+    "courseName": "Cajero de tienda de autoservicio"
+  },
+  {
+    "courseId": "66",
+    "courseName": "Ideas para crecer tu negocio"
+  },
+  {
+    "courseId": "67",
+    "courseName": "Guía para entrevistas de trabajo"
+  },
+  {
+    "courseId": "69",
+    "courseName": "Administrador de bases de datos"
+  },
+  {
+    "courseId": "70",
+    "courseName": "Instalador de cables de cobre"
+  },
+  {
+    "courseId": "71",
+    "courseName": "Programador (orientado a objetos)"
+  },
+  {
+    "courseId": "75",
+    "courseName": "Analista de necesidades de formación"
+  },
+  {
+    "courseId": "76",
+    "courseName": "Administrador de servidores"
+  },
+  {
+    "courseId": "77",
+    "courseName": "Bodeguero (Restaurante)"
+  },
+  {
+    "courseId": "78",
+    "courseName": "Jefe de cocina"
+  },
+  {
+    "courseId": "79",
+    "courseName": "Movilidad motorizada"
+  },
+  {
+    "courseId": "80",
+    "courseName": "Movilidad No Motorizada"
+  },
+  {
+    "courseId": "81",
+    "courseName": "Analista de datos"
+  },
+  {
+    "courseId": "82",
+    "courseName": "Administrador de proyectos para ambientes virtuales de aprendizaje"
+  },
+  {
+    "courseId": "83",
+    "courseName": "Desarrollador de contenidos de aprendizaje"
+  },
+  {
+    "courseId": "84",
+    "courseName": "Facilitador de aprendizaje digital "
+  },
+  {
+    "courseId": "85",
+    "courseName": "Arquitecto de ambientes virtuales de aprendizaje "
+  },
+  {
+    "courseId": "86",
+    "courseName": "Técnico en cultivo de vegetales orgánicos "
+  },
+  {
+    "courseId": "88",
+    "courseName": "Introducción a la facilitación presencial en pequeños grupos"
+  },
+  {
+    "courseId": "89",
+    "courseName": "Programa de educación financiera"
+  },
+  {
+    "courseId": "90",
+    "courseName": "La trascendencia del educador durante la primera infancia"
+  },
+  {
+    "courseId": "93",
+    "courseName": "Conoce el micromenudeo"
+  },
+  {
+    "courseId": "95",
+    "courseName": "Cosecha y cultivo de agua"
+  },
+  {
+    "courseId": "96",
+    "courseName": "Servidor público"
+  },
+  {
+    "courseId": "97",
+    "courseName": "Steward"
+  },
+  {
+    "courseId": "98",
+    "courseName": "Operador de autotransporte"
+  },
+  {
+    "courseId": "99",
+    "courseName": "Jefe de mantenimiento"
+  },
+  {
+    "courseId": "101",
+    "courseName": "Mejora de procesos"
+  },
+  {
+    "courseId": "103",
+    "courseName": "Vida Saludable"
+  },
+  {
+    "courseId": "104",
+    "courseName": "Evaluador de aprendizaje digital"
+  },
+  {
+    "courseId": "105",
+    "courseName": "Evaluador de Ambientes Virtuales de Aprendizaje"
+  },
+  {
+    "courseId": "106",
+    "courseName": "Embalado"
+  },
+  {
+    "courseId": "107",
+    "courseName": "Empaquetado"
+  },
+  {
+    "courseId": "108",
+    "courseName": "Envasado"
+  },
+  {
+    "courseId": "109",
+    "courseName": "Introducción a la economía"
+  },
+  {
+    "courseId": "110",
+    "courseName": "Tecnologías de la Información para servidor público"
+  },
+  {
+    "courseId": "111",
+    "courseName": "Desarrollador de videojuegos"
+  },
+  {
+    "courseId": "113",
+    "courseName": "Bolsa de valores"
+  },
+  {
+    "courseId": "114",
+    "courseName": "Mecánico de bicicletas"
+  },
+  {
+    "courseId": "115",
+    "courseName": "Derechos Humanos para el Servidor Público"
+  },
+  {
+    "courseId": "116",
+    "courseName": "Fundamentos del trastorno del espectro autista"
+  },
+  {
+    "courseId": "117",
+    "courseName": "Etiquetado"
+  },
+  {
+    "courseId": "118",
+    "courseName": "Negocios móviles"
+  },
+  {
+    "courseId": "120",
+    "courseName": "Manejo higiénico de los alimentos"
+  },
+  {
+    "courseId": "121",
+    "courseName": "Desarrollador Back-end"
+  },
+  {
+    "courseId": "122",
+    "courseName": "Desarrollador Front-end"
+  },
+  {
+    "courseId": "123",
+    "courseName": "Administrador de plataformas digitales de aprendizaje"
+  },
+  {
+    "courseId": "127",
+    "courseName": "Salud Digital"
+  },
+  {
+    "courseId": "128",
+    "courseName": "Técnico en manejo de residuos sólidos urbanos"
+  },
+  {
+    "courseId": "129",
+    "courseName": "Ahorro de energía (casa y oficina)"
+  },
+  {
+    "courseId": "130",
+    "courseName": "Técnico en reciclaje"
+  },
+  {
+    "courseId": "131",
+    "courseName": "Instalador de techos verdes"
+  },
+  {
+    "courseId": "132",
+    "courseName": "Diseñador de experiencia de usuario (UX)"
+  },
+  {
+    "courseId": "133",
+    "courseName": "Desarrollador de interfaces gráficas"
+  },
+  {
+    "courseId": "134",
+    "courseName": "Técnico en reparación de laptops"
+  },
+  {
+    "courseId": "135",
+    "courseName": "Técnico en seguridad informática (servidores)"
+  },
+  {
+    "courseId": "136",
+    "courseName": "Asesor de energías renovables"
+  },
+  {
+    "courseId": "137",
+    "courseName": "Servicio de barbería (Barba y bigote)"
+  },
+  {
+    "courseId": "138",
+    "courseName": "Estilista"
+  },
+  {
+    "courseId": "140",
+    "courseName": "Instalador de paneles solares"
+  },
+  {
+    "courseId": "141",
+    "courseName": "Consumo responsable"
+  },
+  {
+    "courseId": "142",
+    "courseName": "Ciudadano global"
+  },
+  {
+    "courseId": "143",
+    "courseName": "Mercadotecnia digital"
+  },
+  {
+    "courseId": "144",
+    "courseName": "Anfitrión Turístico"
+  },
+  {
+    "courseId": "145",
+    "courseName": "Promotor en prevención de accidentes"
+  },
+  {
+    "courseId": "146",
+    "courseName": "Diseñador de circuitos impresos (PCB)"
+  },
+  {
+    "courseId": "147",
+    "courseName": "Lógica de programación"
+  },
+  {
+    "courseId": "148",
+    "courseName": "Programador de microcontroladores "
+  },
+  {
+    "courseId": "149",
+    "courseName": "Programador de microordenadores"
+  },
+  {
+    "courseId": "150",
+    "courseName": "Promotor de artículos orgánicos"
+  },
+  {
+    "courseId": "151",
+    "courseName": "Liderazgo"
+  },
+  {
+    "courseId": "152",
+    "courseName": "Auxiliar Operativo"
+  },
+  {
+    "courseId": "153",
+    "courseName": "Exhibición de productos"
+  },
+  {
+    "courseId": "155",
+    "courseName": "Supervisor de operaciones "
+  },
+  {
+    "courseId": "156",
+    "courseName": "Evaluación de ideas de negocios"
+  },
+  {
+    "courseId": "157",
+    "courseName": "Estrategia formal de autoempleo"
+  },
+  {
+    "courseId": "158",
+    "courseName": "Formulación y evaluación de proyectos"
+  },
+  {
+    "courseId": "159",
+    "courseName": "Cómo calcular tu inversión"
+  },
+  {
+    "courseId": "160",
+    "courseName": "Estándares de calidad"
+  },
+  {
+    "courseId": "161",
+    "courseName": "Ecología industrial"
+  },
+  {
+    "courseId": "162",
+    "courseName": "Diseño de indicadores"
+  },
+  {
+    "courseId": "163",
+    "courseName": "Plan de producción"
+  },
+  {
+    "courseId": "164",
+    "courseName": "Bienestar ocupacional"
+  },
+  {
+    "courseId": "165",
+    "courseName": "Relaciones profesionales"
+  },
+  {
+    "courseId": "166",
+    "courseName": "Relaciones comerciales"
+  },
+  {
+    "courseId": "167",
+    "courseName": "Contabilidad empresarial"
+  },
+  {
+    "courseId": "168",
+    "courseName": "Formalización de tu negocio"
+  },
+  {
+    "courseId": "169",
+    "courseName": "Comercialización y distribución"
+  },
+  {
+    "courseId": "170",
+    "courseName": "Comercio digital"
+  },
+  {
+    "courseId": "171",
+    "courseName": "Plan de exportación"
+  },
+  {
+    "courseId": "173",
+    "courseName": "Experto MIDO niñas, niños y adolescentes"
+  },
+  {
+    "courseId": "174",
+    "courseName": "Fundamentos del cómputo en la nube"
+  },
+  {
+    "courseId": "175",
+    "courseName": "Formación para conductores"
+  },
+  {
+    "courseId": "177",
+    "courseName": "El aprendizaje en los adultos"
+  },
+  {
+    "courseId": "178",
+    "courseName": "Auxiliar contable"
+  },
+  {
+    "courseId": "180",
+    "courseName": "Cómo integrar el perfil de un cliente"
+  },
+  {
+    "courseId": "181",
+    "courseName": "Fundamentos de virtualización"
+  },
+  {
+    "courseId": "182",
+    "courseName": "Niñas y Niños Creciendo Sanos y Listos"
+  },
+  {
+    "courseId": "183",
+    "courseName": "Diseñador de oferta turística"
+  },
+  {
+    "courseId": "184",
+    "courseName": "Fundamentos de electrónica digital"
+  },
+  {
+    "courseId": "185",
+    "courseName": "Asesor de lactancia materna"
+  },
+  {
+    "courseId": "186",
+    "courseName": "Transformando conflictos"
+  },
+  {
+    "courseId": "187",
+    "courseName": "Autoconstrucción"
+  },
+  {
+    "courseId": "188",
+    "courseName": "Promotor turístico"
+  },
+  {
+    "courseId": "189",
+    "courseName": "Evaluador de procesos"
+  },
+  {
+    "courseId": "190",
+    "courseName": "Técnico en minería de datos"
+  },
+  {
+    "courseId": "191",
+    "courseName": "Técnico en seguridad en la nube"
+  },
+  {
+    "courseId": "192",
+    "courseName": "Técnico en redes IP"
+  },
+  {
+    "courseId": "193",
+    "courseName": "Asesor de servicios de infraestructura en la nube"
+  },
+  {
+    "courseId": "194",
+    "courseName": "Evaluador de Indicadores Clave (KPI)"
+  },
+  {
+    "courseId": "195",
+    "courseName": "Técnico en Business Analytics"
+  },
+  {
+    "courseId": "196",
+    "courseName": "Visualizador de datos"
+  },
+  {
+    "courseId": "197",
+    "courseName": "Técnico en comunicaciones inalámbricas"
+  },
+  {
+    "courseId": "198",
+    "courseName": "Fundamentos de la red 4.5G"
+  },
+  {
+    "courseId": "199",
+    "courseName": "Fundamentos de la red 5G"
+  },
+  {
+    "courseId": "201",
+    "courseName": "Barista"
+  },
+  {
+    "courseId": "202",
+    "courseName": "Profesionalización del autotransporte"
+  },
+  {
+    "courseId": "203",
+    "courseName": "Operación de flotas eficientes"
+  },
+  {
+    "courseId": "204",
+    "courseName": "Cadena de suministro y costo del autotransporte"
+  },
+  {
+    "courseId": "205",
+    "courseName": "Guía de autoconstrucción"
+  },
+  {
+    "courseId": "206",
+    "courseName": "Guía de reparación vivienda rural"
+  },
+  {
+    "courseId": "211",
+    "courseName": "Mejora tu ortografía y redacción"
+  },
+  {
+    "courseId": "212",
+    "courseName": "Disciplina en el trabajo"
+  },
+  {
+    "courseId": "213",
+    "courseName": "Cómputo básico"
+  },
+  {
+    "courseId": "215",
+    "courseName": "Promotor del desarrollo infantil"
+  },
+  {
+    "courseId": "216",
+    "courseName": "Investigación empresarial"
+  },
+  {
+    "courseId": "217",
+    "courseName": "Cálculo de huella de carbono"
+  },
+  {
+    "courseId": "218",
+    "courseName": "Cálculo de huella ecológica"
+  },
+  {
+    "courseId": "219",
+    "courseName": "Administrador de la nube"
+  },
+  {
+    "courseId": "221",
+    "courseName": "¿Cómo debo cuidarme si estoy embarazada y tengo diabetes?"
+  },
+  {
+    "courseId": "222",
+    "courseName": "Control de versiones"
+  },
+  {
+    "courseId": "223",
+    "courseName": "Desarrollo móvil en línea"
+  },
+  {
+    "courseId": "224",
+    "courseName": "Desarrollador de sitios web responsivos"
+  },
+  {
+    "courseId": "225",
+    "courseName": "Preprocesadores de estilo"
+  },
+  {
+    "courseId": "226",
+    "courseName": "Desarrollador de aplicaciones en la nube"
+  },
+  {
+    "courseId": "227",
+    "courseName": "Razones por las que te elige o descarta una empresa"
+  },
+  {
+    "courseId": "228",
+    "courseName": "Estructura de un CV"
+  },
+  {
+    "courseId": "229",
+    "courseName": "Integrador de soluciones BI"
+  },
+  {
+    "courseId": "230",
+    "courseName": "Analista de proyectos BI"
+  },
+  {
+    "courseId": "231",
+    "courseName": "Analista técnico en TI"
+  },
+  {
+    "courseId": "232",
+    "courseName": "Facilitador ASUME"
+  },
+  {
+    "courseId": "233",
+    "courseName": "Cálculo de huella hídrica"
+  },
+  {
+    "courseId": "234",
+    "courseName": "Protocolos de atención y servicio"
+  },
+  {
+    "courseId": "235",
+    "courseName": "Auxiliar en la calidad del aire en interiores"
+  },
+  {
+    "courseId": "236",
+    "courseName": "Gobernanza del aire"
+  },
+  {
+    "courseId": "237",
+    "courseName": "Técnico en instalación de energía eólica"
+  },
+  {
+    "courseId": "239",
+    "courseName": "Técnico auxiliar en lactancia materna"
+  },
+  {
+    "courseId": "240",
+    "courseName": "Técnico topógrafo "
+  },
+  {
+    "courseId": "241",
+    "courseName": "Productor de grillos"
+  },
+  {
+    "courseId": "242",
+    "courseName": "Promotor en activación física"
+  },
+  {
+    "courseId": "244",
+    "courseName": "Técnico en instalación de calentadores solares "
+  },
+  {
+    "courseId": "245",
+    "courseName": "Introducción al ecoturismo"
+  },
+  {
+    "courseId": "246",
+    "courseName": "Introducción a la programación"
+  },
+  {
+    "courseId": "247",
+    "courseName": "Administrador de bases de datos no relacionales "
+  },
+  {
+    "courseId": "248",
+    "courseName": "Técnico en construcción y reparación de drones"
+  },
+  {
+    "courseId": "249",
+    "courseName": "Operador de impresoras 3D"
+  },
+  {
+    "courseId": "250",
+    "courseName": "Fundamentos de electrónica analógica "
+  },
+  {
+    "courseId": "251",
+    "courseName": "Instalador de Home Networking "
+  },
+  {
+    "courseId": "252",
+    "courseName": "Técnico en seguridad informática perimetral"
+  },
+  {
+    "courseId": "253",
+    "courseName": "Fundamentos de seguridad informática"
+  },
+  {
+    "courseId": "254",
+    "courseName": "Seguridad en dispositivos móviles y aplicativos (datos personales)"
+  },
+  {
+    "courseId": "255",
+    "courseName": "Fundamentos de tecnologías 4K y OTT"
+  },
+  {
+    "courseId": "256",
+    "courseName": "Gobernanza TI"
+  },
+  {
+    "courseId": "257",
+    "courseName": "Reparador de TV de plasma y LCD"
+  },
+  {
+    "courseId": "258",
+    "courseName": "Prácticas de ofimática"
+  },
+  {
+    "courseId": "262",
+    "courseName": "Cómo dar indicaciones"
+  },
+  {
+    "courseId": "263",
+    "courseName": "Trabajo en equipo"
+  },
+  {
+    "courseId": "268",
+    "courseName": "Fundamentos de Machine Learning"
+  },
+  {
+    "courseId": "271",
+    "courseName": "Seguridad e Higiene en ambiente laboral"
+  },
+  {
+    "courseId": "272",
+    "courseName": "Técnico en instalación y reparación de equipo de cómputo"
+  },
+  {
+    "courseId": "273",
+    "courseName": "Manejo de juntas de trabajo"
+  },
+  {
+    "courseId": "274",
+    "courseName": "Gobernanza del agua"
+  },
+  {
+    "courseId": "275",
+    "courseName": "Cultura ambiental"
+  },
+  {
+    "courseId": "276",
+    "courseName": "Voluntario"
+  },
+  {
+    "courseId": "277",
+    "courseName": "Programador en C#"
+  },
+  {
+    "courseId": "280",
+    "courseName": "Apicultor"
+  },
+  {
+    "courseId": "281",
+    "courseName": "Productor de traspatio para autoconsumo"
+  },
+  {
+    "courseId": "282",
+    "courseName": "Elaboración de composta"
+  },
+  {
+    "courseId": "283",
+    "courseName": "Informes ejecutivos"
+  },
+  {
+    "courseId": "284",
+    "courseName": "Habilidades de presentación"
+  },
+  {
+    "courseId": "285",
+    "courseName": "Prácticas de mecanografía"
+  },
+  {
+    "courseId": "286",
+    "courseName": "Cuidados paliativos (familiares y voluntarios)"
+  },
+  {
+    "courseId": "287",
+    "courseName": "¿Cómo cuidarme para un embarazo saludable?"
+  },
+  {
+    "courseId": "288",
+    "courseName": "¿Cómo debo cuidar mis pies si vivo con diabetes?"
+  },
+  {
+    "courseId": "291",
+    "courseName": "Finanzas personales"
+  },
+  {
+    "courseId": "292",
+    "courseName": "Técnico en seguridad host (escritorio)"
+  },
+  {
+    "courseId": "293",
+    "courseName": "Técnico en informática (Ofimática)"
+  },
+  {
+    "courseId": "298",
+    "courseName": "Constructor de paz"
+  },
+  {
+    "courseId": "299",
+    "courseName": "Cultura urbana"
+  },
+  {
+    "courseId": "300",
+    "courseName": "Almacenamiento de energías renovables en baterías"
+  },
+  {
+    "courseId": "301",
+    "courseName": "Protocolos de venta "
+  },
+  {
+    "courseId": "302",
+    "courseName": "Fundamentos de estructura de datos "
+  },
+  {
+    "courseId": "303",
+    "courseName": "Facilitador de grupos "
+  },
+  {
+    "courseId": "304",
+    "courseName": "Jugar para crecer"
+  },
+  {
+    "courseId": "305",
+    "courseName": "Prácticas de cortesía"
+  },
+  {
+    "courseId": "306",
+    "courseName": "Cultura económica (Introducción)"
+  },
+  {
+    "courseId": "307",
+    "courseName": "Discapacidad en la primera infancia"
+  },
+  {
+    "courseId": "309",
+    "courseName": "Ergonometría digital"
+  },
+  {
+    "courseId": "310",
+    "courseName": "Concentración de agentes contaminantes en el aire "
+  },
+  {
+    "courseId": "311",
+    "courseName": "Técnico instalador de cableado estructurado"
+  },
+  {
+    "courseId": "312",
+    "courseName": "Lengua de señas mexicana"
+  },
+  {
+    "courseId": "313",
+    "courseName": "Cultura económica (PIB)"
+  },
+  {
+    "courseId": "314",
+    "courseName": "Manejo manual de cargas"
+  },
+  {
+    "courseId": "315",
+    "courseName": "Reparador de celulares y tabletas"
+  },
+  {
+    "courseId": "318",
+    "courseName": "Cultura económica (Inflación)"
+  },
+  {
+    "courseId": "319",
+    "courseName": "Huella digital"
+  },
+  {
+    "courseId": "320",
+    "courseName": "Funcionamiento CoDi"
+  },
+  {
+    "courseId": "321",
+    "courseName": "Responsabilidad digital"
+  },
+  {
+    "courseId": "322",
+    "courseName": "Asesor de generación de residuos cero"
+  },
+  {
+    "courseId": "323",
+    "courseName": "Economía circular"
+  },
+  {
+    "courseId": "342",
+    "courseName": "Introducción a Primer Respondiente"
+  },
+  {
+    "courseId": "343",
+    "courseName": "Tu negocio en Internet"
+  },
+  {
+    "courseId": "344",
+    "courseName": "Tus Clientes en Internet"
+  },
+  {
+    "courseId": "345",
+    "courseName": "Transacciones electrónicas"
+  },
+  {
+    "courseId": "346",
+    "courseName": "¿Trabajo remoto?"
+  },
+  {
+    "courseId": "347",
+    "courseName": "Consumo sostenible"
+  },
+  {
+    "courseId": "348",
+    "courseName": "Seguridad para todas y todos"
+  },
+  {
+    "courseId": "349",
+    "courseName": "Paradigma de programación (orientado a objetos)"
+  },
+  {
+    "courseId": "350",
+    "courseName": "Diseñador de objetos para impresión 3D"
+  },
+  {
+    "courseId": "351",
+    "courseName": "Nueva interacción urbana"
+  },
+  {
+    "courseId": "352",
+    "courseName": "Movilidad de baja densidad"
+  },
+  {
+    "courseId": "354",
+    "courseName": "Potabilización del agua"
+  },
+  {
+    "courseId": "355",
+    "courseName": "Responsabilidad digital (Trabajo remoto)"
+  },
+  {
+    "courseId": "356",
+    "courseName": "Desarrollador de JavaScript (Node JS)"
+  },
+  {
+    "courseId": "357",
+    "courseName": "Síndrome de Down: El Espacio de Michelle"
+  },
+  {
+    "courseId": "358",
+    "courseName": "Networking digital"
+  },
+  {
+    "courseId": "359",
+    "courseName": "Analista de optimización en motores de búsqueda (SEO)"
+  },
+  {
+    "courseId": "360",
+    "courseName": "Analista en mercadotecnia de motores de búsqueda (SEM)"
+  },
+  {
+    "courseId": "361",
+    "courseName": "Técnico en agua residual (doméstico)"
+  },
+  {
+    "courseId": "362",
+    "courseName": "Buenas prácticas para el uso de telemedicina"
+  },
+  {
+    "courseId": "364",
+    "courseName": "Decisiones inteligentes para la protección del medio ambiente"
+  },
+  {
+    "courseId": "366",
+    "courseName": "Fundamentos de blockchain"
+  },
+  {
+    "courseId": "367",
+    "courseName": "Electricista"
+  },
+  {
+    "courseId": "368",
+    "courseName": "Uso de código QR"
+  },
+  {
+    "courseId": "369",
+    "courseName": "Fundamentos de redes definidas por software (SDN)"
+  },
+  {
+    "courseId": "370",
+    "courseName": "Transformación digital y evolución tecnológica"
+  },
+  {
+    "courseId": "371",
+    "courseName": "Uso responsable de dispositivos electrónicos"
+  },
+  {
+    "courseId": "372",
+    "courseName": "Uso del correo electrónico"
+  },
+  {
+    "courseId": "373",
+    "courseName": "Regulación de la interacción digital"
+  },
+  {
+    "courseId": "374",
+    "courseName": "Seguridad y privacidad en el manejo de información (Regulación)"
+  },
+  {
+    "courseId": "375",
+    "courseName": "Prevención de delitos cibernéticos"
+  },
+  {
+    "courseId": "376",
+    "courseName": "Netiqueta"
+  },
+  {
+    "courseId": "377",
+    "courseName": "Evaluador de experiencia de usuario (UX)"
+  },
+  {
+    "courseId": "378",
+    "courseName": "Economía naranja"
+  },
+  {
+    "courseId": "379",
+    "courseName": "Conexión a internet en el hogar"
+  },
+  {
+    "courseId": "380",
+    "courseName": "Operación de banca en línea"
+  },
+  {
+    "courseId": "382",
+    "courseName": "Medidas de higiene, prevención y contención de contagios"
+  },
+  {
+    "courseId": "384",
+    "courseName": "Finanzas para invertir"
+  },
+  {
+    "courseId": "385",
+    "courseName": "Mercados financieros"
+  },
+  {
+    "courseId": "387",
+    "courseName": "Buenas prácticas para el ahorro de agua"
+  },
+  {
+    "courseId": "388",
+    "courseName": "Recuperación de cuerpos de agua"
+  },
+  {
+    "courseId": "389",
+    "courseName": "Cimentación de una obra"
+  },
+  {
+    "courseId": "390",
+    "courseName": "Diseño de interiores"
+  },
+  {
+    "courseId": "391",
+    "courseName": "Yo prevengo la violencia"
+  },
+  {
+    "courseId": "392",
+    "courseName": "Postprocesadores de estilo"
+  },
+  {
+    "courseId": "393",
+    "courseName": "Uso de aplicaciones de emergencia"
+  },
+  {
+    "courseId": "394",
+    "courseName": "Comunicación por videollamadas"
+  },
+  {
+    "courseId": "395",
+    "courseName": "Habilidades de negociación"
+  },
+  {
+    "courseId": "397",
+    "courseName": "Manejo ético de la información y datos"
+  },
+  {
+    "courseId": "398",
+    "courseName": "Uso de información y datos"
+  },
+  {
+    "courseId": "399",
+    "courseName": "Uso de interfaz de dispositivos móviles"
+  },
+  {
+    "courseId": "405",
+    "courseName": "Planea la búsqueda de información"
+  },
+  {
+    "courseId": "406",
+    "courseName": "Técnico en comunicaciones por microondas"
+  },
+  {
+    "courseId": "407",
+    "courseName": "Crecer juntos"
+  },
+  {
+    "courseId": "408",
+    "courseName": "Escritura reflexiva"
+  },
+  {
+    "courseId": "409",
+    "courseName": "Uso de servicios digitales"
+  },
+  {
+    "courseId": "410",
+    "courseName": "Alimentación saludable (Edad adulta)"
+  },
+  {
+    "courseId": "411",
+    "courseName": "Organización y almacenamiento digital de información y datos "
+  },
+  {
+    "courseId": "412",
+    "courseName": "Comunicar y presentar datos"
+  },
+  {
+    "courseId": "413",
+    "courseName": "Uso de herramientas colaborativas"
+  },
+  {
+    "courseId": "415",
+    "courseName": "Técnico en seguridad - Control de accesos"
+  },
+  {
+    "courseId": "416",
+    "courseName": "Técnico en seguridad física y del entorno "
+  },
+  {
+    "courseId": "417",
+    "courseName": "Técnico en radiofrecuencia"
+  },
+  {
+    "courseId": "418",
+    "courseName": "Proceso de donación y trasplante de órganos y tejidos"
+  },
+  {
+    "courseId": "516",
+    "courseName": "Atrévete a saber"
+  },
+  {
+    "courseId": "519",
+    "courseName": "Historia"
+  },
+  {
+    "courseId": "520",
+    "courseName": "Centro de Estudios de Historia de México"
+  },
+  {
+    "courseId": "521",
+    "courseName": "Museo Soumaya"
+  },
+  {
+    "courseId": "538",
+    "courseName": "GIF"
+  },
+  {
+    "courseId": "539",
+    "courseName": "Videoblog"
+  },
+  {
+    "courseId": "540",
+    "courseName": "Podcast"
+  },
+  {
+    "courseId": "541",
+    "courseName": "Digitalízate"
+  },
+  {
+    "courseId": "542",
+    "courseName": "Atrévete a crear una app"
+  },
+  {
+    "courseId": "588",
+    "courseName": "Donación y trasplante de órganos"
+  },
+  {
+    "courseId": "590",
+    "courseName": "ABC sobre vacunación"
+  },
+  {
+    "courseId": "100001",
+    "courseName": "Análisis e interpretación de datos"
+  },
+  {
+    "courseId": "100002",
+    "courseName": "Gestión del ecosistema digital"
+  },
+  {
+    "courseId": "100003",
+    "courseName": "Trámites por internet"
+  },
+  {
+    "courseId": "100004",
+    "courseName": "Buenas prácticas para el uso de dispositivos electrónicos"
+  },
+  {
+    "courseId": "100005",
+    "courseName": "Seguros cibernéticos"
+  },
+  {
+    "courseId": "100006",
+    "courseName": "Compras y pagos seguros por internet"
+  },
+  {
+    "courseId": "100007",
+    "courseName": "Introducción a la estadística y probabilidad"
+  },
+  {
+    "courseId": "100010",
+    "courseName": "Concentración de agentes contaminantes en el aire "
+  },
+  {
+    "courseId": "100058",
+    "courseName": "Realidad virtual inmersiva"
+  },
+  {
+    "courseId": "100059",
+    "courseName": "Responsabilidad social"
+  },
+  {
+    "courseId": "100060",
+    "courseName": "Medidas para evitar contagios"
+  },
+  {
+    "courseId": "100061",
+    "courseName": "Mérito"
+  },
+  {
+    "courseId": "100062",
+    "courseName": "Decisiones complejas"
+  },
+  {
+    "courseId": "100063",
+    "courseName": "Solidaridad"
+  },
+  {
+    "courseId": "100064",
+    "courseName": "Actitud de servicio"
+  },
+  {
+    "courseId": "100065",
+    "courseName": "Uso de asistentes virtuales"
+  },
+  {
+    "courseId": "100066",
+    "courseName": "Empatía"
+  },
+  {
+    "courseId": "100067",
+    "courseName": "El arte en la vida de los niños"
+  },
+  {
+    "courseId": "100070",
+    "courseName": "Juego limpio"
+  },
+  {
+    "courseId": "100071",
+    "courseName": "Creación de modelos 3D para entornos virtuales"
+  },
+  {
+    "courseId": "100072",
+    "courseName": "Citas y referencias bibliográficas"
+  },
+  {
+    "courseId": "100074",
+    "courseName": "Diseño de embalajes sostenibles"
+  },
+  {
+    "courseId": "100075",
+    "courseName": "Desarrollador de JavaScript (React)"
+  },
+  {
+    "courseId": "100084",
+    "courseName": "Manejo de la voz para medios digitales"
+  },
+  {
+    "courseId": "100092",
+    "courseName": "Crea la identidad de tu negocio"
+  },
+  {
+    "courseId": "100094",
+    "courseName": "Energía hidroeléctrica para autoconsumo"
+  },
+  {
+    "courseId": "100095",
+    "courseName": "Productor de cultivos energéticos"
+  },
+  {
+    "courseId": "100097",
+    "courseName": "Constructor de paz digital"
+  },
+  {
+    "courseId": "100098",
+    "courseName": "La virtud de servir"
+  },
+  {
+    "courseId": "100099",
+    "courseName": "Contaminación acústica"
+  },
+  {
+    "courseId": "100100",
+    "courseName": "Identidad digital y firma electrónica"
+  },
+  {
+    "courseId": "100101",
+    "courseName": "Retail omnicanal y multicanal"
+  },
+  {
+    "courseId": "100102",
+    "courseName": "Autogestión"
+  },
+  {
+    "courseId": "100103",
+    "courseName": "Introducción a realidad virtual, aumentada y mixta"
+  },
+  {
+    "courseId": "100104",
+    "courseName": "Identificación de información errónea"
+  },
+  {
+    "courseId": "100105",
+    "courseName": "Estrategia de precios"
+  },
+  {
+    "courseId": "100128",
+    "courseName": "Finanzas para manejar una deuda"
+  },
+  {
+    "courseId": "100129",
+    "courseName": "Manejo correcto de las tarjetas de crédito"
+  },
+  {
+    "courseId": "100135",
+    "courseName": "Administración del tiempo"
+  },
+  {
+    "courseId": "100136",
+    "courseName": "Mente analítica y salud digital"
+  },
+  {
+    "courseId": "100139",
+    "courseName": "Autoridad"
+  },
+  {
+    "courseId": "100140",
+    "courseName": "Versatilidad"
+  },
+  {
+    "courseId": "100141",
+    "courseName": "Planea tu retiro"
+  },
+  {
+    "courseId": "100142",
+    "courseName": "La ciencia y los niños"
+  },
+  {
+    "courseId": "100143",
+    "courseName": "Finanzas para elegir un seguro"
+  },
+  {
+    "courseId": "100145",
+    "courseName": "Comercialización de NFT"
+  },
+  {
+    "courseId": "100146",
+    "courseName": "Administrador de bases de datos relacionales"
+  },
+  {
+    "courseId": "100147",
+    "courseName": "Finanzas para el hogar "
+  },
+  {
+    "courseId": "100148",
+    "courseName": "Analista de inversiones personales "
+  },
+  {
+    "courseId": "100149",
+    "courseName": "Crea la propuesta de valor para tu negocio "
+  },
+  {
+    "courseId": "100150",
+    "courseName": "Manejo de contingencias"
+  },
+  {
+    "courseId": "100155",
+    "courseName": "Manejo de riesgos"
+  },
+  {
+    "courseId": "100156",
+    "courseName": "Elige un vehículo con mayor seguridad"
+  },
+  {
+    "courseId": "100157",
+    "courseName": "Soldador industrial"
+  },
+  {
+    "courseId": "100158",
+    "courseName": "Integridad "
+  },
+  {
+    "courseId": "100171",
+    "courseName": "EI_Embarazo"
+  },
+  {
+    "courseId": "100172",
+    "courseName": "EI_Lactancia materna"
+  },
+  {
+    "courseId": "100173",
+    "courseName": "EI_Juego"
+  },
+  {
+    "courseId": "100174",
+    "courseName": "EI_Derechos"
+  },
+  {
+    "courseId": "100176",
+    "courseName": "EI_0 a 3 meses"
+  },
+  {
+    "courseId": "100177",
+    "courseName": "EI_3 a 6 meses"
+  },
+  {
+    "courseId": "100178",
+    "courseName": "EI_6 a 9 meses"
+  },
+  {
+    "courseId": "100179",
+    "courseName": "EI_9 a 12 meses"
+  },
+  {
+    "courseId": "100180",
+    "courseName": "EI_12 a 18 meses"
+  },
+  {
+    "courseId": "100181",
+    "courseName": "EI_18 a 24 meses"
+  },
+  {
+    "courseId": "100182",
+    "courseName": "EI_2 a 3 años"
+  },
+  {
+    "courseId": "100183",
+    "courseName": "EI_3 a 4 años"
+  },
+  {
+    "courseId": "100184",
+    "courseName": "EI_Todas las edades"
+  },
+  {
+    "courseId": "100185",
+    "courseName": "EI_Paternidad activa"
+  },
+  {
+    "courseId": "100186",
+    "courseName": "EI_Duelo"
+  },
+  {
+    "courseId": "100188",
+    "courseName": "EI_Violencia"
+  },
+  {
+    "courseId": "100189",
+    "courseName": "EI_Vínculo y emociones"
+  },
+  {
+    "courseId": "100190",
+    "courseName": "EI_Hábitos"
+  },
+  {
+    "courseId": "100191",
+    "courseName": "EI_Límites"
+  },
+  {
+    "courseId": "100192",
+    "courseName": "EI_Espacios y actividades"
+  },
+  {
+    "courseId": "100194",
+    "courseName": "EI_Transición"
+  },
+  {
+    "courseId": "100195",
+    "courseName": "EI_Física"
+  },
+  {
+    "courseId": "100196",
+    "courseName": "EI_Emocional y mental"
+  },
+  {
+    "courseId": "100197",
+    "courseName": "EI_Seguridad y protección"
+  },
+  {
+    "courseId": "100198",
+    "courseName": "EI_Tipos"
+  },
+  {
+    "courseId": "100199",
+    "courseName": "EI_Inclusión y apoyo"
+  },
+  {
+    "courseId": "100200",
+    "courseName": "EI_Accidentes en casa"
+  },
+  {
+    "courseId": "100202",
+    "courseName": "EI_COVID-19"
+  },
+  {
+    "courseId": "100212",
+    "courseName": "Fundamentos de inteligencia artificial"
+  },
+  {
+    "courseId": "100213",
+    "courseName": "Diseñador de peticiones para modelos de IA generativa"
+  },
+  {
+    "courseId": "100214",
+    "courseName": "Controlador de plagas en espacios urbanos"
+  },
+  {
+    "courseId": "100216",
+    "courseName": "Gestiona tu portafolio como desarrollador"
+  },
+  {
+    "courseId": "100220",
+    "courseName": "La música y las emociones"
+  },
+  {
+    "courseId": "100221",
+    "courseName": "Creación de físicas e interfaz con C# para RV y RA"
+  },
+  {
+    "courseId": "100222",
+    "courseName": "Gánale a la diabetes"
+  },
+  {
+    "courseId": "100297",
+    "courseName": "EI_Tecnología"
+  },
+  {
+    "courseId": "100298",
+    "courseName": "EI_Buen trato (Campaña)"
+  },
+  {
+    "courseId": "100310",
+    "courseName": "Repartidor a domicilio"
+  },
+  {
+    "courseId": "100311",
+    "courseName": "Desarrollador PHP (Orientado a objetos)"
+  },
+  {
+    "courseId": "100312",
+    "courseName": "La música y el  cerebro  "
+  },
+  {
+    "courseId": "100315",
+    "courseName": "EI_Una alimentación que nutre (Campaña)"
+  },
+  {
+    "courseId": "100316",
+    "courseName": "EI_Prevención de la violencia familiar (Campaña)"
+  },
+  {
+    "courseId": "100317",
+    "courseName": "Uso de lenguaje corporal "
+  },
+  {
+    "courseId": "100320",
+    "courseName": "Cultura de servicio"
+  },
+  {
+    "courseId": "100321",
+    "courseName": "Introducción a la Musicoterapia"
+  },
+  {
+    "courseId": "100322",
+    "courseName": "Manejo de dinero"
+  },
+  {
+    "courseId": "100323",
+    "courseName": "Manufactura de proximidad (nearshoring)"
+  },
+  {
+    "courseId": "100324",
+    "courseName": "Productor de biomasa"
+  },
+  {
+    "courseId": "100325",
+    "courseName": "Finanzas para mujeres"
+  },
+  {
+    "courseId": "100326",
+    "courseName": "Seguridad vial en motocicletas"
+  },
+  {
+    "courseId": "100331",
+    "courseName": "Pensamiento sistémico"
+  },
+  {
+    "courseId": "100332",
+    "courseName": "Diseñador de interactivos web"
+  },
+  {
+    "courseId": "100334",
+    "courseName": "Introducción a los impuestos"
+  },
+  {
+    "courseId": "100335",
+    "courseName": "Diseñador de sitios web dinámicos"
+  },
+  {
+    "courseId": "100336",
+    "courseName": "Seguridad en cocinas industriales"
+  },
+  {
+    "courseId": "100337",
+    "courseName": "Mente hábil"
+  },
+  {
+    "courseId": "100343",
+    "courseName": "Sentido común (Podcast)"
+  },
+  {
+    "courseId": "100348",
+    "courseName": "Creando vínculos"
+  },
+  {
+    "courseId": "100349",
+    "courseName": "El perdón (Podcast)"
+  },
+  {
+    "courseId": "100350",
+    "courseName": "Valentía (Podcast)"
+  },
+  {
+    "courseId": "100351",
+    "courseName": "Talento y disciplina (Podcast)"
+  },
+  {
+    "courseId": "100352",
+    "courseName": "Libertad (Podcast)"
+  },
+  {
+    "courseId": "100355",
+    "courseName": "Culpa (Podcast)"
+  },
+  {
+    "courseId": "100366",
+    "courseName": "Hablar para transmitir"
+  },
+  {
+    "courseId": "100417",
+    "courseName": "Entorno y desarrollo cerebral del niño"
+  },
+  {
+    "courseId": "100657",
+    "courseName": "Introducción a los tipos de interés y tasas"
+  },
+  {
+    "courseId": "100659",
+    "courseName": "Diálogo"
+  },
+  {
+    "courseId": "100676",
+    "courseName": "Seguridad para trabajos en alturas"
+  },
+  {
+    "courseId": "100677",
+    "courseName": "Uso de equipo de protección personal"
+  },
+  {
+    "courseId": "100678",
+    "courseName": "Introducción al mantenimiento industrial "
+  },
+  {
+    "courseId": "100690",
+    "courseName": "Introducción a la repostería"
+  },
+  {
+    "courseId": "100694",
+    "courseName": "Señalización de tuberías en la industria "
+  },
+  {
+    "courseId": "100820",
+    "courseName": "Desarrollador de aplicaciones móviles."
+  },
+  {
+    "courseId": "100827",
+    "courseName": "IA Generativa"
+  },
+  {
+    "courseId": "100832",
+    "courseName": "Pausas activas"
+  },
+  {
+    "courseId": "100833",
+    "courseName": "Ejercicios de relajación corporal"
+  },
+  {
+    "courseId": "100835",
+    "courseName": "Acondicionamiento físico general"
+  },
+  {
+    "courseId": "100837",
+    "courseName": "Calentamiento antes del ejercicio"
+  },
+  {
+    "courseId": "100839",
+    "courseName": "Ansiedad: Claves para recuperar la calma"
+  }
+]
