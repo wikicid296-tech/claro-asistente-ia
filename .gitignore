@@ -12,6 +12,7 @@ venv/
 .env
 .env.local
 .env.production
+*.csv
 
 # Archivos del sistema
 .DS_Store
