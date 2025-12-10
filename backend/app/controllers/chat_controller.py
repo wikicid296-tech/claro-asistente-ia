@@ -22,26 +22,32 @@ def build_aprende_iframe_response(user_message: str, top_course: Dict[str, Any],
     Construye respuesta simplificada para mostrar curso en iframe.
     Solo necesita los campos mínimos que el frontend espera.
     """
-    course_id = top_course.get('courseId', '')
+    print("ESTO TRAE TOP COURSE 👾👾👾👾👾👾👾👾👾👾👾👾👾😎😎😎😎😎😎😎:", top_course)
+    course_id = top_course.get('courseId', '') 
     course_name = top_course.get('courseName', 'Curso disponible')
+    mejor_score = top_course.get('score', 0.0) 
+    print(f"Mejor curso: {course_name} (ID: {course_id}) con score✅✅ {mejor_score}")
     
     # 🔥 URL DEL CURSO - Esto es lo más importante
     course_url = f"https://aprende.org/cursos/{course_id}" if course_id else "https://aprende.org"
     
     # 🔥 Respuesta de texto simple
-    if all_candidates:
-        response_text = f"🎓 Encontré {len(all_candidates)} cursos relacionados con '{user_message}':\n\n"
-        response_text += f"**{course_name}** (ID: {course_id})\n\n"
-        
-        if len(all_candidates) > 1:
-            response_text += f"**También encontré {len(all_candidates) - 1} cursos más:**\n"
-            for i, candidate in enumerate(all_candidates[1:4], 2):  # Mostrar max 3 adicionales
-                cand_name = candidate.get('courseName', 'Curso sin nombre')
-                cand_id = candidate.get('courseId', '')
-                response_text += f"{i}. **{cand_name}** (ID: {cand_id})\n"
+    if mejor_score >0.35:
+        if all_candidates:
+            response_text = f"🎓 Encontré {len(all_candidates)} cursos relacionados con '{user_message}':\n\n"
+            response_text += f"**{course_name}** (ID: {course_id})\n\n"
+            
+            if len(all_candidates) > 1:
+                response_text += f"**También encontré {len(all_candidates) - 1} cursos más:**\n"
+                for i, candidate in enumerate(all_candidates[1:4], 2):  # Mostrar max 3 adicionales
+                    cand_name = candidate.get('courseName', 'Curso sin nombre')
+                    cand_id = candidate.get('courseId', '')
+                    response_text += f"{i}. **{cand_name}** (ID: {cand_id})\n"
+        else:
+            response_text = f"😕 No encontré cursos relacionados con '{user_message}'. ¿Podrías intentar con otras palabras clave?"
     else:
         response_text = f"😕 No encontré cursos relacionados con '{user_message}'. ¿Podrías intentar con otras palabras clave?"
-    
+        course_url=None
     # 🔥 RESPUESTA MINIMALISTA PERO COMPLETA para el frontend
     return {
         "success": True,

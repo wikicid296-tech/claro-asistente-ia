@@ -709,10 +709,7 @@ if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
     showChatView();
     addMessage('user', text);
 
-     // 🆕 NUEVO: Si el modo aprende está activo, convertirlo en "manual" después de enviar
-    if (appState.currentMode === 'aprende') {
-        appState.modeActivatedManually = true;
-    }
+    // 🔹 Ya NO tocar modeActivatedManually aquí (se controla al activar el modo/manualmente en la UI)
     
     // Incrementar contador de mensajes del usuario
     if (!userState.isPro) {
