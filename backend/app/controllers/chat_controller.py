@@ -5,13 +5,9 @@ from flask import jsonify, request
 from app.controllers._request_utils import get_user_key_from_request
 from app.services.usage_service import is_usage_blocked, get_usage_status
 from app.services.chat_orchestrator_service import run_web_chat
-from app.services.aprende_search_service import (
-    run_aprende_flow,
-)
 
 from app.services.prompt_service import is_aprende_intent
 from app.services.aprende_search_service import run_aprende_flow
-
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +74,9 @@ def chat_controller():
 
         user_message = data.get("message", "")
         action = (data.get("action", "") or "").lower().strip()
+        
+        # 🆕 OBTENER USER_KEY (importante para memoria)
+        user_key = get_user_key_from_request()
 
         if not user_message:
             return jsonify({"success": False, "error": "Mensaje vacío"}), 400
@@ -90,20 +89,29 @@ def chat_controller():
                 "usage": status,
             }), 429
 
-        if is_aprende_intent(user_message):
-            logger.info("Intent Aprende detectado → ejecutando run_aprende_flow()")
+        # 🔹 Nueva lógica: combinar modo del front + intent por texto
+        use_aprende = False
+
+        # A) Si el front está explícitamente en modo "aprende", lo respetamos SIEMPRE
+        if action == "aprende":
+            use_aprende = True
+
+        # B) Si no está en modo aprende, pero el texto tiene el intent Aprende
+        elif is_aprende_intent(user_message):
+            use_aprende = True
+
+        if use_aprende:
+            logger.info("Modo/Intent Aprende activo → ejecutando run_aprende_flow()")
             aprende_result = run_aprende_flow(user_message, k=5, fetch_top_n=1)
             
             candidates = aprende_result.get("candidates", [])
             top_courses = aprende_result.get("top", [])
             
             if candidates and top_courses:
-                # 🔥 Usar el enfoque simplificado de iframe
                 top_course = top_courses[0]
                 response = build_aprende_iframe_response(user_message, top_course, candidates)
                 return jsonify(response)
             else:
-                # No se encontraron cursos
                 return jsonify({
                     "success": True,
                     "response": f"😕 No encontré cursos relacionados con '{user_message}'. ¿Podrías intentar con otras palabras clave?",
@@ -111,11 +119,11 @@ def chat_controller():
                     "context": "ℹ️ Asistente general disponible"
                 })
 
-        # Flujo normal (no aprende)
+        # 🔹 Flujo normal (no Aprende) - PASAR user_key
         result = run_web_chat(
             user_message=user_message,
             action=action or "busqueda",
-            user_key=get_user_key_from_request(),
+            user_key=user_key,  # 🆕 PASAR EL USER_KEY AQUÍ
         )
 
         return jsonify({"success": True, **result})
