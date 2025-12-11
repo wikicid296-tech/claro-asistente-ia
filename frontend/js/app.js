@@ -264,6 +264,16 @@ function detectModeFromText(text) {
     const modeKeywords = {
         'aprende': ['aprende', 'aprende.org']
     };
+
+    // Helper: match keyword as whole token (or domain like aprende.org)
+    function matchesKeywordStrict(haystack, keyword) {
+        if (!haystack || !keyword) return false;
+        // Escape regex special chars in keyword
+        const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Match when keyword appears as a separate token or bounded by non-word chars
+        const pattern = '(^|\\W)' + esc + '(\\W|$)';
+        return new RegExp(pattern, 'i').test(haystack);
+    }
     
     if (appState.modeActivatedManually) {
         return;
@@ -284,7 +294,7 @@ function detectModeFromText(text) {
         let foundKeyword = false;
         for (const [mode, keywords] of Object.entries(modeKeywords)) {
             for (const keyword of keywords) {
-                if (lowerText.includes(keyword)) {
+                if (matchesKeywordStrict(lowerText, keyword)) {
                     foundKeyword = true;
                     break;
                 }
@@ -300,7 +310,7 @@ function detectModeFromText(text) {
     
     for (const [mode, keywords] of Object.entries(modeKeywords)) {
         for (const keyword of keywords) {
-            if (lowerText.includes(keyword)) {
+            if (matchesKeywordStrict(lowerText, keyword)) {
                 if (appState.currentMode !== mode) {
                     activateModeAutomatically(mode);
                 }
@@ -1192,7 +1202,6 @@ function isTaskMessage(userMsg, botMsg) {
     const lowerBotMsg = botMsg.toLowerCase();
     
     // ============ PASO 1: EXCLUIR MENSAJES CORTOS Y PALABRAS SUELTAS ============
-    // Si es muy corto (menos de 15 caracteres) o una sola palabra, NO es tarea
     if (lowerUserMsg.length < 15 || !lowerUserMsg.includes(' ')) {
         return false;
     }
@@ -1202,7 +1211,8 @@ function isTaskMessage(userMsg, botMsg) {
                           'cuales', 'dónde', 'donde', 'cuándo', 'cuando', 'por qué', 
                           'porque', 'quién', 'quien'];
     
-    if (questionWords.some(q => lowerUserMsg.includes(q)) && !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
+    if (questionWords.some(q => lowerUserMsg.includes(q)) && 
+        !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
         return false;
     }
     
@@ -1210,15 +1220,29 @@ function isTaskMessage(userMsg, botMsg) {
     const consultaWords = ['dime', 'dimelo', 'dame', 'muestra', 'explica', 'explicame',
                            'ayuda', 'ayudame', 'busca', 'encuentra', 'hablame', 'háblame'];
     
-    if (consultaWords.some(w => lowerUserMsg.startsWith(w)) && !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
+    if (consultaWords.some(w => lowerUserMsg.startsWith(w)) && 
+        !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
         return false;
     }
     
-    // ============ PASO 4: SOLO ES TAREA SI TIENE VERBOS EXPLÍCITOS ============
+    // ============ PASO 4: VERBOS / FRASES DE TAREA ============
     const taskVerbs = {
-        reminders: ['recuerdame', 'recuérdame', 'recordarme', 'avisame', 'avísame'],
-        notes: ['anota', 'apunta', 'guarda esto', 'guardar esto'],
-        calendar: ['agendar', 'agenda', 'programar']
+        // Frases típicas de recordatorios
+        reminders: [
+            'recuerdame', 'recuérdame', 'recordarme', 'avisame', 'avísame',
+            'recordatorio', 'no olvides', 'que no se me olvide'
+        ],
+        // Frases típicas de notas
+        notes: [
+            'nota', 'toma nota', 'anota', 'apunta',
+            'guarda esto', 'guardar esto', 'guarda la nota'
+        ],
+        // Frases típicas de agenda / calendario
+        calendar: [
+            'agendar', 'agenda ', 'agrega a la agenda',
+            'pon en la agenda', 'programar', 'programa ',
+            'cita para', 'agenda una cita'
+        ]
     };
     
     let hasTaskVerb = false;
@@ -1236,11 +1260,11 @@ function isTaskMessage(userMsg, botMsg) {
                        lowerBotMsg.includes('he agendado');
     
     // ============ DECISIÓN FINAL ============
-    // Solo es tarea si tiene verbo de acción O (emoji + confirmación del bot)
     return hasTaskVerb || (hasBotEmoji && botConfirms);
 }
 
-async function processTask(userMessage, botResponse)  {
+
+async function processTask(userMessage, botResponse) {
     const timestamp = new Date().toLocaleString('es-MX', {
         day: '2-digit',
         month: '2-digit', 
@@ -1261,36 +1285,55 @@ async function processTask(userMessage, botResponse)  {
     const lowerUserMsg = userMessage.toLowerCase();
     const lowerBotMsg = botResponse.toLowerCase();
     
-    if (lowerUserMsg.includes('recordar') || 
+    // 🔹 1) PRIORIZAR AGENDA / CALENDARIO
+    if (
+        lowerUserMsg.includes('agendar') || 
+        lowerUserMsg.includes('agenda ') ||
+        lowerUserMsg.includes('agrega a la agenda') ||
+        lowerUserMsg.includes('pon en la agenda') ||
+        lowerUserMsg.includes('programar') ||
+        lowerUserMsg.includes('programa ') ||
+        (lowerUserMsg.includes('cita') && !lowerUserMsg.includes('recordar')) ||
+        botResponse.includes('📅') ||
+        lowerBotMsg.includes('agendado') ||
+        lowerBotMsg.includes('he agendado')
+    ) {
+        taskType = 'calendar';
+    } 
+    
+    // 🔹 2) LUEGO RECORDATORIOS
+    else if (
+        lowerUserMsg.includes('recordar') || 
         lowerUserMsg.includes('recuerdame') || 
         lowerUserMsg.includes('recuérdame') ||
         lowerUserMsg.includes('avisame') ||
         lowerUserMsg.includes('avísame') ||
         lowerUserMsg.includes('recordatorio') ||
+        lowerUserMsg.includes('no olvides') ||
+        lowerUserMsg.includes('que no se me olvide') ||
         (botResponse.includes('✅') && !lowerUserMsg.includes('agendar')) ||
-        (lowerBotMsg.includes('recordatorio') && !lowerBotMsg.includes('agendado'))) {
+        (lowerBotMsg.includes('recordatorio') && !lowerBotMsg.includes('agendado'))
+    ) {
         taskType = 'reminders';
     } 
-    else if (lowerUserMsg.includes('agendar') || 
-             lowerUserMsg.includes('agenda ') ||
-             lowerUserMsg.includes('programar') ||
-             (lowerUserMsg.includes('cita') && !lowerUserMsg.includes('recordar')) ||
-             botResponse.includes('📅') ||
-             lowerBotMsg.includes('agendado') ||
-             lowerBotMsg.includes('he agendado')) {
-        taskType = 'calendar';
-    } 
-    else if (lowerUserMsg.includes('nota') || 
-             lowerUserMsg.includes('anota') || 
-             lowerUserMsg.includes('apunta') ||
-             lowerUserMsg.includes('guardar') ||
-             lowerUserMsg.includes('guarda') ||
-             botResponse.includes('📝') ||
-             lowerBotMsg.includes('nota guardada') ||
-             lowerBotMsg.includes('he guardado')) {
+    
+    // 🔹 3) POR ÚLTIMO, NOTAS
+    else if (
+        lowerUserMsg.includes('nota') || 
+        lowerUserMsg.includes('toma nota') ||
+        lowerUserMsg.includes('anota') || 
+        lowerUserMsg.includes('apunta') ||
+        lowerUserMsg.includes('guardar') ||
+        lowerUserMsg.includes('guarda esto') ||
+        lowerUserMsg.includes('guarda la nota') ||
+        botResponse.includes('📝') ||
+        lowerBotMsg.includes('nota guardada') ||
+        lowerBotMsg.includes('he guardado')
+    ) {
         taskType = 'notes';
     }
     
+    // 🔹 4) SI NO SE DETECTÓ TIPO, CAE COMO RECORDATORIO
     if (!taskType) {
         taskType = 'reminders';
     }
@@ -1300,19 +1343,19 @@ async function processTask(userMessage, botResponse)  {
     }
 
     // Si es evento de calendario, generar archivo .ics
-if (taskType === 'calendar') {
-    await generateICSForTask(task);
-}
+    if (taskType === 'calendar') {
+        await generateICSForTask(task);
+    }
 
-appState.tasks[taskType].push(task);
-updateTasksUI();
+    appState.tasks[taskType].push(task);
+    updateTasksUI();
 
-// NUEVO: Si es calendario, actualizar UI nuevamente después de generar el archivo
-if (taskType === 'calendar') {
-    setTimeout(() => {
-        updateTasksUI();
-    }, 100);
-}
+    // Si es calendario, actualizar UI después de generar el archivo
+    if (taskType === 'calendar') {
+        setTimeout(() => {
+            updateTasksUI();
+        }, 100);
+    }
     
     if (elements.tasksContainer) {
         elements.tasksContainer.classList.add('active');
@@ -1320,7 +1363,11 @@ if (taskType === 'calendar') {
     
     expandTaskSection(taskType);
     saveToLocalStorage();
+
+    // Debug opcional
+    console.log('[TASK CREADA]', { taskType, userMessage });
 }
+
 
 function expandTaskSection(taskType) {
     document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));

@@ -39,10 +39,7 @@ class Settings:
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
-    VECTOR_STORE_ID: str = os.getenv(
-        "VECTOR_STORE_ID",
-        "vs_6933017a9aa08191a0c0a728c78429cc"
-    )
+
 
     # Twilio
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")

@@ -1,6 +1,7 @@
 from textwrap import dedent
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -66,9 +67,6 @@ def is_aprende_intent(text: str) -> bool:
         return False
 
     t = text.lower()
-    keywords = [
-        "aprender", "curso", "cursos", "capacitación", "capacitacion",
-        "quiero aprender", "recomiendame un curso", "recomiéndame un curso",
-        "certificación", "certificacion"
-    ]
-    return any(k in t for k in keywords)
+    # Match the whole word 'aprende' (no substrings like 'emprende' or 'aprendemos')
+    # Usamos límites de palabra para asegurar coincidencia exacta.
+    return re.search(r'\baprende\b', t) is not None

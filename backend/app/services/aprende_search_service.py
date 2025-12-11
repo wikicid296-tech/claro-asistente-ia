@@ -13,7 +13,11 @@ def is_aprende_intent(user_message: str, action: str = "") -> bool:
     """
     t = (user_message or "").lower()
     a = (action or "").lower()
-    return a == "aprende" or "aprende" in t or "cursos" in t
+    flag = False
+    if a == 'aprende' or "aprende" in t :
+        flag = True
+    return flag
+    
 
 
 def run_aprende_flow(
