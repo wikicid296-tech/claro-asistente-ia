@@ -7,6 +7,7 @@ from app.services.context_service import get_context_for_query
 from app.services.prompt_service import build_urls_block, build_system_prompt
 from app.services.channel_message_service import build_chat_messages
 from app.services.groq_service import run_groq_completion
+from app.services.memory_service import get_relevant_memory, append_memory   
 
 from app.clients.groq_client import get_groq_client, get_groq_api_key
 
@@ -69,6 +70,11 @@ def run_web_chat(
     if groq_api_key is None:
         groq_api_key = get_groq_api_key()
 
+    # 🆕 OBTENER MEMORIA RELEVANTE
+    previous_messages: list[str] = []
+    if user_key:
+        previous_messages = get_relevant_memory(user_key, user_message)
+    
     # Contexto
     ctx = get_context_for_query(user_message)
     relevant_urls = ctx.get("relevant_urls", [])
@@ -77,11 +83,18 @@ def run_web_chat(
     # Build URLs block
     urls_text = build_urls_block(relevant_urls)
 
+    # 🆕 AJUSTAR TEMPERATURA SEGÚN EL TIPO DE MENSAJE
+    # Para tareas, usar temperatura más baja para respuestas consistentes
+    is_task_request = any(keyword in user_message.lower() for keyword in [
+        'recuerdame', 'recuérdame', 'recordar', 'agenda', 'agendar', 
+        'nota', 'anota', 'guardar', 'junta', 'reunión', 'cita'
+    ])
+    
+    final_temperature = 0.1 if is_task_request else temperature
+    final_max_tokens = 512 if is_task_request else max_tokens
+
     # Build prompt
     system_prompt = build_system_prompt("web", context_label, urls_text)
-
-    # TODO: integrar memory_service real
-    previous_messages: list[str] = []
 
     messages = build_chat_messages(
         system_prompt,
@@ -95,9 +108,37 @@ def run_web_chat(
         groq_client=groq_client,
         groq_api_key=groq_api_key,
         model=model,
-        temperature=temperature,
-        max_tokens=max_tokens,
+        temperature=final_temperature,
+        max_tokens=final_max_tokens,
     )
+
+    # 🆕 AGREGAR EMOJIS Y CONFIRMACIÓN PARA TAREAS
+    if is_task_request:
+        # Determinar tipo de tarea basado en el mensaje
+        lower_msg = user_message.lower()
+        
+        if 'junta' in lower_msg or 'reunión' in lower_msg or 'cita' in lower_msg:
+            # Es evento de calendario
+            if not response_text.startswith('📅'):
+                response_text = f"📅 {response_text}"
+            if 'he agendado' not in response_text.lower() and 'agendado' not in response_text.lower():
+                response_text = response_text.replace('Te recuerdo', 'He agendado tu junta')
+        elif 'recuerdame' in lower_msg or 'recordar' in lower_msg:
+            # Es recordatorio
+            if not response_text.startswith('✅'):
+                response_text = f"✅ {response_text}"
+            if 'he creado' not in response_text.lower() and 'recordatorio creado' not in response_text.lower():
+                response_text = response_text.replace('Te recuerdo', 'He creado un recordatorio')
+        elif 'nota' in lower_msg or 'anota' in lower_msg:
+            # Es nota
+            if not response_text.startswith('📝'):
+                response_text = f"📝 {response_text}"
+            if 'he guardado' not in response_text.lower():
+                response_text = response_text.replace('Te anoto', 'He guardado tu nota')
+
+    # 🆕 GUARDAR EN MEMORIA
+    if user_key:
+        append_memory(user_key, user_message)
 
     return {
         "success": True,
@@ -135,6 +176,11 @@ def run_channel_chat(
     if groq_api_key is None:
         groq_api_key = get_groq_api_key()
 
+    # 🆕 OBTENER MEMORIA
+    previous_messages: list[str] = []
+    if user_key:
+        previous_messages = get_relevant_memory(user_key, user_message)
+
     ctx = get_context_for_query(user_message)
     relevant_urls = ctx.get("relevant_urls", [])
     context_label = ctx.get("label", "ℹ️ Asistente general disponible")
@@ -144,9 +190,6 @@ def run_channel_chat(
 
     # Build system prompt por canal
     system_prompt = build_system_prompt(channel, context_label, urls_text)
-
-    # TODO: memory por canal
-    previous_messages: list[str] = []
 
     # SMS no admite historial
     max_prev = 0 if channel == "sms" else 1
@@ -166,6 +209,10 @@ def run_channel_chat(
         temperature=temperature,
         max_tokens=max_tokens,
     )
+
+    # 🆕 GUARDAR EN MEMORIA
+    if user_key:
+        append_memory(user_key, user_message)
 
     # Truncados por canal
     if channel == "sms":
