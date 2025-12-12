@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Literal
 import logging
+import re
 
 from app.services.context_service import get_context_for_query
 from app.services.prompt_service import build_urls_block, build_system_prompt
@@ -16,6 +17,30 @@ logger = logging.getLogger(__name__)
 Channel = Literal["web", "whatsapp", "sms", "rcs"]
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
+
+
+# ------------------------------------------------------------
+# Utility functions
+# ------------------------------------------------------------
+
+def extract_course_id_from_query(text: str):
+    if not text:
+        return None
+
+    patterns = [
+        r'\bcurso\s*(?:no\.?|número|numero|#)?\s*(\d+)\b',
+        r'\bno\.?\s*(\d+)\b',
+        r'\b#(\d+)\b',
+        r'\b(\d{1,4})\b'
+    ]
+
+    text = text.lower()
+    for p in patterns:
+        m = re.search(p, text)
+        if m:
+            return m.group(1)
+
+    return None
 
 
 # ------------------------------------------------------------
@@ -69,7 +94,6 @@ def run_web_chat(
         groq_client = get_groq_client()
     if groq_api_key is None:
         groq_api_key = get_groq_api_key()
-
     # 🆕 OBTENER MEMORIA RELEVANTE
     previous_messages: list[str] = []
     if user_key:

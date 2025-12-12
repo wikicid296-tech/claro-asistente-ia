@@ -92,3 +92,27 @@ def fetch_courses_top_candidates(candidates: List[Dict[str, Any]], max_fetch: in
         })
 
     return enriched
+
+def get_course_by_id(course_id: str) -> Optional[dict]:
+    """
+    Obtiene un curso directamente por ID desde la API Aprende.
+    Retorna None si no existe.
+    """
+    try:
+        course = fetch_course_by_id(course_id)
+        if not course:
+            return None
+
+        return {
+            "courseId": str(course.get("courseId") or course_id),
+            "courseName": course.get("courseName") or "Curso disponible",
+            "score": 1.0,
+            "metadata": {
+                "courseId": str(course.get("courseId") or course_id),
+                "courseName": course.get("courseName"),
+                "matchType": "explicit_id"
+            }
+        }
+    except Exception:
+        logger.exception("Error obteniendo curso por ID")
+        return None
