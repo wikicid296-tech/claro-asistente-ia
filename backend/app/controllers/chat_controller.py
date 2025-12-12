@@ -31,14 +31,14 @@ def build_aprende_iframe_response(user_message: str, top_course: Dict[str, Any],
     if mejor_score >0.35:
         if all_candidates:
             response_text = f"🎓 Encontré {len(all_candidates)} cursos relacionados con '{user_message}':\n\n"
-            response_text += f"**{course_name}** (ID: {course_id})\n\n"
+            response_text += f"**{course_name}** (Numero de curso: {course_id})\n\n"
             
             if len(all_candidates) > 1:
                 response_text += f"**También encontré {len(all_candidates) - 1} cursos más:**\n"
                 for i, candidate in enumerate(all_candidates[1:4], 2):  # Mostrar max 3 adicionales
                     cand_name = candidate.get('courseName', 'Curso sin nombre')
                     cand_id = candidate.get('courseId', '')
-                    response_text += f"{i}. **{cand_name}** (ID: {cand_id})\n"
+                    response_text += f"{i}. **{cand_name}** (Numero de curso: {cand_id})\n"
         else:
             response_text = f"😕 No encontré cursos relacionados con '{user_message}'. ¿Podrías intentar con otras palabras clave?"
     else:
@@ -89,15 +89,14 @@ def chat_controller():
                 "usage": status,
             }), 429
 
-        # 🔹 Nueva lógica: combinar modo del front + intent por texto
-        use_aprende = False
+        # ---------------------------------------------
+        # MODO APRENDE: estado controlado por frontend
+        # ---------------------------------------------
+        use_aprende = action == "aprende"
 
-        # A) Si el front está explícitamente en modo "aprende", lo respetamos SIEMPRE
-        if action == "aprende":
-            use_aprende = True
-
-        # B) Si no está en modo aprende, pero el texto tiene el intent Aprende
-        elif is_aprende_intent(user_message):
+        # Solo activamos Aprende por texto
+        # si NO estamos ya en Aprende
+        if not use_aprende and is_aprende_intent(user_message):
             use_aprende = True
 
         if use_aprende:

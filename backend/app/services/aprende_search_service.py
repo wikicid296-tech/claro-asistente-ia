@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List
 
 from app.services.openai_vector_search_service import search_courses_in_vector_store
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,43 @@ def run_aprende_flow(
     if not user_message:
         logger.warning("User message vacío")
         return {"query": user_message, "candidates": [], "top": []}
+
+    # =====================================================
+    # BYPASS: Curso solicitado explícitamente por ID
+    # =====================================================
+    def extract_course_id(text: str):
+        t = (text or "").lower()
+        patterns = [
+            r'\bcurso\s*(?:no\.?|número|numero|#)?\s*(\d+)\b',
+            r'\bno\.?\s*(\d+)\b',
+            r'\b#(\d+)\b',
+            r'\b(\d{1,4})\b'
+        ]
+        for p in patterns:
+            m = re.search(p, t)
+            if m:
+                return m.group(1)
+        return None
+
+    course_id = extract_course_id(user_message)
+    if course_id:
+        logger.info(f"🎯 Bypass Aprende activado | Curso solicitado por ID explícito: {course_id}")
+
+        try:
+            from app.services.aprende_courses_api_service import get_course_by_id
+
+            course = get_course_by_id(course_id)
+            if course:
+                logger.info(f"✅ Curso {course_id} encontrado, retornando directo (sin semántica)")
+                return {
+                    "query": user_message,
+                    "candidates": [course],
+                    "top": [course],
+                }
+            else:
+                logger.info(f"❌ Curso {course_id} no encontrado, continuando flujo semántico")
+        except Exception:
+            logger.exception("Error en bypass por ID, continuando flujo semántico")
 
     candidates: List[Dict[str, Any]] = search_courses_in_vector_store(user_message, k=k) or []
     
