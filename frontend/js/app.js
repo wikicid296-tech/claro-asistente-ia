@@ -302,10 +302,9 @@ function detectModeFromText(text) {
             if (foundKeyword) break;
         }
         
-        if (!foundKeyword) {
-            hideModeChip();
-            return;
-        }
+        // NO desactivar Aprende por texto.
+        // Solo se desactiva manualmente (✕ o nueva conversación)
+        return;
     }
     
     for (const [mode, keywords] of Object.entries(modeKeywords)) {
