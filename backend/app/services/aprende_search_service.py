@@ -1,24 +1,12 @@
 import logging
+import re
 from typing import Any, Dict, List
 
-from app.services.openai_vector_search_service import search_courses_in_vector_store
-import re
+from app.services.cluster_search_service import search_courses_in_clusters
+from app.services.noun_extraction_service import extract_main_noun
+from app.services.semantic_guard_service import evaluate_domain
 
 logger = logging.getLogger(__name__)
-
-
-def is_aprende_intent(user_message: str, action: str = "") -> bool:
-    """
-    Heurística simple para activar el modo aprende.
-    Ajusta según tu Router/Orchestrator.
-    """
-    t = (user_message or "").lower()
-    a = (action or "").lower()
-    flag = False
-    if a == 'aprende' or "aprende" in t :
-        flag = True
-    return flag
-    
 
 
 def run_aprende_flow(
@@ -55,13 +43,12 @@ def run_aprende_flow(
     course_id = extract_course_id(user_message)
     if course_id:
         logger.info(f"🎯 Bypass Aprende activado | Curso solicitado por ID explícito: {course_id}")
-
         try:
             from app.services.aprende_courses_api_service import get_course_by_id
 
             course = get_course_by_id(course_id)
             if course:
-                logger.info(f"✅ Curso {course_id} encontrado, retornando directo (sin semántica)")
+                logger.info(f"✅ Curso {course_id} encontrado, retornando directo")
                 return {
                     "query": user_message,
                     "candidates": [course],
@@ -72,22 +59,52 @@ def run_aprende_flow(
         except Exception:
             logger.exception("Error en bypass por ID, continuando flujo semántico")
 
-    candidates: List[Dict[str, Any]] = search_courses_in_vector_store(user_message, k=k) or []
-    
+    # =====================================================
+    # EXTRACCIÓN DE SUSTANTIVO NÚCLEO (Groq)
+    # =====================================================
+    extraction = extract_main_noun(user_message)
+    main_noun = extraction.get("main_noun")
+
+    logger.info("🧠 Sustantivo extraído: %s", main_noun)
+
+    if not main_noun or main_noun == "NONE":
+        return {
+            "query": user_message,
+            "candidates": [],
+            "top": [],
+            "message": "No se pudo identificar el tema principal del aprendizaje."
+        }
+
+    # =====================================================
+    # SEMANTIC GUARD (CLUSTERS)
+    # =====================================================
+    domain_eval = evaluate_domain(main_noun)
+
+    if not domain_eval["allowed"]:
+        return {
+            "query": user_message,
+            "candidates": [],
+            "top": [],
+            "message": f"No contamos con cursos relacionados con {main_noun} 😣💔. Intenta con otra busqueda"
+        }
+
+    logger.info(
+        "Dominio Aprende aceptado | noun=%s | mode=%s | score=%.3f",
+        main_noun,
+        domain_eval.get("mode"),
+        domain_eval.get("score", 0.0)
+    )
+
+
+    # =====================================================
+    # BÚSQUEDA FINAL EN CLUSTERS
+    # =====================================================
+    candidates: List[Dict[str, Any]] = search_courses_in_clusters(user_message, k=k) or []
+
     logger.info(f"📊 Resultados de búsqueda: {len(candidates)} candidatos")
-    
-    # Depurar estructura de candidatos
-    if candidates:
-        logger.info("🔍 Detalle de candidatos:")
-        for i, cand in enumerate(candidates[:5]):  # Mostrar primeros 5
-            logger.info(f"  {i+1}. ID: {cand.get('id', 'N/A')}")
-            logger.info(f"     Score: {cand.get('score', 'N/A')}")
-            logger.info(f"     CourseName: {cand.get('courseName', 'N/A')}")
-            logger.info(f"     CourseId: {cand.get('courseId', 'N/A')}")
-            logger.info(f"     Metadata: {cand.get('metadata', {})}")
-    
+
     top = candidates[:max(fetch_top_n, 0)] if candidates else []
-    
+
     logger.info(f"✅ run_aprende_flow fin | candidatos={len(candidates)}, top={len(top)}")
 
     return {
