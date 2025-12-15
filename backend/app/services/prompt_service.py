@@ -58,15 +58,18 @@ def build_system_prompt(channel: str, context: str = "", urls_text: str = "") ->
         # Devolvemos template sin formatear para evitar 500
         return template
 
-def is_aprende_intent(text: str) -> bool:
-    """
-    Heurística simple para enrutar al flujo Aprende.
-    Ajusta keywords según tu dominio.
-    """
-    if not text:
-        return False
+def is_aprende_intent(user_message: str, action: str = "") -> bool:
+    t = (user_message or "").lower()
+    a = (action or "").lower()
 
-    t = text.lower()
-    # Match the whole word 'aprende' (no substrings like 'emprende' or 'aprendemos')
-    # Usamos límites de palabra para asegurar coincidencia exacta.
-    return re.search(r'\baprende\b', t) is not None
+    # 🔥 PRIORIDAD ABSOLUTA: modo forzado desde frontend
+    if a == "aprende":
+        return True
+
+    # Heurística lingüística
+    patterns = [
+        r"\baprende\b",
+    ]
+
+    return any(re.search(p, t) for p in patterns)
+
