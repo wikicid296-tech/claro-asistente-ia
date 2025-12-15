@@ -5,6 +5,7 @@ from flask import jsonify, request
 from app.controllers._request_utils import get_user_key_from_request
 from app.services.usage_service import is_usage_blocked, get_usage_status
 from app.services.chat_orchestrator_service import run_web_chat
+from app.services.content_safety_service import check_content_safety
 
 from app.services.prompt_service import is_aprende_intent
 from app.services.aprende_search_service import run_aprende_flow
@@ -69,64 +70,88 @@ def build_aprende_iframe_response(user_message: str, top_course: Dict[str, Any],
 
 
 def chat_controller():
+    """
+    Controller principal del endpoint /chat.
+    Aplica content safety global y enruta por intent (Aprende vs Chat).
+    """
+
+    data = request.get_json(force=True, silent=True) or {}
+    user_message = (data.get("message") or "").strip()
+    action = data.get("action", "busqueda")
+    user_key = data.get("user_key")
+
+    if not user_message:
+        return jsonify({
+            "success": False,
+            "message": "Mensaje vacío"
+        }), 400
+
+    # =====================================================
+    # CONTENT SAFETY (GLOBAL)
+    # =====================================================
     try:
-        data = request.get_json() or {}
+        safety = check_content_safety(user_message)
+    except Exception:
+        logger.exception("Error ejecutando content safety")
+        # Fail-open controlado
+        safety = {"flagged": False}
 
-        user_message = data.get("message", "")
-        action = (data.get("action", "") or "").lower().strip()
-        
-        # 🆕 OBTENER USER_KEY (importante para memoria)
-        user_key = get_user_key_from_request()
-
-        if not user_message:
-            return jsonify({"success": False, "error": "Mensaje vacío"}), 400
-
-        if is_usage_blocked():
-            status = get_usage_status()
-            return jsonify({
-                "success": False,
-                "error": "Límite mensual alcanzado",
-                "usage": status,
-            }), 429
-
-        # ---------------------------------------------
-        # MODO APRENDE: estado controlado por frontend
-        # ---------------------------------------------
-        use_aprende = action == "aprende"
-
-        # Solo activamos Aprende por texto
-        # si NO estamos ya en Aprende
-        if not use_aprende and is_aprende_intent(user_message):
-            use_aprende = True
-
-        if use_aprende:
-            logger.info("Modo/Intent Aprende activo → ejecutando run_aprende_flow()")
-            aprende_result = run_aprende_flow(user_message, k=5, fetch_top_n=1)
-            
-            candidates = aprende_result.get("candidates", [])
-            top_courses = aprende_result.get("top", [])
-            
-            if candidates and top_courses:
-                top_course = top_courses[0]
-                response = build_aprende_iframe_response(user_message, top_course, candidates)
-                return jsonify(response)
-            else:
-                return jsonify({
-                    "success": True,
-                    "response": f"😕 No encontré cursos relacionados con '{user_message}'. ¿Podrías intentar con otras palabras clave?",
-                    "aprende_ia_used": False,
-                    "context": "ℹ️ Asistente general disponible"
-                })
-
-        # 🔹 Flujo normal (no Aprende) - PASAR user_key
-        result = run_web_chat(
-            user_message=user_message,
-            action=action or "busqueda",
-            user_key=user_key,  # 🆕 PASAR EL USER_KEY AQUÍ
+    if safety.get("flagged"):
+        logger.warning(
+            "⛔ Input bloqueado por moderación | categories=%s",
+            safety.get("categories")
         )
+        return jsonify({
+            "success": False,
+            "type": "blocked",
+            "message": "No puedo ayudar con este tipo de contenido."
+        }), 200
 
-        return jsonify({"success": True, **result})
+    # =====================================================
+    # ROUTING POR INTENT
+    # =====================================================
+    try:
+        if is_aprende_intent(user_message,action=action):
+            logger.info("🎓 Intent Aprende detectado")
 
-    except Exception as e:
-        logger.error(f"Error en chat_controller: {e}", exc_info=True)
-        return jsonify({"success": False, "error": str(e)}), 500
+            aprende_result = run_aprende_flow(user_message)
+
+            top = aprende_result.get("top") or []
+            candidates = aprende_result.get("candidates") or []
+
+            if top:
+                return jsonify(
+                    build_aprende_iframe_response(
+                        user_message=user_message,
+                        top_course=top[0],
+                        all_candidates=candidates
+                    )
+                ), 200
+
+            return jsonify({
+                "success": True,
+                "response": aprende_result.get(
+                    "message",
+                    "No contamos con cursos relacionados con tu búsqueda."
+                ),
+                "aprende_ia_used": True,
+                "candidates": [],
+                "top": []
+            }), 200
+
+        # =================================================
+        # CHAT NORMAL
+        # =================================================
+        response = run_web_chat(
+            user_message=user_message,
+            action=action,
+            user_key=user_key
+        )
+        return jsonify(response), 200
+
+    except Exception:
+        logger.exception("Error procesando solicitud")
+        return jsonify({
+            "success": False,
+            "message": "Ocurrió un error procesando tu solicitud."
+        }), 500
