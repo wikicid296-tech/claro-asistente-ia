@@ -73,3 +73,17 @@ def is_aprende_intent(user_message: str, action: str = "") -> bool:
 
     return any(re.search(p, t) for p in patterns)
 
+def is_telcel_intent(user_message: str, action: str = "") -> bool:
+    t = (user_message or "").lower()
+    a = (action or "").lower()
+
+    if a == "telcel":
+        return True
+
+    patterns = [
+        r"\btelcel\b"
+    ]
+
+    return any(re.search(p, t) for p in patterns)
+
+

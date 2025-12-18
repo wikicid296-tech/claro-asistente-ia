@@ -6,6 +6,8 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from app.services.usage_service import calculate_cost, add_usage
+import os
+from groq import Groq
 
 logger = logging.getLogger(__name__)
 
@@ -181,3 +183,20 @@ def run_groq_completion(
         pass
 
     return text
+
+def get_groq_api_key() -> str:
+    """
+    Retorna la API key de Groq desde variables de entorno.
+    """
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY no está configurada en el entorno")
+    return api_key
+
+
+def get_groq_client() -> Groq:
+    """
+    Retorna un cliente Groq inicializado.
+    """
+    api_key = get_groq_api_key()
+    return Groq(api_key=api_key)

@@ -35,3 +35,5 @@ logs/
 
 # Archivos batch de Windows (opcional, si no quieres subirlos)
 *.bat
+*.pkl
+*.csv

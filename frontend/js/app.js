@@ -261,9 +261,11 @@ function updateTokenCounter(tokens) {
 function detectModeFromText(text) {
     const lowerText = text ? text.toLowerCase().trim() : '';
     
-    const modeKeywords = {
-        'aprende': ['aprende', 'aprende.org']
-    };
+  const modeKeywords = {
+    'aprende': ['aprende', 'aprende.org'],
+    'telcel': ['telcel']
+};
+
 
     // Helper: match keyword as whole token (or domain like aprende.org)
     function matchesKeywordStrict(haystack, keyword) {
@@ -324,11 +326,13 @@ function detectModeFromText(text) {
  */
 function activateModeAutomatically(mode) {
     const modeNames = {
-        'aprende': 'Aprende.org'
+        'aprende': 'Aprende.org',
+        'telcel': 'telcel'
     };
     
     const placeholders = {
-        'aprende': 'Pregunta sobre cursos de aprende.org'  
+        'aprende': 'Pregunta sobre cursos de aprende.org',
+        'telcel': 'Pregunta sobre servicios, planes o beneficios de Telcel'  
     };
     
     // Actualizar placeholder
@@ -571,6 +575,7 @@ function selectAction(e) {
     
     const placeholders = {
         'aprende': 'Pregunta sobre cursos de aprende.org',
+        'telcel': 'Pregunta sobre planes y servicios Telcel',
         'busqueda': 'Pregunta lo que quieras',
         'tareas': 'Crea o asigna una tarea...',
         'capacitate': 'Pregunta sobre capacítate....',
@@ -580,6 +585,7 @@ function selectAction(e) {
     // Nombres visuales para el chip
     const modeNames = {
         'aprende': 'Aprende.org',
+        'telcel': 'Consulta planes y servicios Telcel',
         'busqueda': 'Búsqueda Inteligente',
         'tareas': 'Asigna tareas',
         'capacitate': 'Capacítate',
@@ -624,6 +630,7 @@ function showModeChip(modeName, modeAction) {
         // Definir íconos según el modo
         const icons = {
             'aprende': '<div class="mode-chip-icon-letter">A</div>',
+            'telcel': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 7h8M8 11h8M8 15h6"/></svg>',
             'busqueda': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
             'tareas': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
             'capacitate': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
