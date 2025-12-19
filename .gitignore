@@ -37,3 +37,4 @@ logs/
 *.bat
 *.pkl
 *.csv
+/pruebas-exploratorias
