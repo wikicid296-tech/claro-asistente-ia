@@ -161,12 +161,15 @@ def chat_controller():
             telcel_service = TelcelRAGService(
                 mongo_uri=MONGO_URI,
                 db_name="telcel_rag",
-                collection_name="embeddings"
+                collection_name="embeddings2"
             )
 
             print("🔍 Ejecutando búsqueda semántica en Mongo (Telcel)")
-            raw_results = telcel_service.search(user_message)
-
+            raw_results = telcel_service.retrieve(
+            query=user_message,
+            datasets=["telcel_basico", "tarifas"],  # o decide dinámicamente
+            k=5
+)
             print(f"📊 RESULTADOS CRUDOS TELCEL ({len(raw_results)} docs):")
             for r in raw_results:
                 print("➡️", r.get("titulo"), "| score:", r.get("score"))
