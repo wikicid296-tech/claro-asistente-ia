@@ -27,7 +27,12 @@ class TelcelRAGService:
         openai_model: str = "text-embedding-3-large",
         vector_index: str = "vector_index2",
     ):
-        self.mongo_client = MongoClient(os.getenv("MONGO_URI"))
+        self.mongo_client = MongoClient(
+        mongo_uri,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=5000
+    )
         self.collection = self.mongo_client[db_name][collection_name]
 
         self.openai_client = OpenAI(api_key= os.getenv("OPENAI_API_KEY"))
@@ -52,40 +57,42 @@ class TelcelRAGService:
     # --------------------------------------------------
 
     def retrieve(
-        self,
-        *,
-        query: str,
-        datasets: Optional[List[str]] = None,
-        k: int = 5,
-        num_candidates: int = 100,
+    self,
+    *,
+    query: str,
+    datasets: Optional[List[str]] = None,
+    k: int = 5,
+    num_candidates: int = 40,  # 🔒 Render-safe
     ) -> List[Dict[str, Any]]:
         """
-        Recupera documentos relevantes desde MongoDB.
+        Recupera documentos relevantes desde MongoDB usando Vector Search.
 
-        datasets:
-            None -> todos
-            ["telcel_basico"]
-            ["tarifas"]
-            ["telcel_basico", "tarifas"]
+        - SOLO filtra por campos garantizados (dataset)
+        - El resto del refinamiento se hace vía reranking
         """
 
+        # 1️⃣ Embedding de la query
         query_embedding = self.embed_query(query)
 
-        vector_stage: Dict[str, Any] = {
-            "index": self.vector_index,
-            "path": "embedding",
-            "queryVector": query_embedding,
-            "numCandidates": num_candidates,
-            "limit": k,
+        # 2️⃣ Vector Search base (ligero)
+        vector_search = {
+            "$vectorSearch": {
+                "index": self.vector_index,
+                "path": "embedding",
+                "queryVector": query_embedding,
+                "numCandidates": num_candidates,
+                "limit": k,
+            }
         }
 
+        # 3️⃣ Filtro SEGURO (solo dataset)
         if datasets:
-            vector_stage["filter"] = {
+            vector_search["$vectorSearch"]["filter"] = {
                 "dataset": {"$in": datasets}
             }
 
         pipeline = [
-            {"$vectorSearch": vector_stage},
+            vector_search,
             {
                 "$project": {
                     "_id": 1,
@@ -95,9 +102,18 @@ class TelcelRAGService:
                     "categoria": 1,
                     "subtipo": 1,
                     "dataset": 1,
+                    "es_temporal": 1,
                     "score": {"$meta": "vectorSearchScore"},
                 }
             }
         ]
 
-        return list(self.collection.aggregate(pipeline))
+        # 4️⃣ Ejecución protegida
+        try:
+            docs = list(self.collection.aggregate(pipeline))
+        except Exception as e:
+            # ⚠️ Nunca mates el worker
+            print(f"[TelcelRAGService] Error en vector search: {e}")
+            return []
+
+        return docs
