@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 from app.services.telcel_rag_service import TelcelRAGService
 from app.services.response_synthesis_service import synthesize_answer
 from app.services.groq_service import get_groq_client, get_groq_api_key
+from app.agents.claro.claro_agent import ClaroAgent
+from app.services.prompt_service import is_claro_intent
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -144,6 +147,27 @@ def chat_controller():
                 "candidates": [],
                 "top": []
             }), 200
+            
+                # =================================================
+        # 📡📡📡 INTENT CLARO (AGENTE + RAG POR PAÍS)
+        # =================================================
+        if is_claro_intent(user_message, action=action):
+            print("📡📡📡 INTENT CLARO DETECTADO 📡📡📡")
+            logger.info("📡 Intent Claro detectado")
+
+            claro_agent = ClaroAgent(
+            user_message=user_message,
+            context={},
+            intent="claro"
+        )
+
+            result = claro_agent.handle()
+            print("📦 RESPUESTA CLARO AGENT:", result)
+
+        
+
+            return jsonify(claro_agent.handle()), 200
+
 
         # =================================================
         # 🔥🔥🔥 INTENT TELCEL (RAG + GROQ)

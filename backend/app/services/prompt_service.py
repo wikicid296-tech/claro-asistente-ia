@@ -86,4 +86,15 @@ def is_telcel_intent(user_message: str, action: str = "") -> bool:
 
     return any(re.search(p, t) for p in patterns)
 
+def is_claro_intent(user_message: str, action: str = "") -> bool:
+    t = (user_message or "").lower()
+    a = (action or "").lower()
 
+    if a == "claro":
+        return True
+
+    patterns = [
+        r"\bclaro\b"
+    ]
+
+    return any(re.search(p, t) for p in patterns)
