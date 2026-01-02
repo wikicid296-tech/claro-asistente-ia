@@ -775,16 +775,19 @@ if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
 // ==================== API CALLS ====================
 async function callAPI(message) {
     try {
-        const response = await fetch(`${API_URL}/chat`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                message: message,
-                action: appState.currentMode
-            })
-        });
+    const conversationId = sessionStorage.getItem('claroAssistant_sessionId');
+
+    const response = await fetch(`${API_URL}/chat`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Conversation-Id': conversationId   // 👈 CLAVE
+        },
+        body: JSON.stringify({
+            message: message,
+            action: appState.currentMode
+        })
+    });
         
         // ===== MANEJAR ERROR 429 (RATE LIMIT) =====
         if (response.status === 429) {
