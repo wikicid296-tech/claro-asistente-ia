@@ -38,7 +38,7 @@ def synthesize_answer(
     domain_name: str,
     groq_client,
     groq_api_key,
-    max_chars_per_doc: int = 1200
+    max_chars_per_doc: int = 3000
 ) -> Dict[str, object]:
     """
     Servicio genérico de síntesis.
@@ -115,7 +115,7 @@ INSTRUCCIONES DE RESPUESTA:
         groq_client=groq_client,
         groq_api_key=groq_api_key,
         temperature=0.0,
-        max_tokens=300
+        max_tokens=1000
     )
 
     return {

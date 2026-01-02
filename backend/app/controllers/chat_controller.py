@@ -1,25 +1,31 @@
 import logging
-from typing import Any, Dict, List
-from flask import jsonify, request
 import os
+from flask import jsonify, request
+from dotenv import load_dotenv
+from typing import Any, Dict, List
+
 from app.controllers._request_utils import get_user_key_from_request
 from app.services.usage_service import is_usage_blocked, get_usage_status
 from app.services.chat_orchestrator_service import run_web_chat
 from app.services.content_safety_service import check_content_safety
 
-from app.services.prompt_service import is_aprende_intent, is_telcel_intent
+from app.services.prompt_service import (
+    is_aprende_intent,
+    is_telcel_intent,
+    is_claro_intent,
+)
 from app.services.aprende_search_service import run_aprende_flow
-from dotenv import load_dotenv
 from app.services.telcel_rag_service import TelcelRAGService
 from app.services.response_synthesis_service import synthesize_answer
 from app.services.groq_service import get_groq_client, get_groq_api_key
+
 from app.agents.claro.claro_agent import ClaroAgent
-from app.services.prompt_service import is_claro_intent
+from app.agents.claro.country_detector import detect_country
+
+from app.states.conversationStore import load_state, save_state
 
 load_dotenv()
-
 logger = logging.getLogger(__name__)
-
 
 def build_aprende_iframe_response(user_message: str, top_course: Dict[str, Any],
                                  all_candidates: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -76,15 +82,13 @@ def build_aprende_iframe_response(user_message: str, top_course: Dict[str, Any],
 def chat_controller():
     """
     Controller principal del endpoint /chat.
-    Aplica content safety global y enruta por intent.
+    Implementa estado conversacional mínimo (slots + awaiting).
     """
 
     data = request.get_json(force=True, silent=True) or {}
     user_message = (data.get("message") or "").strip()
     action = data.get("action", "busqueda")
-    user_key = data.get("user_key")
-
-    print("📥 INPUT RECIBIDO:", data)
+    user_key =  get_user_key_from_request()
 
     if not user_message:
         return jsonify({
@@ -97,13 +101,11 @@ def chat_controller():
     # =====================================================
     try:
         safety = check_content_safety(user_message)
-        print("🛡️ RESULTADO CONTENT SAFETY:", safety)
     except Exception:
         logger.exception("Error ejecutando content safety")
         safety = {"flagged": False}
 
     if safety.get("flagged"):
-        print("⛔ MENSAJE BLOQUEADO POR CONTENT SAFETY")
         return jsonify({
             "success": False,
             "type": "blocked",
@@ -111,19 +113,39 @@ def chat_controller():
         }), 200
 
     # =====================================================
-    # ROUTING POR INTENT
+    # CARGA DE ESTADO CONVERSACIONAL
     # =====================================================
+    state = load_state(user_key)
+
+    # =====================================================
+    # RESOLUCIÓN DE SLOT PENDIENTE (PAÍS)
+    # =====================================================
+    if state.awaiting_slot == "pais":
+        print("🧩 CONTROLLER → resolviendo slot PAÍS")
+        country = detect_country(user_message)
+
+        if country != "unknown":
+            state.slots["pais"] = country
+            state.awaiting_slot = None
+            save_state(user_key, state)
+
+            print("🔁 CONTROLLER → reanudando intent CLARO con query original")
+
+            claro_agent = ClaroAgent(
+                user_message=str(state.original_query),
+                context=state.slots,
+                intent=str(state.intent),
+            )
+
+            result = claro_agent.handle()
+            return jsonify(result), 200
+
     try:
         # =================================================
         # INTENT APRENDE
         # =================================================
         if is_aprende_intent(user_message, action=action):
-            print("🎓🎓🎓 INTENT APRENDE DETECTADO 🎓🎓🎓")
-            logger.info("🎓 Intent Aprende detectado")
-
             aprende_result = run_aprende_flow(user_message)
-
-            print("📦 RESPUESTA APRENDE:", aprende_result)
 
             top = aprende_result.get("top") or []
             candidates = aprende_result.get("candidates") or []
@@ -147,66 +169,70 @@ def chat_controller():
                 "candidates": [],
                 "top": []
             }), 200
-            
-                # =================================================
+
+        # =================================================
         # 📡📡📡 INTENT CLARO (AGENTE + RAG POR PAÍS)
         # =================================================
+        print("🧭 CONTROLLER → evaluando intent CLARO")
+        print("🧾 user_message:", repr(user_message))
+        print("🧠 state antes de Claro:", state.__dict__ if state else None)
+
         if is_claro_intent(user_message, action=action):
             print("📡📡📡 INTENT CLARO DETECTADO 📡📡📡")
             logger.info("📡 Intent Claro detectado")
-
             claro_agent = ClaroAgent(
-            user_message=user_message,
-            context={},
-            intent="claro"
-        )
+                user_message=user_message,
+                context=state.slots,
+                intent="claro"
+            )
 
             result = claro_agent.handle()
-            print("📦 RESPUESTA CLARO AGENT:", result)
+            print("📦 RESPUESTA ClaroAgent:", result)
 
-        
+            # ⛔ El agente pidió país → guardar estado conversacional
+            if result.get("awaiting") == "pais":
+                print("💾 CONTROLLER → guardando estado: esperando PAÍS")
+                state.intent = "claro"
+                state.awaiting_slot = "pais"
+                state.original_query = user_message
+                save_state(user_key, state)
+                print("🔑 user_key:", user_key)
 
-            return jsonify(claro_agent.handle()), 200
+
+            print("🚀 CONTROLLER DEVOLVIENDO RESPUESTA CLARO")
+            return jsonify(result), 200
 
 
         # =================================================
-        # 🔥🔥🔥 INTENT TELCEL (RAG + GROQ)
+        # INTENT TELCEL
         # =================================================
-        MONGO_URI = os.getenv("MONGO_URI")
-        if not MONGO_URI:
-           raise RuntimeError("MONGO_URI no está configurada en el entorno")
         if is_telcel_intent(user_message, action=action):
-            print("📱📱📱 INTENT TELCEL DETECTADO 📱📱📱")
-            logger.info("📱 Intent Telcel detectado")
+            mongo_uri = os.getenv("MONGO_URI")
+            if not mongo_uri:
+                raise RuntimeError("MONGO_URI no está configurada")
 
             groq_client = get_groq_client()
             groq_api_key = get_groq_api_key()
 
             telcel_service = TelcelRAGService(
-                mongo_uri=MONGO_URI,
+                mongo_uri=mongo_uri,
                 db_name="telcel_rag",
-                collection_name="embeddings2"
+                collection_name="embeddings2",
             )
 
-            print("🔍 Ejecutando búsqueda semántica en Mongo (Telcel)")
             raw_results = telcel_service.retrieve(
-            query=user_message,
-            datasets=["telcel_basico", "tarifas"],  # o decide dinámicamente
-            k=5
-)
-            print(f"📊 RESULTADOS CRUDOS TELCEL ({len(raw_results)} docs):")
-            for r in raw_results:
-                print("➡️", r.get("titulo"), "| score:", r.get("score"))
+                query=user_message,
+                datasets=["telcel_basico", "tarifas"],
+                k=5,
+            )
 
             synthesized = synthesize_answer(
                 user_question=user_message,
                 documents=raw_results,
                 domain_name="Telcel",
                 groq_client=groq_client,
-                groq_api_key=groq_api_key
+                groq_api_key=groq_api_key,
             )
-
-            print("🧠 RESPUESTA SINTETIZADA (GROQ):", synthesized)
 
             return jsonify({
                 "success": True,
@@ -215,26 +241,23 @@ def chat_controller():
                 "context_reset": False,
                 "memory_used": 0,
                 "response": synthesized["response"],
-                "relevant_urls": synthesized["relevant_urls"]
+                "relevant_urls": synthesized.get("relevant_urls", [])
             }), 200
 
         # =================================================
         # CHAT NORMAL
         # =================================================
-        print("💬💬💬 FLUJO CHAT NORMAL 💬💬💬")
+        print("⚠️ CONTROLLER → CAYÓ EN CHAT NORMAL")
 
         response = run_web_chat(
             user_message=user_message,
             action=action,
-            user_key=user_key
+            user_key=user_key,
         )
-
-        print("🤖 RESPUESTA CHAT NORMAL:", response)
         return jsonify(response), 200
 
     except Exception:
         logger.exception("Error procesando solicitud")
-        print("🔥🔥🔥 EXCEPCIÓN NO CONTROLADA EN chat_controller 🔥🔥🔥")
         return jsonify({
             "success": False,
             "message": "Ocurrió un error procesando tu solicitud."
