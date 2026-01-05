@@ -19,6 +19,7 @@ from app.services.telcel_rag_service import TelcelRAGService
 from app.services.response_synthesis_service import synthesize_answer
 from app.services.groq_service import get_groq_client, get_groq_api_key
 
+from app.agents.telcel.telcel_agent import TelcelAgent
 from app.agents.claro.claro_agent import ClaroAgent
 from app.agents.claro.country_detector import detect_country
 
@@ -118,6 +119,22 @@ def chat_controller():
     state = load_state(user_key)
 
     # =====================================================
+    # RESOLUCIÓN DE EXPECTATIVA TELCEL
+    # =====================================================
+    if state.awaiting_slot == "telcel_subdomain":
+        telcel_agent = TelcelAgent(
+            user_message=user_message,
+            context=state.slots,
+            intent="telcel",
+        )
+
+        result = telcel_agent.handle()
+        state.awaiting_slot = None
+        save_state(user_key, state)
+
+        return jsonify(result), 200
+
+    # =====================================================
     # RESOLUCIÓN DE SLOT PENDIENTE (PAÍS)
     # =====================================================
     if state.awaiting_slot == "pais":
@@ -169,6 +186,26 @@ def chat_controller():
                 "candidates": [],
                 "top": []
             }), 200
+        # =================================================
+        # INTENT TELCEL *(lo cambiamos de lugar para que pueda detectar claro mexico como telcel)
+        # =================================================
+        if is_telcel_intent(user_message, action=action):
+            telcel_agent = TelcelAgent(
+                user_message=user_message,
+                context=state.slots,
+                intent="telcel",
+            )
+
+            result = telcel_agent.handle()
+
+            # ⛔ El agente activó continuidad conversacional
+            if result.get("awaiting"):
+                state.intent = "telcel"
+                state.awaiting_slot = result["awaiting"]
+                state.original_query = user_message
+                save_state(user_key, state)
+
+            return jsonify(result), 200
 
         # =================================================
         # 📡📡📡 INTENT CLARO (AGENTE + RAG POR PAÍS)
@@ -203,46 +240,7 @@ def chat_controller():
             return jsonify(result), 200
 
 
-        # =================================================
-        # INTENT TELCEL
-        # =================================================
-        if is_telcel_intent(user_message, action=action):
-            mongo_uri = os.getenv("MONGO_URI")
-            if not mongo_uri:
-                raise RuntimeError("MONGO_URI no está configurada")
 
-            groq_client = get_groq_client()
-            groq_api_key = get_groq_api_key()
-
-            telcel_service = TelcelRAGService(
-                mongo_uri=mongo_uri,
-                db_name="telcel_rag",
-                collection_name="embeddings2",
-            )
-
-            raw_results = telcel_service.retrieve(
-                query=user_message,
-                datasets=["telcel_basico", "tarifas"],
-                k=5,
-            )
-
-            synthesized = synthesize_answer(
-                user_question=user_message,
-                documents=raw_results,
-                domain_name="Telcel",
-                groq_client=groq_client,
-                groq_api_key=groq_api_key,
-            )
-
-            return jsonify({
-                "success": True,
-                "action": "telcel",
-                "context": "📱 Información oficial de Telcel",
-                "context_reset": False,
-                "memory_used": 0,
-                "response": synthesized["response"],
-                "relevant_urls": synthesized.get("relevant_urls", [])
-            }), 200
 
         # =================================================
         # CHAT NORMAL

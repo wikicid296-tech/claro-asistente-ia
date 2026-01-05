@@ -498,31 +498,46 @@ function handleNavigation(e) {
     }
 }
 
-// ==================== NUEVA CONVERSACIÓN ====================
+function generateNewConversationId() {
+    const newId =
+        'session_' +
+        Date.now() +
+        '_' +
+        Math.random().toString(36).substr(2, 9);
+
+    sessionStorage.setItem('claroAssistant_sessionId', newId);
+    return newId;
+}
+
 function startNewConversation() {
+    // 🔑 1️⃣ Generar NUEVO conversationId
+    const newSessionId = generateNewConversationId();
+    console.log('🔑 Nueva conversationId generada:', newSessionId);
+
+    // 🧹 2️⃣ Reset de estado interno
     appState.conversationHistory = [];
     userState.messageCount = 0;
     elements.chatHistory.innerHTML = '';
+
+    // 🧭 3️⃣ Reset de vistas
     elements.welcomePage.style.display = 'flex';
     elements.chatPage.style.display = 'none';
 
-    // Mostrar carrusel en pantalla de bienvenida
-const carousel = document.getElementById('suggestionsCarousel');
-if (carousel) {
-    carousel.style.display = 'block';
-}
-    
-    // NUEVO: Habilitar input al iniciar nueva conversación
+    // 🎠 4️⃣ Mostrar carrusel de sugerencias
+    const carousel = document.getElementById('suggestionsCarousel');
+    if (carousel) {
+        carousel.style.display = 'block';
+    }
+
+    // 🚦 5️⃣ Reset de límites y UI
     removeLimitWarning();
-    
-    // 🆕 RESETEO COMPLETO: Ocultar chip de modo y resetear a búsqueda
     hideModeChip();
-    
-    // 🆕 Resetear placeholder y modo
+
+    // 🆕 6️⃣ Reset de modo y placeholder
     elements.userInput.placeholder = 'Pregunta lo que quieras';
     appState.currentMode = 'busqueda';
-    
-    // 🆕 Resetear selección visual en el menú de acciones
+
+    // 🧩 7️⃣ Reset visual del menú de acciones
     elements.actionItems.forEach(item => {
         if (item.getAttribute('data-action') === 'busqueda') {
             item.classList.add('selected');
@@ -530,19 +545,22 @@ if (carousel) {
             item.classList.remove('selected');
         }
     });
-    
+
+    // 💾 8️⃣ Persistencia limpia
     saveToLocalStorage();
-    
+
+    // 📌 9️⃣ Navegación
     elements.navItems.forEach(item => item.classList.remove('active'));
     if (elements.newConversationBtn) {
         elements.newConversationBtn.classList.add('active');
     }
     elements.tasksContainer.classList.remove('active');
-    
+
+    // 📱 🔟 Responsive
     if (window.innerWidth < 900) {
         closeSidebar();
     }
-    
+
     console.log('🆕 Nueva conversación iniciada - Modo resetado a búsqueda');
 }
 
