@@ -77,12 +77,15 @@ def is_telcel_intent(user_message: str, action: str = "") -> bool:
     t = (user_message or "").lower()
     a = (action or "").lower()
 
-    if a == "telcel" or a == "claro méxico":
+    if a == "telcel" or a == "claro méxico" or a == "claro mexico" or a =="Claro Mexico" or a =="Claro México":
         return True
 
     patterns = [
         r"\btelcel\b",
-        r"\bclaro méxico\b"
+        r"\bclaro méxico\b",
+        r"\bclaro mexico\b",
+        r"\bClaro Mexico\b",
+        r"\bClaro México\b",
     ]
 
     return any(re.search(p, t) for p in patterns)
