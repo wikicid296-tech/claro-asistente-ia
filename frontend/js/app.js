@@ -850,6 +850,25 @@ async function callAPI(message) {
                 appState.lastAprendeResource = null;
             }
             
+            // =====================================================
+            // 🆕 TELCEL: detectar URL de buscador y añadir link (sin iframe)
+            // =====================================================
+            if (data.action === 'telcel' && Array.isArray(data.relevant_urls)) {
+                const telcelSearchUrl = data.relevant_urls.find(
+                    url => typeof url === 'string' && url.includes('telcel.com/buscador?')
+                );
+
+                if (telcelSearchUrl) {
+                    console.log('🔎 Telcel buscador detectado:', telcelSearchUrl);
+
+                    // Añadir enlace al texto de respuesta si no está presente
+                    if (!data.response.includes(telcelSearchUrl)) {
+                        data.response += `\n\n🔗 **Consulta directa en Telcel:** ` +
+                            `[Abrir buscador de Telcel](${telcelSearchUrl})`;
+                    }
+                }
+            }
+            
             return data.response;
         } else {
             throw new Error(data.error || 'Error desconocido');
@@ -916,6 +935,8 @@ if (type === 'bot' && appState.lastAprendeResource) {
     // Limpiar después de usar para no mostrarlo en mensajes posteriores
     appState.lastAprendeResource = null;
 }
+    
+    
     
     // Agregar al chat
     elements.chatHistory.appendChild(messageContainer);

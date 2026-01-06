@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from flask import jsonify, request
 from dotenv import load_dotenv
 from typing import Any, Dict, List
@@ -137,25 +138,37 @@ def chat_controller():
     # =====================================================
     # RESOLUCIÓN DE SLOT PENDIENTE (PAÍS)
     # =====================================================
-    if state.awaiting_slot == "pais":
-        print("🧩 CONTROLLER → resolviendo slot PAÍS")
-        country = detect_country(user_message)
+    # =====================================================
+    # =====================================================
+# 🔀 REDIRECCIÓN DE DOMINIO: Claro → Telcel
+# =====================================================
+    if state.awaiting_slot == "pais" and state.intent == "claro":
 
-        if country != "unknown":
-            state.slots["pais"] = country
+        # Partimos siempre de la intención original
+        original_query = state.original_query or user_message
+
+        # Si el usuario confirmó México, materializarlo en la query
+        if re.search(r"\bm[eé]xico\b", user_message.lower()):
+            original_query = f"{original_query} mexico"
+
+        # Si redefine dominio (Claro México → Telcel)
+        if is_telcel_intent(user_message, action=action):
+            # Abortamos flujo Claro
             state.awaiting_slot = None
+            state.intent = None
+            state.original_query = None
             save_state(user_key, state)
 
-            print("🔁 CONTROLLER → reanudando intent CLARO con query original")
-
-            claro_agent = ClaroAgent(
-                user_message=str(state.original_query),
-                context=state.slots,
-                intent=str(state.intent),
+            # Reinyectamos intención ORIGINAL (ya enriquecida)
+            telcel_agent = TelcelAgent(
+                user_message=original_query,
+                context={},
+                intent="telcel",
             )
 
-            result = claro_agent.handle()
+            result = telcel_agent.handle()
             return jsonify(result), 200
+
 
     try:
         # =================================================
