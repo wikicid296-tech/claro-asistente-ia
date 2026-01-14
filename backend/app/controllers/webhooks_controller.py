@@ -24,6 +24,27 @@ def strip_markdown(text: str) -> str:
     text = text.replace("__", "")
     text = text.replace("\n\n", "\n")
     return text.strip()
+def format_aprende_for_sms(result: dict) -> str:
+    """
+    Versión SMS-safe para Aprende:
+    - 1 curso
+    - 1 link
+    - texto corto
+    """
+    top = (result.get("top") or [])
+    if not top:
+        return "Consulta disponible en aprende.org"
+
+    course = top[0]
+    name = course.get("courseName", "Curso recomendado")
+    cid = course.get("courseId", "")
+    url = f"https://aprende.org/cursos/{cid}" if cid else "https://aprende.org"
+
+    return "\n".join([
+        "Curso recomendado:",
+        name,
+        url
+    ])
 
 
 def format_aprende_for_channel(result: dict) -> str:
@@ -57,17 +78,26 @@ def format_aprende_for_channel(result: dict) -> str:
     return "\n".join(lines).strip()
 
 
-def build_channel_message(result: dict) -> str:
+def build_channel_message(result: dict, channel_name: str) -> str:
     """
-    Decide cómo representar la respuesta del cerebro
-    para canales (SMS / WhatsApp / RCS).
+    Representación de respuesta según canal.
     """
-    # Caso Aprende
-    if result.get("aprende_ia_used"):
-        return format_aprende_for_channel(result)
 
-    # Default: texto plano sin markdown
-    return strip_markdown(result.get("response", ""))
+    # ---- APRENDE ----
+    if result.get("aprende_ia_used"):
+        if channel_name == "sms":
+            return format_aprende_for_sms(result)
+        else:
+            return format_aprende_for_channel(result)
+
+    # ---- DEFAULT ----
+    text = strip_markdown(result.get("response", ""))
+
+    # SMS: hard limit defensivo
+    if channel_name == "sms" and len(text) > 300:
+        return text[:280] + "..."
+
+    return text
 
 
 # -------------------------------
@@ -108,7 +138,7 @@ def _generic_channel_controller(channel_name: str):
             user_key=from_number,
         )
 
-        message_text = build_channel_message(result)
+        message_text = build_channel_message(result, channel_name=channel_name)
 
         if not message_text:
             message_text = "No pude generar una respuesta. Intenta reformular tu mensaje."
