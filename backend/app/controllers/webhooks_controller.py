@@ -57,7 +57,7 @@ def sms_controller():
         api_key = get_groq_api_key()
 
         result = run_channel_chat(
-            channel="whatsapp",
+            channel="sms",
             user_message=incoming_msg,
             user_key=from_number,
             groq_client=client,
@@ -103,7 +103,7 @@ def rcs_controller():
         api_key = get_groq_api_key()
 
         result = run_channel_chat(
-            channel="whatsapp",
+            channel="rcs",
             user_message=incoming_msg,
             user_key=from_number,
             groq_client=client,
