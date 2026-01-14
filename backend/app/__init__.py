@@ -18,7 +18,7 @@ def create_app():
     # Blueprints
     app.register_blueprint(system_bp)
     app.register_blueprint(chat_bp)
-    app.register_blueprint(webhook_bp)
+    app.register_blueprint(webhook_bp, url_prefix="/webhooks")
     app.register_blueprint(calendar_bp)
     app.register_blueprint(static_bp)
 
