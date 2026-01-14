@@ -67,7 +67,7 @@ def sms_controller():
         )
 
         resp = MessagingResponse()
-        resp.message(result["response"])
+        resp.message("OK, el problema es acentos en la respuesta")
         return str(resp), 200, {"Content-Type": "text/xml"}
 
     except Exception as e:
