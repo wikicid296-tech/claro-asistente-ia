@@ -7,102 +7,109 @@ from app.services.cerebro_service import procesar_chat_web
 logger = logging.getLogger(__name__)
 
 
-# -------------------------------
-# Helpers locales (urgente, simple)
-# -------------------------------
+# -------------------------------------------------
+# Helpers generales
+# -------------------------------------------------
 
 def strip_markdown(text: str) -> str:
-    """
-    Limpieza mínima y segura:
-    - quita ** __
-    - colapsa saltos
-    """
     if not text:
         return text
 
-    text = text.replace("**", "")
-    text = text.replace("__", "")
-    text = text.replace("\n\n", "\n")
-    return text.strip()
+    return (
+        text.replace("**", "")
+            .replace("__", "")
+            .replace("\n\n", "\n")
+            .strip()
+    )
+
+
+# -------------------------------------------------
+# Aprende – formatos por canal
+# -------------------------------------------------
+
 def format_aprende_for_sms(result: dict) -> str:
     """
-    Versión SMS-safe para Aprende:
-    - 1 curso
-    - 1 link
-    - texto corto
+    SMS-safe para Aprende (MX):
+    - Sin URLs
+    - Hasta 5 cursos
+    - Instrucción de búsqueda por título o ID
     """
-    top = (result.get("top") or [])
-    if not top:
-        return "Consulta disponible en aprende.org"
+    candidates = result.get("candidates") or result.get("top") or []
 
-    course = top[0]
-    name = course.get("courseName", "Curso recomendado")
-    cid = course.get("courseId", "")
-    url = f"https://aprende.org/cursos/{cid}" if cid else "https://aprende.org"
+    if not candidates:
+        return (
+            "Cursos disponibles en Aprende.org.\n"
+            "Busca por tema o palabra clave en aprende.org."
+        )
 
-    return "\n".join([
-        "Curso recomendado:",
-        name,
-        url
-    ])
+    lines = ["Cursos recomendados (Aprende.org):", ""]
 
-
-def format_aprende_for_channel(result: dict) -> str:
-    """
-    Representación textual plana de Aprende
-    """
-    lines = []
-
-    top = (result.get("top") or [])
-    candidates = (result.get("candidates") or [])
-
-    if top:
-        course = top[0]
-        name = course.get("courseName", "Curso recomendado")
+    for idx, course in enumerate(candidates[:5], start=1):
+        name = course.get("courseName", "Curso")
         cid = course.get("courseId", "")
-        url = f"https://aprende.org/cursos/{cid}" if cid else "https://aprende.org"
-
-        lines.append("Curso recomendado:")
-        lines.append(name)
-        lines.append(url)
-
-    if len(candidates) > 1:
+        lines.append(f"{idx}. {name}")
+        if cid:
+            lines.append(f"   ID: {cid}")
         lines.append("")
-        lines.append("Otros cursos:")
-        for c in candidates[1:4]:
-            cname = c.get("courseName", "Curso")
-            cid = c.get("courseId", "")
-            url = f"https://aprende.org/cursos/{cid}" if cid else "https://aprende.org"
-            lines.append(f"- {cname}: {url}")
+
+    lines.append("Busca el curso por título o ID en aprende.org")
 
     return "\n".join(lines).strip()
 
 
-def build_channel_message(result: dict, channel_name: str) -> str:
+def format_aprende_for_channel(result: dict) -> str:
     """
-    Representación de respuesta según canal.
+    WhatsApp / RCS:
+    texto plano, informativo, con URLs permitidas
     """
+    lines = []
+    candidates = result.get("candidates") or result.get("top") or []
 
+    if not candidates:
+        return "Consulta cursos disponibles en aprende.org."
+
+    lines.append("Cursos recomendados:")
+
+    for idx, course in enumerate(candidates[:5], start=1):
+        name = course.get("courseName", "Curso")
+        cid = course.get("courseId", "")
+        url = f"https://aprende.org/cursos/{cid}" if cid else "https://aprende.org"
+
+        lines.append(f"{idx}. {name}")
+        lines.append(url)
+        lines.append("")
+
+    return "\n".join(lines).strip()
+
+
+# -------------------------------------------------
+# Builder principal por canal
+# -------------------------------------------------
+
+def build_channel_message(result: dict, channel_name: str) -> str:
     # ---- APRENDE ----
     if result.get("aprende_ia_used"):
         if channel_name == "sms":
             return format_aprende_for_sms(result)
-        else:
-            return format_aprende_for_channel(result)
+        return format_aprende_for_channel(result)
 
     # ---- DEFAULT ----
     text = strip_markdown(result.get("response", ""))
 
-    # SMS: hard limit defensivo
-    if channel_name == "sms" and len(text) > 300:
-        return text[:280] + "..."
+    # SMS: evitar meta / disclaimers
+    if channel_name == "sms":
+        # protección extra: nunca URLs en SMS
+        text = text.replace("http://", "").replace("https://", "")
+        # fallback informativo si queda vacío
+        if not text.strip():
+            return "Puedo ayudarte con cursos, información y servicios. Escribe tu consulta."
 
     return text
 
 
-# -------------------------------
+# -------------------------------------------------
 # Controllers
-# -------------------------------
+# -------------------------------------------------
 
 def whatsapp_controller():
     return _generic_channel_controller(channel_name="whatsapp")
@@ -113,10 +120,8 @@ def sms_controller():
 
 
 def rcs_controller():
-    # GET de verificación
     if request.method == "GET":
         return "RCS Webhook activo", 200
-
     return _generic_channel_controller(channel_name="rcs")
 
 
@@ -131,23 +136,25 @@ def _generic_channel_controller(channel_name: str):
             resp.message("Por favor envía un mensaje válido.")
             return str(resp), 200, {"Content-Type": "text/xml"}
 
-        # Llamamos al MISMO cerebro que la web
         result = procesar_chat_web(
             user_message=incoming_msg,
             action="chat",
             user_key=from_number,
         )
 
-        message_text = build_channel_message(result, channel_name=channel_name)
+        message_text = build_channel_message(result, channel_name)
 
         if not message_text:
-            message_text = "No pude generar una respuesta. Intenta reformular tu mensaje."
+            message_text = (
+                "Puedo ayudarte con cursos, información y servicios. "
+                "Escribe el tema que te interesa."
+            )
 
         resp.message(message_text)
         return str(resp), 200, {"Content-Type": "text/xml"}
 
     except Exception as e:
-        logger.error(f"Error en {channel_name}_controller: {e}", exc_info=True)
+        logger.error(f"Error en {channel_name}_controller", exc_info=True)
         resp = MessagingResponse()
         resp.message("Ocurrió un error. Intenta nuevamente.")
         return str(resp), 200, {"Content-Type": "text/xml"}
@@ -155,14 +162,13 @@ def _generic_channel_controller(channel_name: str):
 
 def rcs_status_controller():
     try:
-        message_sid = request.values.get("MessageSid")
-        message_status = request.values.get("MessageStatus")
-        error_code = request.values.get("ErrorCode")
-
         logger.info(
-            f"RCS Status: sid={message_sid} status={message_status} error={error_code}"
+            "RCS Status: sid=%s status=%s error=%s",
+            request.values.get("MessageSid"),
+            request.values.get("MessageStatus"),
+            request.values.get("ErrorCode"),
         )
         return "", 200
-    except Exception as e:
-        logger.error(f"Error en rcs_status_controller: {e}")
+    except Exception:
+        logger.exception("Error en rcs_status_controller")
         return "", 200
