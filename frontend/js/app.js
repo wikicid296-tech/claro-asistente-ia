@@ -24,7 +24,7 @@ const TOKEN_CONFIG = {
 
 // Estado global de la aplicación
 const appState = {
-    currentMode: 'busqueda',
+    currentMode: 'descubre', // Cambiado de 'busqueda' a 'descubre' para consistencia
     conversationHistory: [],
     tasks: {
         reminders: [],
@@ -38,7 +38,8 @@ const appState = {
     },
     lastAprendeResource: null,
     // 🆕 AGREGAR ESTA LÍNEA
-    modeActivatedManually: false  // Flag para saber si el modo fue activado manualmente
+    modeActivatedManually: false,  // Flag para saber si el modo fue activado manualmente
+    isLoadedFromHistory: false  // Flag para saber si la conversación actual fue cargada desde el historial
 };
 
 // Elementos del DOM
@@ -50,32 +51,35 @@ const elements = {
     navItems: document.querySelectorAll('.nav-item'),
     tasksContainer: document.getElementById('tasksContainer'),
     taskHeaders: document.querySelectorAll('.task-header'),
+    tasksSection: document.getElementById('tasksSection'),
+    taskCategoryHeaders: document.querySelectorAll('.task-category-header'),
+    tasksNavBtn: document.getElementById('tasksNavBtn'),
     newConversationBtn: document.getElementById('newConversationBtn'),
     clearTasksBtn: document.getElementById('clear-tasks'),
-    
+
     // Main content
     welcomePage: document.getElementById('welcomePage'),
     chatPage: document.getElementById('chatPage'),
     chatHistory: document.getElementById('chatHistory'),
-    
+
     // Input
     userInput: document.getElementById('userInput'),
     sendBtn: document.getElementById('sendBtn'),
     addBtn: document.getElementById('addBtn'),
     actionMenu: document.getElementById('actionMenu'),
     actionItems: document.querySelectorAll('.action-item'),
-    
+
     // Token counter - NUEVO
     tokenCounter: document.getElementById('tokenCounter'),
     currentTokens: document.getElementById('currentTokens'),
     maxTokens: document.getElementById('maxTokens'),
-    
+
     // Suggestions
     suggestionCards: document.querySelectorAll('.suggestion-card'),
-    
+
     // Loading
     loadingOverlay: document.getElementById('loadingOverlay'),
-    
+
     // Task lists
     remindersList: document.getElementById('reminders-list'),
     notesList: document.getElementById('notes-list'),
@@ -256,68 +260,53 @@ function updateTokenCounter(tokens) {
 
 // ==================== DETECCIÓN AUTOMÁTICA DE MODO ====================
 /**
- * Detecta palabras clave en el texto y activa el modo correspondiente
+ * Detecta palabras clave en el texto y activa el modo correspondiente automáticamente
  */
 function detectModeFromText(text) {
     const lowerText = text ? text.toLowerCase().trim() : '';
     
-  const modeKeywords = {
-    'aprende': ['aprende', 'aprende.org'],
-
-};
-
-
-    // Helper: match keyword as whole token (or domain like aprende.org)
+    // Palabras clave para cada modo
+    const modeKeywords = {
+        'aprende': ['aprende', 'aprende.org', 'aprender', 'curso', 'cursos', 'estudio'],
+        'busqueda_web': ['google', 'buscar', 'internet', 'web', 'información', 'investigar', 'investigación']
+    };
+    
+    // Helper: detecta si una palabra clave aparece como token completo
     function matchesKeywordStrict(haystack, keyword) {
         if (!haystack || !keyword) return false;
-        // Escape regex special chars in keyword
+        // Escape regex special chars
         const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // Match when keyword appears as a separate token or bounded by non-word chars
+        // Match cuando aparece como token separado
         const pattern = '(^|\\W)' + esc + '(\\W|$)';
         return new RegExp(pattern, 'i').test(haystack);
     }
     
+    // Si está en modo manual, no cambiar automáticamente
     if (appState.modeActivatedManually) {
         return;
     }
     
-    const isEmptyInput = !text || text.length === 0;
-    const hasShortText = text && text.length < 3;
-    
-    if (appState.currentMode === 'aprende') {
-        if (isEmptyInput) {
-            return;
-        }
-        
-        if (hasShortText) {
-            return;
-        }
-        
-        let foundKeyword = false;
-        for (const [mode, keywords] of Object.entries(modeKeywords)) {
-            for (const keyword of keywords) {
-                if (matchesKeywordStrict(lowerText, keyword)) {
-                    foundKeyword = true;
-                    break;
-                }
-            }
-            if (foundKeyword) break;
-        }
-        
-        // NO desactivar Aprende por texto.
-        // Solo se desactiva manualmente (✕ o nueva conversación)
+    // No detectar si el texto es muy corto o está vacío
+    if (!text || text.length < 3) {
         return;
     }
     
+    // Buscar coincidencias en cada modo
     for (const [mode, keywords] of Object.entries(modeKeywords)) {
         for (const keyword of keywords) {
             if (matchesKeywordStrict(lowerText, keyword)) {
+                // Si detectamos la palabra clave y no estamos ya en ese modo, cambiar
                 if (appState.currentMode !== mode) {
                     activateModeAutomatically(mode);
                 }
                 return;
             }
         }
+    }
+    
+    // Si no detecta ninguna palabra clave y no está en "descubre", volver a descubre
+    if (appState.currentMode !== 'descubre' && !appState.modeActivatedManually) {
+        deactivateAutoMode();
     }
 }
 
@@ -327,10 +316,12 @@ function detectModeFromText(text) {
 function activateModeAutomatically(mode) {
     const modeNames = {
         'aprende': 'Aprende.org',
+        'busqueda_web': 'Búsqueda web'
     };
     
     const placeholders = {
         'aprende': 'Pregunta sobre cursos de aprende.org',
+        'busqueda_web': 'Busca cualquier información en la web...'
     };
     
     // Actualizar placeholder
@@ -338,7 +329,7 @@ function activateModeAutomatically(mode) {
     
     // Actualizar modo en el estado
     appState.currentMode = mode;
-
+    
     // 🆕 MARCAR QUE NO FUE MANUAL (fue automático)
     appState.modeActivatedManually = false;
     
@@ -357,16 +348,49 @@ function activateModeAutomatically(mode) {
     console.log(`🤖 Modo "${mode}" activado automáticamente`);
 }
 
+/**
+ * Desactiva el modo automático y vuelve a "descubre"
+ */
+function deactivateAutoMode() {
+    if (appState.currentMode !== 'descubre') {
+        appState.currentMode = 'descubre';
+        appState.modeActivatedManually = false;
+        
+        elements.userInput.placeholder = 'Pregunta lo que quieras';
+        hideModeChip();
+        
+        // Actualizar selección en el menú
+        elements.actionItems.forEach(item => {
+            if (item.getAttribute('data-action') === 'descubre') {
+                item.classList.add('selected');
+            } else {
+                item.classList.remove('selected');
+            }
+        });
+        
+        console.log('🤖 Volviendo a modo "descubre"');
+    }
+}
+
 // ==================== INICIALIZACIÓN ====================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     initializeEventListeners();
     loadFromLocalStorage();
+    
+    // 🆕 Actualizar UI de tareas al cargar
+    updateTasksUI();
+    
+    // Inicializar módulo de conversaciones (esperar a que cargue)
+    await initConversationStorage();
     
     // Inicializar contador de tokens
     if (elements.maxTokens) {
         elements.maxTokens.textContent = TOKEN_CONFIG.MAX_TOKENS;
     }
     updateTokenCounter(0);
+    
+    // 🆕 CARGAR HISTORIAL DE CONVERSACIONES (ahora que están cargadas las funciones)
+    updateConversationHistoryUI();
     
     // 🆕 CONSULTAR CONSUMO AL CARGAR
     fetchUsageStatus();
@@ -376,22 +400,27 @@ function initializeEventListeners() {
     // Toggle sidebar (móvil)
     elements.menuToggle.addEventListener('click', toggleSidebar);
     elements.overlay.addEventListener('click', closeSidebar);
-    
+
     // Navegación sidebar
     elements.navItems.forEach(item => {
         item.addEventListener('click', handleNavigation);
     });
-    
+
     // Nueva conversación
     if (elements.newConversationBtn) {
         elements.newConversationBtn.addEventListener('click', startNewConversation);
     }
-    
-    // Task headers
+
+    // Task category headers (NEW STYLE)
+    elements.taskCategoryHeaders.forEach(header => {
+        header.addEventListener('click', toggleTaskCategory);
+    });
+
+    // Task headers (old style) - ESTILO ORIGINAL QUE QUEREMOS RECUPERAR
     elements.taskHeaders.forEach(header => {
         header.addEventListener('click', toggleTaskCard);
     });
-    
+
     // Limpiar tareas
     if (elements.clearTasksBtn) {
         elements.clearTasksBtn.addEventListener('click', clearAllTasks);
@@ -463,6 +492,12 @@ elements.userInput.addEventListener('focus', function() {
     
     // Cerrar menú al hacer clic fuera
     document.addEventListener('click', handleOutsideClick);
+    
+    // 🆕 Botón para limpiar historial
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', clearAllConversationHistory);
+    }
 }
 
 // ==================== SIDEBAR FUNCTIONS ====================
@@ -478,21 +513,33 @@ function closeSidebar() {
 
 function handleNavigation(e) {
     const section = this.getAttribute('data-section');
-    
+
     if (section === 'home') {
         startNewConversation();
         return;
     }
-    
+
     elements.navItems.forEach(item => item.classList.remove('active'));
     this.classList.add('active');
-    
+
     if (section === 'tasks') {
-        elements.tasksContainer.classList.toggle('active');
+        if (elements.tasksSection) {
+            elements.tasksSection.classList.toggle('active');
+            elements.tasksSection.style.display = elements.tasksSection.classList.contains('active') ? 'flex' : 'none';
+        }
+        if (elements.tasksContainer) {
+            elements.tasksContainer.classList.toggle('active');
+        }
     } else {
-        elements.tasksContainer.classList.remove('active');
+        if (elements.tasksSection) {
+            elements.tasksSection.classList.remove('active');
+            elements.tasksSection.style.display = 'none';
+        }
+        if (elements.tasksContainer) {
+            elements.tasksContainer.classList.remove('active');
+        }
     }
-    
+
     if (window.innerWidth < 900) {
         closeSidebar();
     }
@@ -510,6 +557,12 @@ function generateNewConversationId() {
 }
 
 function startNewConversation() {
+    // 🔑 0️⃣ GUARDAR conversación anterior en el historial
+    saveCurrentConversation();
+    
+    // 🆕 RESETEAR flag de historial
+    appState.isLoadedFromHistory = false;
+    
     // 🔑 1️⃣ Generar NUEVO conversationId
     const newSessionId = generateNewConversationId();
     console.log('🔑 Nueva conversationId generada:', newSessionId);
@@ -535,11 +588,11 @@ function startNewConversation() {
 
     // 🆕 6️⃣ Reset de modo y placeholder
     elements.userInput.placeholder = 'Pregunta lo que quieras';
-    appState.currentMode = 'busqueda';
+    appState.currentMode = 'descubre';
 
     // 🧩 7️⃣ Reset visual del menú de acciones
     elements.actionItems.forEach(item => {
-        if (item.getAttribute('data-action') === 'busqueda') {
+        if (item.getAttribute('data-action') === 'descubre') {
             item.classList.add('selected');
         } else {
             item.classList.remove('selected');
@@ -564,16 +617,108 @@ function startNewConversation() {
     console.log('🆕 Nueva conversación iniciada - Modo resetado a búsqueda');
 }
 
+// ==================== TASK MANAGEMENT (ESTILO ORIGINAL) ====================
 function toggleTaskCard(e) {
     const body = this.nextElementSibling;
     const isOpen = body.classList.contains('open');
-    
+
     document.querySelectorAll('.task-body').forEach(b => b.classList.remove('open'));
     document.querySelectorAll('.task-header').forEach(h => h.classList.remove('collapsed'));
-    
+
     if (!isOpen) {
         body.classList.add('open');
         this.classList.add('collapsed');
+    }
+}
+
+function toggleTaskCategory(e) {
+    e.stopPropagation();
+    const header = e.currentTarget;
+    const category = header.closest('.task-category');
+    if (!category) return;
+
+    const taskList = category.querySelector('.task-list');
+    const toggleIcon = header.querySelector('.task-category-toggle .material-symbols-outlined');
+
+    if (!taskList) return;
+
+    const isVisible = taskList.style.display !== 'none' && taskList.style.display !== '';
+
+    if (isVisible) {
+        taskList.style.display = 'none';
+        if (toggleIcon) {
+            toggleIcon.style.transform = 'rotate(-90deg)';
+        }
+    } else {
+        taskList.style.display = 'flex';
+        if (toggleIcon) {
+            toggleIcon.style.transform = 'rotate(0deg)';
+        }
+    }
+}
+
+function expandTaskSection(taskType) {
+    document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));
+    document.querySelectorAll('.task-header').forEach(header => header.classList.remove('collapsed'));
+
+    const targetHeader = document.querySelector(`.task-header[data-task-type="${taskType}"]`);
+    if (targetHeader) {
+        const targetBody = targetHeader.nextElementSibling;
+        targetBody.classList.add('open');
+        targetHeader.classList.add('collapsed');
+    }
+}
+
+function expandTaskCategory(taskType) {
+    const categoryMap = {
+        'reminders': 'reminders',
+        'notes': 'notes',
+        'calendar': 'calendar'
+    };
+
+    const category = categoryMap[taskType];
+    if (!category) return;
+
+    const targetHeader = document.querySelector(`.task-category-header[data-category="${category}"]`);
+    if (targetHeader) {
+        const taskCategory = targetHeader.closest('.task-category');
+        if (taskCategory) {
+            const taskList = taskCategory.querySelector('.task-list');
+            const toggleIcon = targetHeader.querySelector('.task-category-toggle .material-symbols-outlined');
+
+            if (taskList) {
+                taskList.style.display = 'flex';
+                if (toggleIcon) {
+                    toggleIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
+    }
+}
+
+// 🆕 Función para mostrar la sección de tareas (estilo original)
+function showTasksSection(taskType) {
+    // Mostrar la sección de tareas
+    if (elements.tasksSection) {
+        elements.tasksSection.classList.add('active');
+        elements.tasksSection.style.display = 'flex';
+    }
+
+    // Mostrar el contenedor de tareas (estilo antiguo, por compatibilidad)
+    if (elements.tasksContainer) {
+        elements.tasksContainer.classList.add('active');
+    }
+
+    // Expandir la categoría correspondiente
+    if (taskType) {
+        expandTaskCategory(taskType);
+    }
+
+    // Actualizar navegación
+    elements.navItems.forEach(item => item.classList.remove('active'));
+    const tasksNavBtn = document.getElementById('tasksNavBtn');
+    if (tasksNavBtn) {
+        tasksNavBtn.classList.add('active');
     }
 }
 
@@ -591,29 +736,27 @@ function selectAction(e) {
     
     const placeholders = {
         'aprende': 'Pregunta sobre cursos de aprende.org',
-        'busqueda': 'Pregunta lo que quieras',
+        'descubre': 'Pregunta lo que quieras',
         'tareas': 'Crea o asigna una tarea...',
-        'capacitate': 'Pregunta sobre capacítate....',
-        'productividad': 'Organiza tu trabajo...'
+        'busqueda_web': 'Busca cualquier información en la web...'
     };
     
     // Nombres visuales para el chip
     const modeNames = {
         'aprende': 'Aprende.org',
-        'busqueda': 'Búsqueda Inteligente',
-        'tareas': 'Asigna tareas',
-        'capacitate': 'Capacítate',
-        'productividad': 'Productividad'
+        'descubre': 'Descubre',
+        'tareas': 'Gestión de tareas',
+        'busqueda_web': 'Búsqueda web'
     };
     
     elements.userInput.placeholder = placeholders[action] || 'Pregunta lo que quieras';
     appState.currentMode = action;
     
     // 🆕 MARCAR QUE FUE ACTIVADO MANUALMENTE
-    appState.modeActivatedManually = (action !== 'busqueda');
+    appState.modeActivatedManually = (action !== 'descubre');
     
     // Mostrar u ocultar chip según el modo
-    if (action !== 'busqueda') {
+    if (action !== 'descubre') {
         showModeChip(modeNames[action], action);
     } else {
         hideModeChip();
@@ -645,8 +788,7 @@ function showModeChip(modeName, modeAction) {
         const icons = {
             'aprende': '<div class="mode-chip-icon-letter">A</div>',
             'tareas': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-            'capacitate': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
-            'productividad': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
+            'busqueda_web': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>'
         };
         
         // Insertar el ícono correspondiente
@@ -684,7 +826,7 @@ function hideModeChip() {
     }
     
     // Resetear al modo búsqueda
-    appState.currentMode = 'busqueda';
+    appState.currentMode = 'descubre';
 
     // 🆕 RESETEAR FLAG DE MODO MANUAL
     appState.modeActivatedManually = false;
@@ -694,7 +836,7 @@ function hideModeChip() {
     
     // Actualizar selección visual en el menú
     elements.actionItems.forEach(item => {
-        if (item.getAttribute('data-action') === 'busqueda') {
+        if (item.getAttribute('data-action') === 'descubre') {
             item.classList.add('selected');
         } else {
             item.classList.remove('selected');
@@ -1399,28 +1541,13 @@ async function processTask(userMessage, botResponse) {
         }, 100);
     }
     
-    if (elements.tasksContainer) {
-        elements.tasksContainer.classList.add('active');
-    }
+    // Mostrar sección de tareas (estilo original)
+    showTasksSection(taskType);
     
-    expandTaskSection(taskType);
     saveToLocalStorage();
 
     // Debug opcional
     console.log('[TASK CREADA]', { taskType, userMessage });
-}
-
-
-function expandTaskSection(taskType) {
-    document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));
-    document.querySelectorAll('.task-header').forEach(header => header.classList.remove('collapsed'));
-    
-    const targetHeader = document.querySelector(`.task-header[data-task-type="${taskType}"]`);
-    if (targetHeader) {
-        const targetBody = targetHeader.nextElementSibling;
-        targetBody.classList.add('open');
-        targetHeader.classList.add('collapsed');
-    }
 }
 
 function updateTasksUI() {
@@ -1431,21 +1558,17 @@ function updateTasksUI() {
 }
 
 function updateTaskBadges() {
-    const totalTasks = (appState.tasks.reminders?.length || 0) + 
-                      (appState.tasks.notes?.length || 0) + 
+    const totalTasks = (appState.tasks.reminders?.length || 0) +
+                      (appState.tasks.notes?.length || 0) +
                       (appState.tasks.calendar?.length || 0);
-    
-    const tasksNavBtn = document.getElementById('tasksNavBtn');
-    if (tasksNavBtn) {
-        const textSpan = tasksNavBtn.querySelector('span');
-        if (textSpan) {
-            let badgeText = 'Gestión de tareas';
-            if (totalTasks > 0) {
-                badgeText += ` (${totalTasks})`;
-            }
-            textSpan.textContent = badgeText;
-        }
+
+    // Actualizar badge en navegación
+    const tasksCountNav = document.getElementById('tasksCountNav');
+    if (tasksCountNav) {
+        tasksCountNav.textContent = `(${totalTasks})`;
     }
+
+    console.log(`📊 Tareas actualizadas: ${totalTasks} en total`);
 }
 
 function updateTaskList(container, tasks, taskType, emptyMessage) {
@@ -1468,11 +1591,11 @@ function updateTaskList(container, tasks, taskType, emptyMessage) {
         <div class="task-time">Creado: ${task.created_at}</div>
         ${false && taskType === 'calendar' && task.icsFileUrl ? `
         <button class="task-download" onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')" title="Descargar evento">
-            <i class="fas fa-download"></i>
+            <span class="material-symbols-outlined">download</span>
         </button>
         ` : ''}
         <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})" title="Eliminar">
-            <i class="fas fa-times"></i>
+            <span class="material-symbols-outlined">close</span>
         </button>
     </div>
 `;
@@ -1551,7 +1674,7 @@ function loadFromLocalStorage() {
             if (data.sessionId === currentSessionId) {
                 appState.conversationHistory = data.conversationHistory || [];
                 appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
-                appState.currentMode = data.currentMode || 'busqueda';
+                appState.currentMode = data.currentMode || 'descubre';
                 userState.messageCount = data.messageCount || 0;
                 userState.isPro = data.isPro || false;
                 
@@ -1621,6 +1744,180 @@ function closePremiumModal() {
         overlay.classList.remove('active');
     }
 }
+
+// ==================== FUNCIONES DE HISTORIAL DE CONVERSACIONES ====================
+/**
+ * Importa las funciones necesarias de chatStorage
+ * Se hace dinámicamente para evitar problemas con módulos ES6
+ */
+let saveConversation, loadConversations, loadConversationById, deleteConversation, clearConversations;
+
+async function initConversationStorage() {
+    return new Promise((resolve) => {
+        import('./chatStorage.js').then(module => {
+            saveConversation = module.saveConversation;
+            loadConversations = module.loadConversations;
+            loadConversationById = module.loadConversationById;
+            deleteConversation = module.deleteConversation;
+            clearConversations = module.clearConversations;
+            console.log('✅ Módulo de almacenamiento de conversaciones cargado');
+            resolve();
+        }).catch(e => {
+            console.error('❌ Error cargando módulo de conversaciones:', e);
+            resolve(); // Resolver incluso con error para no bloquear la app
+        });
+    });
+}
+
+/**
+ * Guarda la conversación actual en el historial
+ */
+function saveCurrentConversation() {
+    // No guardar si la conversación fue cargada desde el historial
+    if (appState.isLoadedFromHistory) {
+        console.log('ℹ️ Conversación saltada (fue cargada desde historial)');
+        appState.isLoadedFromHistory = false;
+        return;
+    }
+    
+    // Solo guardar si hay más de 1 mensaje (al menos 1 usuario + 1 bot)
+    if (appState.conversationHistory.length >= 2) {
+        const userMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'user');
+        const botMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'bot');
+        
+        // Solo guardar si hay al menos 1 mensaje del usuario Y 1 respuesta del bot
+        if (userMessages.length > 0 && botMessages.length > 0) {
+            const firstMessage = userMessages[0];
+            const title = firstMessage ? firstMessage.content.substring(0, 50) : 'Conversación sin título';
+            
+            saveConversation(appState.conversationHistory, title);
+            updateConversationHistoryUI();
+            console.log('💾 Conversación guardada en historial');
+        }
+    }
+}
+
+/**
+ * Carga una conversación del historial
+ */
+function loadConversationFromHistory(conversationId) {
+    const conversation = loadConversationById(conversationId);
+    
+    if (conversation) {
+        // Generar nuevo session ID para esta conversación
+        const newSessionId = generateNewConversationId();
+        
+        // Cargar los mensajes
+        appState.conversationHistory = conversation.messages || [];
+        
+        // 🆕 MARCAR que fue cargada desde el historial para evitar guardarla nuevamente
+        appState.isLoadedFromHistory = true;
+        
+        // Mostrar vista de chat
+        showChatView();
+        elements.chatHistory.innerHTML = '';
+        
+        // Renderizar mensajes
+        appState.conversationHistory.forEach(msg => {
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container ' + (msg.type || msg.role);
+            
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'message-avatar ' + (msg.type || msg.role);
+            
+            if ((msg.type || msg.role) === 'bot') {
+                avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
+            } else {
+                avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
+            }
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'msg ' + (msg.type || msg.role);
+            messageDiv.innerHTML = formatMessage(msg.content);
+            
+            contentDiv.appendChild(messageDiv);
+            messageContainer.appendChild(avatarDiv);
+            messageContainer.appendChild(contentDiv);
+            
+            elements.chatHistory.appendChild(messageContainer);
+        });
+        
+        // Scroll al final
+        setTimeout(() => {
+            elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+        }, 100);
+        
+        saveToLocalStorage();
+        console.log('📂 Conversación cargada desde historial:', conversationId);
+    }
+}
+
+/**
+ * Actualiza la UI del listado de conversaciones en el sidebar
+ */
+function updateConversationHistoryUI() {
+    const historyList = document.getElementById('conversationHistoryList');
+    if (!historyList) return;
+    
+    // Validar que las funciones de almacenamiento estén cargadas
+    if (typeof loadConversations !== 'function') {
+        console.warn('⚠️ Las funciones de almacenamiento aún no están cargadas');
+        return;
+    }
+    
+    const conversations = loadConversations();
+    
+    if (conversations.length === 0) {
+        historyList.innerHTML = '<div class="no-conversations">Sin conversaciones</div>';
+        return;
+    }
+    
+    historyList.innerHTML = '';
+    
+    conversations.forEach(conversation => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.dataset.conversationId = conversation.id;
+        
+        const title = document.createElement('span');
+        title.className = 'history-item-title';
+        title.textContent = conversation.title;
+        title.addEventListener('click', () => loadConversationFromHistory(conversation.id));
+        
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'history-item-delete';
+        deleteBtn.innerHTML = '✕';
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteConversation(conversation.id);
+            updateConversationHistoryUI();
+            console.log('🗑️ Conversación eliminada');
+        });
+        
+        item.appendChild(title);
+        item.appendChild(deleteBtn);
+        historyList.appendChild(item);
+    });
+}
+
+/**
+ * Limpia todo el historial de conversaciones
+ */
+function clearAllConversationHistory() {
+    if (confirm('¿Eliminar todo el historial de conversaciones? Esta acción no se puede deshacer.')) {
+        clearConversations();
+        updateConversationHistoryUI();
+        console.log('🗑️ Todo el historial fue eliminado');
+    }
+}
+
+// Exponer funciones globalmente
+window.saveCurrentConversation = saveCurrentConversation;
+window.loadConversationFromHistory = loadConversationFromHistory;
+window.clearAllConversationHistory = clearAllConversationHistory;
 
 
 // ==================== CARRUSEL DE SUGERENCIAS ====================
@@ -1744,4 +2041,3 @@ console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 1
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cToken Limit:', 'color: #28a745; font-weight: bold;', TOKEN_CONFIG.MAX_TOKENS);
 console.log('%cReady to chat!', 'color: #28a745;');
-
