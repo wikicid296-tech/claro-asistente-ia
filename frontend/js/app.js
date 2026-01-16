@@ -105,6 +105,55 @@ const usageState = {
     warning: false
 };
 
+// ==================== MODE CONTROLLER ====================
+function setMode(mode, { source = 'manual' } = {}) {
+    const placeholders = {
+        descubre: 'Pregunta lo que quieras',
+        aprende: 'Pregunta sobre cursos de aprende.org',
+        busqueda_web: 'Busca cualquier información en la web...'
+    };
+
+    const modeNames = {
+        descubre: 'Descubre',
+        aprende: 'Aprende.org',
+        busqueda_web: 'Búsqueda web'
+    };
+
+    // 1️⃣ Estado
+    appState.currentMode = mode;
+    appState.modeActivatedManually = source === 'manual';
+
+    // 2️⃣ Placeholder
+    if (elements.userInput) {
+        elements.userInput.placeholder = placeholders[mode] || placeholders.descubre;
+    }
+
+    // 3️⃣ Chip
+    if (mode === 'descubre') {
+        hideModeChip();
+    } else {
+        showModeChip(modeNames[mode], mode);
+    }
+
+    // 4️⃣ Sidebar
+    elements.navItems.forEach(item => {
+        item.classList.toggle(
+            'active',
+            item.getAttribute('data-section') === mode
+        );
+    });
+
+    // 5️⃣ Action menu
+    elements.actionItems.forEach(item => {
+        item.classList.toggle(
+            'selected',
+            item.getAttribute('data-action') === mode
+        );
+    });
+
+    console.log(`🔄 Modo activo: ${mode} (source: ${source})`);
+}
+
 // ==================== FUNCIONES DE CONSUMO ====================
 /**
  * Consulta el endpoint /usage y actualiza el estado
@@ -314,63 +363,17 @@ function detectModeFromText(text) {
  * Activa un modo automáticamente y actualiza la UI
  */
 function activateModeAutomatically(mode) {
-    const modeNames = {
-        'aprende': 'Aprende.org',
-        'busqueda_web': 'Búsqueda web'
-    };
-    
-    const placeholders = {
-        'aprende': 'Pregunta sobre cursos de aprende.org',
-        'busqueda_web': 'Busca cualquier información en la web...'
-    };
-    
-    // Actualizar placeholder
-    elements.userInput.placeholder = placeholders[mode] || 'Pregunta lo que quieras';
-    
-    // Actualizar modo en el estado
-    appState.currentMode = mode;
-    
-    // 🆕 MARCAR QUE NO FUE MANUAL (fue automático)
-    appState.modeActivatedManually = false;
-    
-    // Mostrar chip
-    showModeChip(modeNames[mode], mode);
-    
-    // Actualizar selección en el menú de acciones
-    elements.actionItems.forEach(item => {
-        if (item.getAttribute('data-action') === mode) {
-            item.classList.add('selected');
-        } else {
-            item.classList.remove('selected');
-        }
-    });
-    
-    console.log(`🤖 Modo "${mode}" activado automáticamente`);
+    setMode(mode, { source: 'auto' });
 }
+
 
 /**
  * Desactiva el modo automático y vuelve a "descubre"
  */
 function deactivateAutoMode() {
-    if (appState.currentMode !== 'descubre') {
-        appState.currentMode = 'descubre';
-        appState.modeActivatedManually = false;
-        
-        elements.userInput.placeholder = 'Pregunta lo que quieras';
-        hideModeChip();
-        
-        // Actualizar selección en el menú
-        elements.actionItems.forEach(item => {
-            if (item.getAttribute('data-action') === 'descubre') {
-                item.classList.add('selected');
-            } else {
-                item.classList.remove('selected');
-            }
-        });
-        
-        console.log('🤖 Volviendo a modo "descubre"');
-    }
+    setMode('descubre', { source: 'auto' });
 }
+
 
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', async function() {
@@ -519,8 +522,9 @@ function handleNavigation(e) {
         return;
     }
 
-    elements.navItems.forEach(item => item.classList.remove('active'));
-    this.classList.add('active');
+    if (['descubre', 'aprende', 'busqueda_web'].includes(section)) {
+        setMode(section, { source: 'manual' });
+    }
 
     if (section === 'tasks') {
         if (elements.tasksSection) {
@@ -544,6 +548,7 @@ function handleNavigation(e) {
         closeSidebar();
     }
 }
+
 
 function generateNewConversationId() {
     const newId =
@@ -730,40 +735,11 @@ function toggleActionMenu(e) {
 
 function selectAction(e) {
     const action = this.getAttribute('data-action');
-    
-    elements.actionItems.forEach(item => item.classList.remove('selected'));
-    this.classList.add('selected');
-    
-    const placeholders = {
-        'aprende': 'Pregunta sobre cursos de aprende.org',
-        'descubre': 'Pregunta lo que quieras',
-        'tareas': 'Crea o asigna una tarea...',
-        'busqueda_web': 'Busca cualquier información en la web...'
-    };
-    
-    // Nombres visuales para el chip
-    const modeNames = {
-        'aprende': 'Aprende.org',
-        'descubre': 'Descubre',
-        'tareas': 'Gestión de tareas',
-        'busqueda_web': 'Búsqueda web'
-    };
-    
-    elements.userInput.placeholder = placeholders[action] || 'Pregunta lo que quieras';
-    appState.currentMode = action;
-    
-    // 🆕 MARCAR QUE FUE ACTIVADO MANUALMENTE
-    appState.modeActivatedManually = (action !== 'descubre');
-    
-    // Mostrar u ocultar chip según el modo
-    if (action !== 'descubre') {
-        showModeChip(modeNames[action], action);
-    } else {
-        hideModeChip();
-    }
-    
+
+    setMode(action, { source: 'manual' });
     elements.actionMenu.classList.remove('active');
 }
+
 
 // ==================== MODE CHIP FUNCTIONS ====================
 /**
@@ -816,49 +792,12 @@ function showModeChip(modeName, modeAction) {
 function hideModeChip() {
     if (!elements.modeChipContainer) return;
     
-    // Ocultar contenedor
     elements.modeChipContainer.style.display = 'none';
-    
-    // 🆕 MOSTRAR CARRUSEL cuando se cierra el chip
-    const carousel = document.getElementById('suggestionsCarousel');
-    if (carousel && elements.welcomePage.style.display !== 'none') {
-        carousel.style.display = 'block';
-    }
-    
-    // Resetear al modo búsqueda
-    appState.currentMode = 'descubre';
-
-    // 🆕 RESETEAR FLAG DE MODO MANUAL
-    appState.modeActivatedManually = false;
-    
-    // Restaurar placeholder
-    elements.userInput.placeholder = 'Pregunta lo que quieras';
-    
-    // Actualizar selección visual en el menú
-    elements.actionItems.forEach(item => {
-        if (item.getAttribute('data-action') === 'descubre') {
-            item.classList.add('selected');
-        } else {
-            item.classList.remove('selected');
-        }
-    });
-    
-    console.log('❌ Chip desactivado - Modo: búsqueda');
-}
-
-// Exponer funciones globalmente para testing
-window.showModeChip = showModeChip;
-window.hideModeChip = hideModeChip;
-
-function handleOutsideClick(e) {
-    const menu = elements.actionMenu;
-    const addBtn = e.target.closest('.add-btn');
-    const menuItem = e.target.closest('.action-item');
-    
-    if (!addBtn && !menuItem && menu.classList.contains('active')) {
-        menu.classList.remove('active');
+    if (appState.currentMode !== 'descubre') {
+        setMode('descubre', { source: 'manual' });
     }
 }
+
 
 // ==================== SUGGESTION CARDS ====================
 function handleSuggestionClick(e) {
