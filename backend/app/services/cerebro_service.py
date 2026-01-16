@@ -6,6 +6,7 @@ from typing import Dict, Any
 
 from app.services.content_safety_service import check_content_safety
 from app.services.chat_orchestrator_service import run_web_chat
+from app.services.web_search_service import run_web_search
 
 from app.services.prompt_service import (
     is_aprende_intent,
@@ -122,6 +123,25 @@ def procesar_chat_web(
     # Cargar estado conversacional
     # -------------------------------------------------
     state = load_state(user_key)
+    
+    # -------------------------------------------------
+    # BÚSQUEDA WEB (acción explícita)
+    # -------------------------------------------------
+    if action == "busqueda_web":
+        web_result = run_web_search(user_message)
+
+        return {
+            "success": True,
+            "response": web_result.get(
+                "content",
+                "No fue posible obtener resultados de la búsqueda."
+            ),
+            "context": "🌐 BÚSQUEDA WEB",
+            "context_reset": False,
+            "memory_used": 0,
+            "relevant_urls": web_result.get("sources", []),
+            "action": "busqueda_web",
+        }
 
     # -------------------------------------------------
     # Resolución de slot pendiente TELCEL
