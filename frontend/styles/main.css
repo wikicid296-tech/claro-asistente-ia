@@ -199,12 +199,36 @@ nav.sidebar.active {
     pointer-events: none;
 }
 
+.nav-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: transform 0.2s ease;
+}
+
+.nav-item.active ~ .tasks-section {
+    display: flex;
+}
+
 .section-title {
     margin-top: 20px;
     margin-bottom: 10px;
     color: #999;
     font-size: 13px;
     font-weight: 500;
+}
+
+.section-title.title-text {
+    color: var(--texto-oscuro);
+    font-size: 13px;
 }
 
 .no-conversations {
@@ -293,25 +317,6 @@ nav.sidebar.active {
     color: var(--texto-claro);
 }
 
-.task-delete {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: none;
-    border: none;
-    color: var(--error);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 2px 5px;
-    border-radius: 3px;
-    line-height: 1;
-}
-
-.task-delete:hover {
-    background: var(--error);
-    color: var(--blanco);
-}
-
 .task-download {
     position: absolute;
     bottom: 5px;
@@ -337,6 +342,174 @@ nav.sidebar.active {
     text-align: center;
     padding: 10px;
     font-size: 13px;
+}
+
+/* ==================== TASKS SECTION (NEW STYLE) ==================== */
+.tasks-section {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px 8px;
+    background: #ffffff;
+    border-left: 2px solid var(--azul);
+    margin-left: 8px;
+    margin-top: -4px;
+}
+
+.tasks-section.active {
+    display: flex;
+}
+
+.tasks-section .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--texto-oscuro);
+    margin-bottom: 4px;
+    margin-top: 0;
+}
+
+.tasks-section .section-title::before {
+    content: '✓';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: var(--azul);
+    color: white;
+    border-radius: 4px;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.task-category {
+    border: 1px solid var(--azul);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #ffffff;
+}
+
+.task-category-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #e1f5fe;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--azul);
+    transition: all 0.2s ease;
+}
+
+.task-category-header:hover {
+    background: #b3e5fc;
+}
+
+.task-category-header .material-symbols-outlined {
+    font-size: 22px;
+    color: var(--azul);
+}
+
+.task-category-header span:nth-child(2) {
+    flex: 1;
+}
+
+.task-category-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+    color: var(--azul);
+}
+
+.task-list {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+    background: #ffffff;
+}
+
+.task-list .no-tasks,
+.task-list .empty-task-message {
+    color: #999;
+    font-size: 12px;
+    text-align: center;
+    padding: 16px;
+    font-style: italic;
+}
+
+.task-item {
+    position: relative;
+    background: #ffffff;
+    border-left: 4px solid var(--azul);
+    padding: 12px 14px;
+    padding-right: 35px;
+    border-radius: 0;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    border: 1px solid #b3e5fc;
+    border-left: 4px solid var(--azul);
+}
+
+.task-item:hover {
+    background: #f0f9ff;
+    box-shadow: 0 2px 8px rgba(0, 188, 212, 0.15);
+}
+
+.task-content {
+    margin-bottom: 6px;
+    color: var(--texto-oscuro);
+    font-size: 13px;
+    word-break: break-word;
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+.task-time {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 0;
+}
+
+.task-delete {
+    position: absolute;
+    top: 10px;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 20px;
+    padding: 2px 4px;
+    line-height: 1;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-delete:hover {
+    color: #c0392b;
+    transform: scale(1.1);
+}
+
+.task-delete .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.task-count {
+    font-size: 13px;
+    color: var(--azul);
+    font-weight: 600;
 }
 
 /* ==================== MAIN CONTENT ==================== */
@@ -1600,4 +1773,112 @@ main.content {
         font-size: 12px;
         padding: 10px 14px;
     }
+}
+
+/* ==================== HISTORIAL DE CONVERSACIONES ==================== */
+.history-list {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.history-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    color: var(--texto-oscuro);
+}
+
+.history-item:hover {
+    background: #e8f5f7;
+    border-color: var(--azul);
+}
+
+.history-item-title {
+    flex: 1;
+    min-width: 0;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+.history-item-delete {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+    flex-shrink: 0;
+}
+
+.history-item-delete:hover {
+    color: #dc3545;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.clear-history-btn {
+    flex: 1;
+    padding: 8px 10px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #666;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.clear-history-btn:hover {
+    background: #ffebee;
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.clear-history-btn svg {
+    width: 14px;
+    height: 14px;
 }
