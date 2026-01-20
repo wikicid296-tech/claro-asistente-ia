@@ -380,7 +380,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     initializeEventListeners();
     loadFromLocalStorage();
     
-    // 🆕 Actualizar UI de tareas al cargar
+    // Actualizar UI de tareas al cargar
     updateTasksUI();
     
     // Inicializar módulo de conversaciones (esperar a que cargue)
@@ -393,7 +393,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateTokenCounter(0);
     
     // 🆕 CARGAR HISTORIAL DE CONVERSACIONES (ahora que están cargadas las funciones)
-    updateConversationHistoryUI();
+    setTimeout(() => {
+        updateConversationHistoryUI();
+    }, 500);
     
     // 🆕 CONSULTAR CONSUMO AL CARGAR
     fetchUsageStatus();
@@ -562,64 +564,133 @@ function generateNewConversationId() {
 }
 
 function startNewConversation() {
-    // 🔑 0️⃣ GUARDAR conversación anterior en el historial
-    saveCurrentConversation();
-    
-    // 🆕 RESETEAR flag de historial
-    appState.isLoadedFromHistory = false;
-    
-    // 🔑 1️⃣ Generar NUEVO conversationId
-    const newSessionId = generateNewConversationId();
-    console.log('🔑 Nueva conversationId generada:', newSessionId);
-
-    // 🧹 2️⃣ Reset de estado interno
-    appState.conversationHistory = [];
-    userState.messageCount = 0;
-    elements.chatHistory.innerHTML = '';
-
-    // 🧭 3️⃣ Reset de vistas
-    elements.welcomePage.style.display = 'flex';
-    elements.chatPage.style.display = 'none';
-
-    // 🎠 4️⃣ Mostrar carrusel de sugerencias
-    const carousel = document.getElementById('suggestionsCarousel');
-    if (carousel) {
-        carousel.style.display = 'block';
-    }
-
-    // 🚦 5️⃣ Reset de límites y UI
-    removeLimitWarning();
-    hideModeChip();
-
-    // 🆕 6️⃣ Reset de modo y placeholder
-    elements.userInput.placeholder = 'Pregunta lo que quieras';
-    appState.currentMode = 'descubre';
-
-    // 🧩 7️⃣ Reset visual del menú de acciones
-    elements.actionItems.forEach(item => {
-        if (item.getAttribute('data-action') === 'descubre') {
-            item.classList.add('selected');
-        } else {
-            item.classList.remove('selected');
+    try {
+        // 🔑 0️⃣ Guardar conversación anterior en el historial
+        if (appState.conversationHistory.length >= 2) {
+            saveCurrentConversation();
         }
-    });
 
-    // 💾 8️⃣ Persistencia limpia
-    saveToLocalStorage();
+        // 🆕 1️⃣ Resetear flag de historial
+        appState.isLoadedFromHistory = false;
 
-    // 📌 9️⃣ Navegación
-    elements.navItems.forEach(item => item.classList.remove('active'));
-    if (elements.newConversationBtn) {
-        elements.newConversationBtn.classList.add('active');
+        // 🔑 2️⃣ Generar NUEVO conversationId
+        const newSessionId = generateNewConversationId();
+        console.log('🔑 Nueva conversationId generada:', newSessionId);
+
+        // 🧹 3️⃣ Reset de estado interno
+        appState.conversationHistory = [];
+        userState.messageCount = 0;
+
+        // Limpiar UI del chat
+        if (elements.chatHistory) {
+            elements.chatHistory.innerHTML = '';
+        }
+
+        // 🧭 4️⃣ Reset de vistas
+        if (elements.welcomePage) {
+            elements.welcomePage.style.display = 'flex';
+        }
+        if (elements.chatPage) {
+            elements.chatPage.style.display = 'none';
+        }
+
+        // 🎠 5️⃣ Mostrar carrusel de sugerencias (si existe)
+        const carousel = document.getElementById('suggestionsCarousel');
+        if (carousel) {
+            carousel.style.display = 'block';
+        }
+
+        // 🚦 6️⃣ Reset de límites y UI
+        if (typeof removeLimitWarning === 'function') {
+            removeLimitWarning();
+        }
+        if (typeof hideModeChip === 'function') {
+            hideModeChip();
+        }
+
+        // 🆕 7️⃣ Reset de modo y placeholder
+        if (elements.userInput) {
+            elements.userInput.placeholder = 'Pregunta lo que quieras';
+        }
+        appState.currentMode = 'descubre';
+        appState.modeActivatedManually = false;
+
+        // 🧩 8️⃣ Reset visual del menú de acciones
+        if (elements.actionItems) {
+            elements.actionItems.forEach(item => {
+                item.classList.toggle(
+                    'selected',
+                    item.getAttribute('data-action') === 'descubre'
+                );
+            });
+        }
+
+        // 💾 9️⃣ Persistencia limpia
+        saveToLocalStorage();
+
+        // 📌 🔟 Navegación sidebar
+        if (elements.navItems) {
+            elements.navItems.forEach(item => item.classList.remove('active'));
+        }
+
+        if (elements.newConversationBtn) {
+            elements.newConversationBtn.classList.add('active');
+        }
+
+        // 📱 1️⃣1️⃣ Responsive
+        if (window.innerWidth < 900 && typeof closeSidebar === 'function') {
+            closeSidebar();
+        }
+
+        // 🔄 Actualizar historial de conversaciones
+        updateConversationHistoryUI();
+
+        console.log('🆕 Nueva conversación iniciada correctamente');
+
+    } catch (error) {
+        console.error('❌ Error en startNewConversation:', error);
     }
-    elements.tasksContainer.classList.remove('active');
-
-    // 📱 🔟 Responsive
-    if (window.innerWidth < 900) {
-        closeSidebar();
+}
+/**
+ * Guarda la conversación actual en el historial
+ */
+function saveCurrentConversation() {
+    // No guardar si la conversación fue cargada desde el historial
+    if (appState.isLoadedFromHistory) {
+        console.log('ℹ️ Conversación saltada (fue cargada desde historial)');
+        appState.isLoadedFromHistory = false;
+        return null;
     }
-
-    console.log('🆕 Nueva conversación iniciada - Modo resetado a búsqueda');
+    
+    // Verificar que saveConversation esté disponible
+    if (typeof saveConversation !== 'function') {
+        console.error('❌ saveConversation no está disponible');
+        return null;
+    }
+    
+    // Solo guardar si hay más de 1 mensaje (al menos 1 usuario + 1 bot)
+    if (appState.conversationHistory.length >= 2) {
+        const userMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'user');
+        const botMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'bot');
+        
+        // Solo guardar si hay al menos 1 mensaje del usuario Y 1 respuesta del bot
+        if (userMessages.length > 0 && botMessages.length > 0) {
+            const firstMessage = userMessages[0];
+            const title = firstMessage ? firstMessage.content.substring(0, 50) : 'Conversación sin título';
+            
+            const conversationId = saveConversation(appState.conversationHistory, title);
+            
+            // Actualizar UI después de guardar
+            setTimeout(() => {
+                updateConversationHistoryUI();
+            }, 100);
+            
+            console.log('💾 Conversación guardada en historial:', conversationId);
+            return conversationId;
+        }
+    }
+    
+    return null;
 }
 
 // ==================== TASK MANAGEMENT (ESTILO ORIGINAL) ====================
@@ -659,6 +730,28 @@ function toggleTaskCategory(e) {
         if (toggleIcon) {
             toggleIcon.style.transform = 'rotate(0deg)';
         }
+    }
+}
+function handleOutsideClick(e) {
+    // ==================== ACTION MENU (+) ====================
+    if (elements.actionMenu && elements.actionMenu.classList.contains('active')) {
+        const clickedInsideMenu = elements.actionMenu.contains(e.target);
+        const clickedAddBtn = elements.addBtn && elements.addBtn.contains(e.target);
+
+        if (!clickedInsideMenu && !clickedAddBtn) {
+            elements.actionMenu.classList.remove('active');
+        }
+    }
+
+    // ==================== SIDEBAR (modo móvil) ====================
+    if (
+        elements.sidebar &&
+        elements.sidebar.classList.contains('active') &&
+        !elements.sidebar.contains(e.target) &&
+        elements.menuToggle &&
+        !elements.menuToggle.contains(e.target)
+    ) {
+        closeSidebar();
     }
 }
 
@@ -958,6 +1051,29 @@ async function callAPI(message) {
         console.error('API Error:', error);
         throw error;
     }
+}
+
+async function initConversationStorage() {
+    return new Promise((resolve) => {
+        import('./chatStorage.js').then(module => {
+            saveConversation = module.saveConversation;
+            loadConversations = module.loadConversations;
+            loadConversationById = module.loadConversationById;
+            deleteConversation = module.deleteConversation;
+            clearConversations = module.clearConversations;
+            console.log('✅ Módulo de almacenamiento de conversaciones cargado');
+            resolve();
+        }).catch(e => {
+            console.error('❌ Error cargando módulo de conversaciones:', e);
+            // Definir funciones vacías como fallback
+            saveConversation = () => null;
+            loadConversations = () => [];
+            loadConversationById = () => null;
+            deleteConversation = () => {};
+            clearConversations = () => {};
+            resolve();
+        });
+    });
 }
 
 function showChatView() {
@@ -1687,112 +1803,34 @@ function closePremiumModal() {
 // ==================== FUNCIONES DE HISTORIAL DE CONVERSACIONES ====================
 /**
  * Importa las funciones necesarias de chatStorage
- * Se hace dinámicamente para evitar problemas con módulos ES6
  */
 let saveConversation, loadConversations, loadConversationById, deleteConversation, clearConversations;
 
-async function initConversationStorage() {
-    return new Promise((resolve) => {
-        import('./chatStorage.js').then(module => {
-            saveConversation = module.saveConversation;
-            loadConversations = module.loadConversations;
-            loadConversationById = module.loadConversationById;
-            deleteConversation = module.deleteConversation;
-            clearConversations = module.clearConversations;
-            console.log('✅ Módulo de almacenamiento de conversaciones cargado');
-            resolve();
-        }).catch(e => {
-            console.error('❌ Error cargando módulo de conversaciones:', e);
-            resolve(); // Resolver incluso con error para no bloquear la app
-        });
-    });
-}
-
-/**
- * Guarda la conversación actual en el historial
- */
-function saveCurrentConversation() {
-    // No guardar si la conversación fue cargada desde el historial
-    if (appState.isLoadedFromHistory) {
-        console.log('ℹ️ Conversación saltada (fue cargada desde historial)');
-        appState.isLoadedFromHistory = false;
-        return;
+// Carga inmediata del módulo de chatStorage
+(async function() {
+    try {
+        // Intenta cargar las funciones del módulo ES6
+        const module = await import('./chatStorage.js');
+        saveConversation = module.saveConversation;
+        loadConversations = module.loadConversations;
+        loadConversationById = module.loadConversationById;
+        deleteConversation = module.deleteConversation;
+        clearConversations = module.clearConversations;
+        console.log('✅ Módulo de almacenamiento de conversaciones cargado');
+    } catch (e) {
+        console.error('❌ Error cargando módulo de conversaciones:', e);
+        
+        // Fallback: definir funciones básicas si falla la importación
+        saveConversation = (messages, title) => {
+            console.warn('Fallback: saveConversation llamado');
+            return null;
+        };
+        loadConversations = () => [];
+        loadConversationById = () => null;
+        deleteConversation = () => {};
+        clearConversations = () => {};
     }
-    
-    // Solo guardar si hay más de 1 mensaje (al menos 1 usuario + 1 bot)
-    if (appState.conversationHistory.length >= 2) {
-        const userMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'user');
-        const botMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'bot');
-        
-        // Solo guardar si hay al menos 1 mensaje del usuario Y 1 respuesta del bot
-        if (userMessages.length > 0 && botMessages.length > 0) {
-            const firstMessage = userMessages[0];
-            const title = firstMessage ? firstMessage.content.substring(0, 50) : 'Conversación sin título';
-            
-            saveConversation(appState.conversationHistory, title);
-            updateConversationHistoryUI();
-            console.log('💾 Conversación guardada en historial');
-        }
-    }
-}
-
-/**
- * Carga una conversación del historial
- */
-function loadConversationFromHistory(conversationId) {
-    const conversation = loadConversationById(conversationId);
-    
-    if (conversation) {
-        // Generar nuevo session ID para esta conversación
-        const newSessionId = generateNewConversationId();
-        
-        // Cargar los mensajes
-        appState.conversationHistory = conversation.messages || [];
-        
-        // 🆕 MARCAR que fue cargada desde el historial para evitar guardarla nuevamente
-        appState.isLoadedFromHistory = true;
-        
-        // Mostrar vista de chat
-        showChatView();
-        elements.chatHistory.innerHTML = '';
-        
-        // Renderizar mensajes
-        appState.conversationHistory.forEach(msg => {
-            const messageContainer = document.createElement('div');
-            messageContainer.className = 'message-container ' + (msg.type || msg.role);
-            
-            const avatarDiv = document.createElement('div');
-            avatarDiv.className = 'message-avatar ' + (msg.type || msg.role);
-            
-            if ((msg.type || msg.role) === 'bot') {
-                avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
-            } else {
-                avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
-            }
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'msg ' + (msg.type || msg.role);
-            messageDiv.innerHTML = formatMessage(msg.content);
-            
-            contentDiv.appendChild(messageDiv);
-            messageContainer.appendChild(avatarDiv);
-            messageContainer.appendChild(contentDiv);
-            
-            elements.chatHistory.appendChild(messageContainer);
-        });
-        
-        // Scroll al final
-        setTimeout(() => {
-            elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
-        }, 100);
-        
-        saveToLocalStorage();
-        console.log('📂 Conversación cargada desde historial:', conversationId);
-    }
-}
+})();
 
 /**
  * Actualiza la UI del listado de conversaciones en el sidebar
@@ -1841,7 +1879,74 @@ function updateConversationHistoryUI() {
         historyList.appendChild(item);
     });
 }
-
+/**
+ * Carga una conversación del historial
+ */
+function loadConversationFromHistory(conversationId) {
+    if (typeof loadConversationById !== 'function') {
+        console.error('❌ loadConversationById no está disponible');
+        return;
+    }
+    
+    const conversation = loadConversationById(conversationId);
+    
+    if (conversation) {
+        // Guardar conversación actual antes de cargar una nueva
+        saveCurrentConversation();
+        
+        // Generar nuevo session ID para esta conversación
+        const newSessionId = generateNewConversationId();
+        
+        // Cargar los mensajes
+        appState.conversationHistory = conversation.messages || [];
+        
+        // 🆕 MARCAR que fue cargada desde el historial
+        appState.isLoadedFromHistory = true;
+        
+        // Mostrar vista de chat
+        showChatView();
+        elements.chatHistory.innerHTML = '';
+        
+        // Renderizar mensajes
+        appState.conversationHistory.forEach(msg => {
+            const messageContainer = document.createElement('div');
+            messageContainer.className = 'message-container ' + (msg.type || msg.role);
+            
+            const avatarDiv = document.createElement('div');
+            avatarDiv.className = 'message-avatar ' + (msg.type || msg.role);
+            
+            if ((msg.type || msg.role) === 'bot') {
+                avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
+            } else {
+                avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
+            }
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'msg ' + (msg.type || msg.role);
+            messageDiv.innerHTML = formatMessage(msg.content);
+            
+            contentDiv.appendChild(messageDiv);
+            messageContainer.appendChild(avatarDiv);
+            messageContainer.appendChild(contentDiv);
+            
+            elements.chatHistory.appendChild(messageContainer);
+        });
+        
+        // Scroll al final
+        setTimeout(() => {
+            elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+        }, 100);
+        
+        saveToLocalStorage();
+        updateConversationHistoryUI();
+        console.log('📂 Conversación cargada desde historial:', conversationId);
+    } else {
+        console.error('❌ No se pudo cargar la conversación:', conversationId);
+    }
+}
 /**
  * Limpia todo el historial de conversaciones
  */
@@ -1855,7 +1960,7 @@ function clearAllConversationHistory() {
 
 // Exponer funciones globalmente
 window.saveCurrentConversation = saveCurrentConversation;
-window.loadConversationFromHistory = loadConversationFromHistory;
+window.loadConversationFromHistofry = loadConversationFromHistory;
 window.clearAllConversationHistory = clearAllConversationHistory;
 
 
