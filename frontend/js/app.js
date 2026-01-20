@@ -732,6 +732,28 @@ function toggleTaskCategory(e) {
         }
     }
 }
+function handleOutsideClick(e) {
+    // ==================== ACTION MENU (+) ====================
+    if (elements.actionMenu && elements.actionMenu.classList.contains('active')) {
+        const clickedInsideMenu = elements.actionMenu.contains(e.target);
+        const clickedAddBtn = elements.addBtn && elements.addBtn.contains(e.target);
+
+        if (!clickedInsideMenu && !clickedAddBtn) {
+            elements.actionMenu.classList.remove('active');
+        }
+    }
+
+    // ==================== SIDEBAR (modo móvil) ====================
+    if (
+        elements.sidebar &&
+        elements.sidebar.classList.contains('active') &&
+        !elements.sidebar.contains(e.target) &&
+        elements.menuToggle &&
+        !elements.menuToggle.contains(e.target)
+    ) {
+        closeSidebar();
+    }
+}
 
 function expandTaskSection(taskType) {
     document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));
