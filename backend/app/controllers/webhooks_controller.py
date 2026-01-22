@@ -48,8 +48,10 @@ def format_aprende_for_sms(result: dict) -> str:
         name = course.get("courseName", "Curso")
         cid = course.get("courseId", "")
         lines.append(f"{idx}. {name}")
-        if cid:
-            lines.append(f"   ID: {cid}")
+        url = f"https://aprende.org/cursos/{cid}" if cid else "https://aprende.org"
+        #if cid:
+            #lines.append(f"   ID: {cid}")
+        lines.append(f"visita: {url}")
         lines.append("")
 
     lines.append("Busca el curso por título o ID en aprende.org")
@@ -99,7 +101,7 @@ def build_channel_message(result: dict, channel_name: str) -> str:
     # SMS: evitar meta / disclaimers
     if channel_name == "sms":
         # protección extra: nunca URLs en SMS
-        text = text.replace("http://", "").replace("https://", "")
+        #text = text.replace("http://", "").replace("https://", "")
         # fallback informativo si queda vacío
         if not text.strip():
             return "Puedo ayudarte con cursos, información y servicios. Escribe tu consulta."
@@ -135,6 +137,22 @@ def _generic_channel_controller(channel_name: str):
         if not incoming_msg:
             resp.message("Por favor envía un mensaje válido.")
             return str(resp), 200, {"Content-Type": "text/xml"}
+
+
+        if channel_name in ["whatsapp", "sms"] and incoming_msg.lower() in ["reiniciar", "reset", "empezar de nuevo"]:
+            from app.states.conversationStore import clear_state, save_state, ConversationState
+                # Borra estado anterior
+            clear_state(from_number)
+            state = ConversationState()
+            state.slots["_reset"] = "true"
+                # Crear estado limpio explícito (opcional pero más seguro)
+            save_state(from_number, state)
+
+            resp.message("✅ Conversación reiniciada. ¿En qué puedo ayudarte hoy?")
+            return str(resp), 200, {"Content-Type": "text/xml"}
+
+
+
 
         result = procesar_chat_web(
             user_message=incoming_msg,
