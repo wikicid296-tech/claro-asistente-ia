@@ -168,6 +168,11 @@ async function fetchUsageStatus() {
         }
         
         const data = await response.json();
+        // ==================== AUTO WEB SEARCH UX ====================
+        if (data.auto_triggered === true && data.action === 'busqueda_web_auto') {
+            handleAutoWebSearchUX();
+        }
+
         
         if (data.success) {
             usageState.consumed = data.consumed;
@@ -187,6 +192,14 @@ async function fetchUsageStatus() {
         console.error('Error fetching usage:', error);
     }
 }
+function handleAutoWebSearchUX() {
+    // 1️⃣ Activar visualmente el modo (SIN marcarlo como manual)
+    setMode('busqueda_web', { source: 'auto' });
+
+    // 2️⃣ Mostrar aviso contextual no intrusivo
+    showAutoWebSearchToast();
+}
+
 
 /**
  * Actualiza la barra visual de consumo
@@ -2071,6 +2084,25 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+function showAutoWebSearchToast() {
+    const toast = document.createElement('div');
+    toast.className = 'auto-web-toast';
+    toast.innerHTML = `
+        <span>🌐</span>
+        <div>
+            <strong>Búsqueda web activada automáticamente</strong><br>
+            <small>La pregunta requiere información actualizada</small>
+        </div>
+    `;
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
 
 // ==================== RESPONSIVE HANDLERS ====================
 window.addEventListener('resize', function() {

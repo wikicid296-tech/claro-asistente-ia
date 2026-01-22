@@ -13,6 +13,29 @@ logger = logging.getLogger(__name__)
 # ==========================================================
 # CONFIG
 # ==========================================================
+# ==========================================================
+# GROQ CONFIG (LLM TIEBREAKER)
+# ==========================================================
+
+def get_groq_api_key() -> Optional[str]:
+    return getattr(settings, "GROQ_API_KEY", None) or os.getenv("GROQ_API_KEY")
+
+def build_groq_client():
+    api_key = get_groq_api_key()
+    if not api_key:
+        print("⚠️ [GROQ] API key no configurada")
+        return None
+    try:
+        from groq import Groq
+        return Groq(api_key=api_key)
+    except Exception as e:
+        print("❌ Error inicializando Groq client:", e)
+        return None
+
+@lru_cache(maxsize=1)
+def get_groq_client():
+    return build_groq_client()
+
 
 def get_openai_api_key() -> Optional[str]:
     return getattr(settings, "OPENAI_API_KEY", None) or os.getenv("OPENAI_API_KEY")
@@ -45,6 +68,60 @@ def build_openai_client():
 @lru_cache(maxsize=1)
 def get_openai_client():
     return build_openai_client()
+def llm_aprende_tiebreaker(query: str, options: List[str]) -> Optional[str]:
+    """
+    Usa Groq como árbitro semántico SOLO para desempates.
+    Regresa el nombre exacto del curso ganador o None.
+    """
+    client = get_groq_client()
+    if not client:
+        print("⚠️ [LLM] Cliente Groq no disponible")
+        return None
+
+    options_text = "\n".join([f"- {o}" for o in options])
+
+    prompt = f"""
+El usuario escribió: "{query}"
+
+¿Cuál de las siguientes opciones es la MÁS adecuada para enseñar esa habilidad?
+
+Opciones:
+{options_text}
+
+Responde SOLO con el nombre exacto de la opción correcta.
+No expliques.
+""".strip()
+
+    print("\n🤖 [LLM] Ejecutando desempate semántico")
+    print("Prompt enviado:")
+    print(prompt)
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=20,
+        )
+
+        content = response.choices[0].message.content
+        if content is None:
+            print("⚠️ [LLM] Respuesta vacía del modelo")
+            return None
+        answer = content.strip()
+        print("🤖 [LLM] Respuesta cruda:", answer)
+
+        if answer in options:
+            print("✅ [LLM] Opción válida seleccionada:", answer)
+            return answer
+
+        print("⚠️ [LLM] Respuesta no coincide con opciones")
+        return None
+
+    except Exception as e:
+        print("❌ [LLM] Error en llamada a Groq:", e)
+        return None
+
 
 # ==========================================================
 # LOAD PACK
@@ -211,9 +288,9 @@ def apply_lexical_rerank(query: str, results: List[dict]) -> List[dict]:
     print(f"→ Top score:    {top:.4f}")
     print(f"→ Second score: {second:.4f}")
     print(f"→ Delta:        {delta:.4f}")
-    print("→ Rango válido:", 0.35, "<= top <=", 0.40)
+    print("→ Rango válido:", 0.35, "<= top <=", 0.45)
 
-    if not (0.35 <= top <= 0.40):
+    if not (0.35 <= top <= 0.45):
         print("→ NO: Top fuera de rango.")
         return results
 
@@ -246,18 +323,106 @@ def apply_lexical_rerank(query: str, results: List[dict]) -> List[dict]:
 
     print("============================\n")
     return results
+def llm_rewrite_learning_intent(user_query: str) -> Optional[str]:
+    """
+    Usa un LLM para reescribir la intención del usuario como una
+    descripción breve, práctica y cotidiana de la habilidad que desea aprender.
+
+    Reglas de salida:
+    - 1 sola oración
+    - Lenguaje cotidiano
+    - Describe la tarea (qué se hace), NO el curso
+    - NO menciona profesiones ni roles
+    - NO explica ni da consejos
+    - Máx. ~15 palabras
+
+    Ejemplos de salida válidos:
+      - "Cambiar un foco fundido en casa"
+      - "Reparar una fuga de agua en una llave"
+      - "Aprender a escribir más rápido en el teclado"
+
+    Devuelve None si el LLM falla.
+    """
+
+    client = get_groq_client()
+    if not client:
+        print("⚠️ [LLM] Cliente Groq no disponible para intent rewrite")
+        return None
+
+    prompt = f"""
+Reformula la intención del usuario como una descripción breve y práctica
+de la habilidad que desea aprender.
+
+Reglas estrictas:
+- Usa lenguaje cotidiano.
+- Describe la tarea, no el curso.
+- No menciones profesiones, oficios ni roles.
+- No expliques ni agregues contexto.
+- Máximo una oración corta.
+
+Entrada del usuario:
+"{user_query}"
+
+Salida:
+""".strip()
+
+    print("\n🧠 [LLM] Ejecutando rewrite de intención")
+    print("Prompt enviado:")
+    print(prompt)
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=40,
+        )
+
+        content = response.choices[0].message.content
+        if not content:
+            print("⚠️ [LLM] Rewrite vacío")
+            return None
+
+        intent = content.strip().rstrip(".")
+
+        # Filtro defensivo mínimo (por si el modelo se sale)
+        forbidden_keywords = [
+            "curso",
+            "profesión",
+            "oficio",
+            "electricista",
+            "mecánico",
+            "técnico",
+            "clase",
+        ]
+
+        lowered = intent.lower()
+        if any(k in lowered for k in forbidden_keywords):
+            print("⚠️ [LLM] Rewrite contiene términos prohibidos:", intent)
+            return None
+
+        print("✅ [LLM] Intención reescrita:", intent)
+        return intent
+
+    except Exception as e:
+        print("❌ [LLM] Error durante intent rewrite:", e)
+        return None
+
 
 # ==========================================================
 # SEARCH MAIN
 # ==========================================================
 
 def search_courses_in_clusters(query: str, k: int = 10) -> List[dict]:
+    print("🚀 search_courses_in_clusters INVOCADO con query =", repr(query))
     logger.info(f"🔍 Ejecutando búsqueda para query='{query}'")
 
     if not query:
         return []
 
-    # Load cluster pack
+    # ==========================================================
+    # LOAD CLUSTER PACK
+    # ==========================================================
     path = get_cluster_pack_path()
     if not os.path.exists(path):
         logger.error("Cluster pack no encontrado.")
@@ -274,17 +439,20 @@ def search_courses_in_clusters(query: str, k: int = 10) -> List[dict]:
     labels = _safe_get(pack, "cluster_labels", "labels", "y")
     centroids = _safe_get(pack, "centroids", "cluster_centroids", "centers")
 
-    # Normalize embeddings
     embeddings = np.asarray(embeddings, dtype=np.float32)
     course_ids = np.asarray(course_ids)
     course_names = np.asarray(course_names) if course_names is not None else None
 
-    # Embedding del query
+    # ==========================================================
+    # EMBEDDING DEL QUERY
+    # ==========================================================
     q_vec = embed_query(query)
     if q_vec is None:
         return []
 
-    # Selección por clusters
+    # ==========================================================
+    # SELECCIÓN POR CLUSTERS
+    # ==========================================================
     if centroids is not None and labels is not None:
         c_sims = _cosine_sim_matrix(q_vec, np.asarray(centroids))
         top_clusters = np.argsort(c_sims)[::-1][:3]
@@ -295,11 +463,13 @@ def search_courses_in_clusters(query: str, k: int = 10) -> List[dict]:
 
     pool_emb = embeddings[idx_pool]
     sims = _cosine_sim_matrix(q_vec, pool_emb)
-
     order = np.argsort(sims)[::-1][:k]
 
-    # Build raw results
-    results = []
+    # ==========================================================
+    # BUILD RAW RESULTS
+    # ==========================================================
+    results: List[Dict[str, Any]] = []
+
     for rank_idx in order:
         real_idx = idx_pool[rank_idx]
         cid = str(course_ids[real_idx])
@@ -312,90 +482,89 @@ def search_courses_in_clusters(query: str, k: int = 10) -> List[dict]:
             "metadata": {"courseId": cid, "courseName": cname},
         })
 
-    # ==========================================
+    # ==========================================================
     # PRINT: ORDEN INICIAL
-    # ==========================================
+    # ==========================================================
     print("\n############################################")
     print("➡️  ORDEN INICIAL ANTES DEL RE-RANKING")
     for i, r in enumerate(results, 1):
         print(f" {i}. {r['courseName']} → score={r['score']:.4f}")
     print("############################################\n")
 
-    # ==========================================
-    # APPLY RERANK
-    # ==========================================
+    # ==========================================================
+    # RE-RANKING LÉXICO
+    # ==========================================================
     results = apply_lexical_rerank(query, results)
 
     # ==========================================================
-    # INICIO BLOQUE DE RE-RANKING SEMÁNTICO POR TÍTULO
+    # RE-RANKING SEMÁNTICO POR TÍTULO
     # ==========================================================
-
     print("\n==============================")
     print("🔍 Re-ranking semántico por título")
     print("==============================\n")
 
     title_pack = load_title_embeddings()
 
-    if title_pack:
-        print("➡️ Orden inicial según embeddings de contenido:")
-        for i, r in enumerate(results, 1):
-            print(f" {i}. {r['courseName']} → content={r['score']:.4f}")
+    if title_pack and len(results) >= 2:
+        for r in results:
+            cid = str(r["courseId"])
+            t_emb = get_title_embedding_for_id(cid, title_pack)
 
-        if len(results) >= 2:
-            top = results[0]["score"]
-            second = results[1]["score"]
-            delta = top - second
+            title_sim = _cosine_single(q_vec, t_emb) if t_emb is not None else 0.0
+            r["_title_sim"] = title_sim
+            r["_combined"] = 0.7 * r["score"] + 0.3 * title_sim
 
-            if 0.35 <= top <= 0.40 and delta < 0.02:
-                print(f"✔ Re-ranking ACTIVADO (top={top:.4f}, delta={delta:.4f})\n")
+            print(
+                f"→ {r['courseName']}\n"
+                f"   content_sim={r['score']:.4f} | "
+                f"title_sim={title_sim:.4f} | "
+                f"combined={r['_combined']:.4f}"
+            )
 
-                for r in results:
-                    cid = str(r["courseId"])
-                    t_emb = get_title_embedding_for_id(cid, title_pack)
-
-                    if t_emb is None:
-                        r["_title_sim"] = 0.0
-                    else:
-                        r["_title_sim"] = _cosine_single(q_vec, t_emb)
-
-                    # combinación ponderada
-                    r["_combined"] = 0.7 * r["score"] + 0.3 * r["_title_sim"]
-
-                    print(f"→ {r['courseName']}")
-                    print(f"    content_sim = {r['score']:.4f}")
-                    print(f"    title_sim   = {r['_title_sim']:.4f}")
-                    print(f"    combined    = {r['_combined']:.4f}\n")
-
-                # Reordenar por combined
-                results.sort(key=lambda x: x["_combined"], reverse=True)
-
-                print("\n🏁 NUEVO ORDEN DESPUÉS DEL RE-RANKING:")
-                for i, r in enumerate(results, 1):
-                    print(f" {i}. {r['courseName']} → combined={r['_combined']:.4f}")
-
-            else:
-                print("❌ Re-ranking NO activado (fuera de umbral).")
-        else:
-            print("❌ No hay suficientes resultados para re-ranking.")
-
-    else:
-        print("⚠️ No se cargó title_embeddings; re-ranking desactivado.")
+        results.sort(key=lambda x: x["_combined"], reverse=True)
 
     print("\n==============================")
-    print("🏁 Fin del re-ranking semántico")
+    print("🏁 Fin del re-ranking semántico por título")
     print("==============================\n")
 
     # ==========================================================
-    # FIN BLOQUE DE RE-RANKING
+    # LLM INTENT REWRITE (NUEVO ENFOQUE)
     # ==========================================================
+    intent_description = llm_rewrite_learning_intent(query)
 
-    # ==========================================
+    if intent_description:
+        print("\n🧠 Intención normalizada por LLM:")
+        print("   ", intent_description)
+
+        print("\n🔄 Re-ranking por intención normalizada")
+
+        for r in results:
+            base = r.get("_combined", r["score"])
+            role_text = (r.get("courseName") or "").lower()
+
+            intent_sim = _lexical_similarity(intent_description, role_text)
+            r["_combined"] = base + 0.05 * intent_sim
+
+            print(
+                f"→ {r['courseName']}\n"
+                f"   base={base:.4f} | "
+                f"intent_sim={intent_sim:.4f} | "
+                f"combined={r['_combined']:.4f}"
+            )
+
+        results.sort(key=lambda x: x["_combined"], reverse=True)
+
+    # ==========================================================
     # RESULTADOS FINALES
-    # ==========================================
+    # ==========================================================
     print("\n############################################")
     print("🏁 RESULTADOS FINALES DESPUÉS DEL RE-RANKING")
     for i, r in enumerate(results, 1):
-        print(f" {i}. {r['courseName']} → score={r['score']:.4f} | combined={r.get('_combined')}")
+        print(
+            f" {i}. {r['courseName']} → "
+            f"score={r['score']:.4f} | combined={r.get('_combined')}"
+        )
     print("############################################\n")
 
     return results
+

@@ -7,6 +7,8 @@ from typing import Dict, Any
 from app.services.content_safety_service import check_content_safety
 from app.services.chat_orchestrator_service import run_web_chat
 from app.services.web_search_service import run_web_search
+from app.services.freshness_llm_service import llm_can_answer_with_cutoff
+
 
 from app.services.prompt_service import (
     is_aprende_intent,
@@ -247,6 +249,30 @@ def procesar_chat_web(
             save_state(user_key, state)
 
         return result
+        # -------------------------------------------------
+    # AUTO BÚSQUEDA WEB (DECISIÓN LLM)
+    # -------------------------------------------------
+    can_answer = llm_can_answer_with_cutoff(user_message)
+
+    if not can_answer:
+        logger.info("🌐 Auto Web Search: conocimiento insuficiente según LLM")
+
+        web_result = run_web_search(user_message)
+
+        return {
+            "success": True,
+            "response": web_result.get(
+                "content",
+                "No fue posible obtener información actualizada."
+            ),
+            "context": "🌐 BÚSQUEDA WEB (AUTO)",
+            "context_reset": False,
+            "memory_used": 0,
+            "relevant_urls": web_result.get("sources", []),
+            "action": "busqueda_web_auto",
+            "auto_triggered": True,
+        }
+
 
     # -------------------------------------------------
     # CHAT NORMAL (fallback)

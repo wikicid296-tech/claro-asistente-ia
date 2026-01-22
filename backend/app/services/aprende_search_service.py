@@ -7,6 +7,56 @@ from app.services.noun_extraction_service import extract_main_noun
 from app.services.semantic_guard_service import evaluate_domain
 
 logger = logging.getLogger(__name__)
+def build_aprende_search_query(
+    main_noun: str,
+    user_message: str,
+) -> str:
+    """
+    Construye una query canónica de aprendizaje a partir del sustantivo núcleo.
+    Ejemplo:
+      user_message: "aprende a cambiar una bombilla"
+      main_noun: "bombilla"
+      → "aprender a cambiar bombilla"
+    """
+
+    msg = (user_message or "").lower()
+
+    # Verbos comunes de acción en Aprende
+    ACTION_VERBS = [
+        "cambiar",
+        "reparar",
+        "instalar",
+        "arreglar",
+        "usar",
+        "hacer",
+        "mantener",
+        "conectar",
+        "configurar",
+    ]
+
+    verb = None
+    for v in ACTION_VERBS:
+        if v in msg:
+            verb = v
+            break
+
+    # Fallback seguro
+    if not verb:
+        verb = "usar"
+
+    # Normalizamos artículos
+    noun = re.sub(r"\b(una|un|el|la|los|las)\b", "", main_noun).strip()
+
+    search_query = f"aprender a {verb} {noun}"
+
+    logger.info(
+        "🔧 Query Aprende canónica construida | verb=%s | noun=%s | query='%s'",
+        verb,
+        noun,
+        search_query,
+    )
+
+    return search_query
 
 
 def run_aprende_flow(
@@ -99,7 +149,19 @@ def run_aprende_flow(
     # =====================================================
     # BÚSQUEDA FINAL EN CLUSTERS
     # =====================================================
-    candidates: List[Dict[str, Any]] = search_courses_in_clusters(user_message, k=k) or []
+    # =====================================================
+# CONSTRUCCIÓN DE QUERY CANÓNICA APRENDE (ENFOQUE B)
+# =====================================================
+
+    search_query = build_aprende_search_query(
+        main_noun=main_noun,
+        user_message=user_message,
+    )
+
+    candidates: List[Dict[str, Any]] = search_courses_in_clusters(
+        search_query,
+        k=k,
+    ) or []
 
     logger.info(f"📊 Resultados de búsqueda: {len(candidates)} candidatos")
 
@@ -108,7 +170,8 @@ def run_aprende_flow(
     logger.info(f"✅ run_aprende_flow fin | candidatos={len(candidates)}, top={len(top)}")
 
     return {
-        "query": user_message,
+        "query": search_query,
+        "original_query": user_message,
         "candidates": candidates,
         "top": top,
     }
