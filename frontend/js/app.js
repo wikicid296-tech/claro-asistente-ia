@@ -6,7 +6,7 @@ const API_URL = window.location.hostname === 'localhost' || window.location.host
 
 // ==================== CONFIGURACIÓN DE LÍMITE DE MENSAJES ====================
 const MESSAGE_LIMIT = {
-    FREE: 5,  // Límite de mensajes gratis (solo cuenta mensajes del usuario)
+    FREE: 20,  // Límite de mensajes gratis (solo cuenta mensajes del usuario)
     PRO: Infinity
 };
 
@@ -1822,7 +1822,7 @@ let saveConversation, loadConversations, loadConversationById, deleteConversatio
 // Carga inmediata del módulo de chatStorage
 (async function() {
     try {
-        // Intenta cargar las funciones del módulo ES6
+        // Intenta cargar las funciones del módFulo ES6
         const module = await import('./chatStorage.js');
         saveConversation = module.saveConversation;
         loadConversations = module.loadConversations;
