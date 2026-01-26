@@ -1,77 +1,198 @@
-# app/services/memory_service.py
 import logging
-from typing import List, Optional, Dict
+import re
+from typing import Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
-# Conservamos el storage simple actual
-CHAT_MEMORY: Dict[str, List[str]] = {}
+# ============================
+# ESTRUCTURA DE MEMORIA GLOBAL
+# ============================
+#
+# CHAT_MEMORY = {
+#   user_key: {
+#       "facts": {...},              # memoria persistente
+#       "recent": [...],             # ventana conversacional
+#       "active_topic": "general"    # contexto suave
+#   }
+# }
+#
+CHAT_MEMORY: Dict[str, Dict[str, Any]] = {}
 
+
+# ============================
+# EXTRACCIÓN DE HECHOS
+# ============================
+
+NAME_REGEX = re.compile(
+    r"(me llamo|mi nombre es|soy)\s+([a-zA-ZÁÉÍÓÚáéíóúñÑ]+)",
+    re.IGNORECASE
+)
+
+
+def extract_facts(text: str) -> Dict[str, Any]:
+    """
+    Extrae hechos persistentes del mensaje del usuario.
+    Esta función debe ser conservadora: solo guardar información explícita.
+    """
+    facts: Dict[str, Any] = {}
+    if not text:
+        return facts
+
+    # Nombre del usuario
+    match = NAME_REGEX.search(text)
+    if match:
+        facts["name"] = match.group(2).capitalize()
+
+    return facts
+
+
+# ============================
+# CONTEXTO TEMÁTICO (SUAVE)
+# ============================
 
 def detect_main_topic(text: str) -> str:
     text_lower = (text or "").lower()
 
-    telecom_keywords = ['claro', 'telcel', 'a1', 'plan', 'internet', 'telefon', 'móvil', 'movil',
-                        'datos', 'paquete', 'recarga', 'operador', 'señal']
-    education_keywords = ['curso', 'aprender', 'estudiar', 'educaci', 'diploma', 'universidad',
-                          'inglés', 'ingles', 'programa', 'capacita', 'aprende.org', 'clase',
-                          'enseña', 'profesor', 'escuela', 'carrera', 'profesional']
-    health_keywords = ['salud', 'medic', 'doctor', 'enfermedad', 'diabetes', 'presión', 'presion',
-                       'nutrición', 'nutricion', 'dieta', 'ejercicio', 'hospital', 'sintoma',
-                       'tratamiento', 'clikisalud', 'clinica']
-    task_keywords = ['recordar', 'recuerdame', 'recuérdame', 'agenda', 'agendar', 'nota', 'anota',
-                     'guardar', 'programa']
+    telecom_keywords = [
+        'claro', 'telcel', 'a1', 'plan', 'internet', 'telefon',
+        'móvil', 'movil', 'datos', 'paquete', 'recarga', 'operador'
+    ]
+    education_keywords = [
+        'curso', 'aprender', 'estudiar', 'educaci', 'diploma',
+        'universidad', 'ingles', 'inglés', 'programa', 'capacita'
+    ]
+    health_keywords = [
+        'salud', 'medic', 'doctor', 'enfermedad', 'tratamiento'
+    ]
 
-    counts = {
-        'telecom': sum(1 for kw in telecom_keywords if kw in text_lower),
-        'education': sum(1 for kw in education_keywords if kw in text_lower),
-        'health': sum(1 for kw in health_keywords if kw in text_lower),
-        'task': sum(1 for kw in task_keywords if kw in text_lower),
+    def score(keywords: List[str]) -> int:
+        return sum(1 for kw in keywords if kw in text_lower)
+
+    scores = {
+        "telecom": score(telecom_keywords),
+        "education": score(education_keywords),
+        "health": score(health_keywords),
     }
-    max_count = max(counts.values()) if counts else 0
-    if max_count == 0:
-        return 'general'
 
-    for topic, count in counts.items():
-        if count == max_count:
-            return topic
+    best_topic = max(
+    scores.items(),
+    key=lambda item: item[1])[0]
 
-    return 'general'
+    return best_topic if scores[best_topic] > 0 else "general"
 
 
-def detect_context_change(current_message: str, previous_messages: List[str]) -> bool:
-    if not previous_messages:
-        return False
+# ============================
+# INICIALIZACIÓN DE USUARIO
+# ============================
 
-    current_context = detect_main_topic(current_message)
-    previous_contexts = [detect_main_topic(msg) for msg in previous_messages]
-
-    if current_context and all(current_context != prev for prev in previous_contexts if prev):
-        logger.info(f"Cambio de contexto detectado: {previous_contexts[-1] if previous_contexts else 'none'} → {current_context}")
-        return True
-
-    return False
-
-
-def get_relevant_memory(user_key: str, current_message: str) -> List[str]:
-    mem = CHAT_MEMORY.get(user_key, [])
-    if not mem:
-        return []
-
-    if detect_context_change(current_message, mem):
-        logger.info("Limpiando memoria anterior por cambio de contexto")
-        CHAT_MEMORY[user_key] = []
-        return []
-
-    # Mantienes solo 1 mensaje previo hoy
-    return mem[-1:]
+def _ensure_user_memory(user_key: str) -> Dict[str, Any]:
+    if user_key not in CHAT_MEMORY:
+        CHAT_MEMORY[user_key] = {
+            "facts": {},
+            "recent": [],
+            "active_topic": "general",
+        }
+    return CHAT_MEMORY[user_key]
 
 
-def append_memory(user_key: str, message: str, max_len: int = 2) -> None:
-    mem = CHAT_MEMORY.get(user_key, [])
-    mem.append(message)
+# ============================
+# API PÚBLICA
+# ============================
 
-    if len(mem) > max_len:
-        mem = mem[-max_len:]
+def append_memory(
+    user_key: str,
+    role: str,
+    message: str,
+    max_recent: int = 6
+) -> None:
+    """
+    Agrega un mensaje a la memoria del usuario.
+    - Extrae hechos persistentes solo desde mensajes del usuario.
+    - Mantiene una ventana conversacional acotada.
+    - Actualiza el contexto temático sin borrar identidad.
+    """
+    memory = _ensure_user_memory(user_key)
 
-    CHAT_MEMORY[user_key] = mem
+    if role == "user":
+        # Extraer hechos persistentes
+        new_facts = extract_facts(message)
+        if new_facts:
+            logger.info(f"Hechos detectados para {user_key}: {new_facts}")
+            memory["facts"].update(new_facts)
+
+        # Actualizar contexto activo (soft)
+        memory["active_topic"] = detect_main_topic(message)
+
+    # Agregar a ventana conversacional
+    memory["recent"].append({
+        "role": role,
+        "content": message
+    })
+
+    # Limitar tamaño de ventana
+    memory["recent"] = memory["recent"][-max_recent:]
+
+
+def get_memory_snapshot(user_key: str) -> Dict[str, Any]:
+    """
+    Devuelve una copia segura de la memoria del usuario.
+    """
+    memory = _ensure_user_memory(user_key)
+    return {
+        "facts": dict(memory["facts"]),
+        "recent": list(memory["recent"]),
+        "active_topic": memory["active_topic"],
+    }
+
+
+def build_prompt_messages(
+    user_key: str,
+    user_message: str
+) -> List[Dict[str, str]]:
+    """
+    Construye la lista de mensajes que se enviará al LLM,
+    inyectando memoria factual y ventana conversacional.
+    """
+    memory = _ensure_user_memory(user_key)
+
+    messages: List[Dict[str, str]] = []
+
+    # Inyección de memoria factual (NO conversacional)
+    if memory["facts"]:
+        system_memory = (
+            "Información conocida y confirmada del usuario:\n"
+            f"{memory['facts']}"
+        )
+        messages.append({
+            "role": "system",
+            "content": system_memory
+        })
+
+    # Ventana conversacional
+    messages.extend(memory["recent"])
+
+    # Mensaje actual
+    messages.append({
+        "role": "user",
+        "content": user_message
+    })
+
+    return messages
+
+
+def reset_conversation_window(user_key: str) -> None:
+    """
+    Limpia solo la ventana conversacional.
+    NO borra hechos persistentes.
+    """
+    memory = _ensure_user_memory(user_key)
+    memory["recent"] = []
+
+
+def reset_all_memory(user_key: str) -> None:
+    """
+    Borra toda la memoria del usuario.
+    Usar solo bajo acción explícita del usuario.
+    """
+    if user_key in CHAT_MEMORY:
+        del CHAT_MEMORY[user_key]
