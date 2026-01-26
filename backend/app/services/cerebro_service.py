@@ -8,6 +8,10 @@ from app.services.content_safety_service import check_content_safety
 from app.services.chat_orchestrator_service import run_web_chat
 from app.services.web_search_service import run_web_search
 from app.services.freshness_llm_service import llm_can_answer_with_cutoff
+from app.services.memory_service import (
+    append_memory,
+    build_prompt_messages,
+)
 
 
 from app.services.prompt_service import (
@@ -120,6 +124,12 @@ def procesar_chat_web(
             "type": "blocked",
             "message": "No puedo ayudar con este tipo de contenido.",
         }
+    append_memory(
+    user_key=user_key,
+    role="user",
+    message=user_message,
+)
+
 
     # -------------------------------------------------
     # Cargar estado conversacional
@@ -274,11 +284,26 @@ def procesar_chat_web(
         }
 
 
+
     # -------------------------------------------------
-    # CHAT NORMAL (fallback)
+    # CHAT NORMAL (fallback con memoria)
     # -------------------------------------------------
-    return run_web_chat(
-        user_message=user_message,
-        action=action,
+    messages = build_prompt_messages(
         user_key=user_key,
+        user_message=user_message,
     )
+
+    response = run_web_chat(
+        messages=messages,
+        action=action,
+    )
+
+    # Guardar respuesta del asistente en memoria
+    append_memory(
+        user_key=user_key,
+        role="assistant",
+        message=response.get("response", ""),
+    )
+
+    return response
+
