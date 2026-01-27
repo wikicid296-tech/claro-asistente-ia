@@ -1,3 +1,8 @@
+// ==================== FEATURE FLAGS ====================
+// Permite abrir automáticamente el selector de apps del SO al crear un evento/recordatorio
+// Feedback negativo → cambiar a false
+const AUTO_OPEN_ICS_ON_CREATE = true;
+
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8000'  // Desarrollo local
@@ -387,7 +392,6 @@ function deactivateAutoMode() {
     setMode('descubre', { source: 'auto' });
 }
 
-
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', async function() {
     initializeEventListeners();
@@ -664,9 +668,6 @@ function startNewConversation() {
         console.error('❌ Error en startNewConversation:', error);
     }
 }
-/**
- * Guarda la conversación actual en el historial
- */
 function saveCurrentConversation() {
     // No guardar si la conversación fue cargada desde el historial
     if (appState.isLoadedFromHistory) {
@@ -1408,6 +1409,37 @@ function createMediaViewer(url, type) {
     viewerDiv.appendChild(contentDiv);
     return viewerDiv;
 }
+// ==================== NOTAS: COPIAR / COMPARTIR ====================
+async function copyNoteToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        console.log('📝 Nota copiada al portapapeles');
+        showSuccessMessage('📝 Nota copiada. Puedes pegarla en tu app de notas.');
+    } catch (err) {
+        console.error('❌ Error copiando nota:', err);
+        showErrorMessage('No se pudo copiar la nota');
+    }
+}
+
+async function shareNoteIfAvailable(text) {
+    if (!navigator.share) {
+        console.log('ℹ️ Web Share API no disponible');
+        await copyNoteToClipboard(text);
+        return;
+    }
+
+    try {
+        await navigator.share({
+            title: 'Nota de Claria',
+            text
+        });
+        console.log('📤 Nota compartida');
+    } catch (err) {
+        console.log('ℹ️ Share cancelado o no disponible, copiando nota');
+        await copyNoteToClipboard(text);
+    }
+}
+
 
 
 // ==================== PROTECCIÓN ANTI-DESCARGA AVANZADA ====================
@@ -1451,71 +1483,37 @@ function applyMediaProtection(mediaElement) {
 // ==================== TASK MANAGEMENT ====================
 function isTaskMessage(userMsg, botMsg) {
     const lowerUserMsg = userMsg.toLowerCase().trim();
-    const lowerBotMsg = botMsg.toLowerCase();
     
-    // ============ PASO 1: EXCLUIR MENSAJES CORTOS Y PALABRAS SUELTAS ============
-    if (lowerUserMsg.length < 15 || !lowerUserMsg.includes(' ')) {
-        return false;
+    // 1. Detección directa por verbos de acción (Prioridad Alta)
+    const strongActionVerbs = [
+        // Calendar / Agenda
+        'agendar', 'agenda', 'programar', 'programa', 'cita', 
+        'crear evento', 'nuevo evento',
+        // Recordatorios
+        'recordatorio', 'recuerdame', 'recuérdame', 'avisame', 'avísame', 
+        'no olvides', 'acuérdame',
+        // Notas
+        'nota', 'anota', 'toma nota', 'haz una nota', 'has una nota', 
+        'guardar nota', 'crear nota', 'apunta', 'apuntar', 'escribe esto'
+    ];
+
+    if (strongActionVerbs.some(verb => lowerUserMsg.startsWith(verb))) {
+        return true;
     }
-    
-    // ============ PASO 2: EXCLUIR PREGUNTAS ============
-    const questionWords = ['qué', 'que', 'cómo', 'como', 'cuál', 'cual', 'cuáles', 
-                          'cuales', 'dónde', 'donde', 'cuándo', 'cuando', 'por qué', 
-                          'porque', 'quién', 'quien'];
-    
-    if (questionWords.some(q => lowerUserMsg.includes(q)) && 
-        !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
-        return false;
+
+    // 2. Detección contextual (Palabra clave + Fecha/Hora)
+    if ((lowerUserMsg.includes('cita') || lowerUserMsg.includes('reunión') || lowerUserMsg.includes('llamada')) && 
+        (lowerUserMsg.includes('mañana') || lowerUserMsg.includes('hoy') || lowerUserMsg.includes(':') || lowerUserMsg.includes(' pm') || lowerUserMsg.includes(' am'))) {
+        return true;
     }
-    
-    // ============ PASO 3: EXCLUIR PALABRAS DE CONSULTA ============
-    const consultaWords = ['dime', 'dimelo', 'dame', 'muestra', 'explica', 'explicame',
-                           'ayuda', 'ayudame', 'busca', 'encuentra', 'hablame', 'háblame'];
-    
-    if (consultaWords.some(w => lowerUserMsg.startsWith(w)) && 
-        !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
-        return false;
-    }
-    
-    // ============ PASO 4: VERBOS / FRASES DE TAREA ============
-    const taskVerbs = {
-        // Frases típicas de recordatorios
-        reminders: [
-            'recuerdame', 'recuérdame', 'recordarme', 'avisame', 'avísame',
-            'recordatorio', 'no olvides', 'que no se me olvide'
-        ],
-        // Frases típicas de notas
-        notes: [
-            'nota', 'toma nota', 'anota', 'apunta',
-            'guarda esto', 'guardar esto', 'guarda la nota'
-        ],
-        // Frases típicas de agenda / calendario
-        calendar: [
-            'agendar', 'agenda ', 'agrega a la agenda',
-            'pon en la agenda', 'programar', 'programa ',
-            'cita para', 'agenda una cita'
-        ]
-    };
-    
-    let hasTaskVerb = false;
-    for (const category in taskVerbs) {
-        if (taskVerbs[category].some(verb => lowerUserMsg.includes(verb))) {
-            hasTaskVerb = true;
-            break;
-        }
-    }
-    
-    // ============ PASO 5: O SI EL BOT CONFIRMA CON EMOJIS ============
-    const hasBotEmoji = botMsg.includes('✅') || botMsg.includes('📝') || botMsg.includes('📅');
-    const botConfirms = lowerBotMsg.includes('he creado') || 
-                       lowerBotMsg.includes('he guardado') || 
-                       lowerBotMsg.includes('he agendado');
-    
-    // ============ DECISIÓN FINAL ============
-    return hasTaskVerb || (hasBotEmoji && botConfirms);
+
+    // 3. Fallback: Confirmación del Bot
+    const botConfirms = botMsg.includes('✅') || botMsg.includes('📅') || 
+                       botMsg.toLowerCase().includes('he agendado') ||
+                       botMsg.toLowerCase().includes('guardado');
+                       
+    return botConfirms;
 }
-
-
 async function processTask(userMessage, botResponse) {
     const timestamp = new Date().toLocaleString('es-MX', {
         day: '2-digit',
@@ -1525,6 +1523,7 @@ async function processTask(userMessage, botResponse) {
         minute: '2-digit'
     });
     
+    // 1. Creamos el objeto base de la tarea
     const task = {
         content: userMessage,
         response: botResponse,
@@ -1533,89 +1532,61 @@ async function processTask(userMessage, botResponse) {
         id: Date.now() + Math.random().toString(36).substr(2, 9)
     };
     
+    // 2. Clasificación de tipo (Calendar, Reminders, Notes)
     let taskType = null;
     const lowerUserMsg = userMessage.toLowerCase();
     const lowerBotMsg = botResponse.toLowerCase();
     
-    // 🔹 1) PRIORIZAR AGENDA / CALENDARIO
-    if (
-        lowerUserMsg.includes('agendar') || 
-        lowerUserMsg.includes('agenda ') ||
-        lowerUserMsg.includes('agrega a la agenda') ||
-        lowerUserMsg.includes('pon en la agenda') ||
-        lowerUserMsg.includes('programar') ||
-        lowerUserMsg.includes('programa ') ||
-        (lowerUserMsg.includes('cita') && !lowerUserMsg.includes('recordar')) ||
-        botResponse.includes('📅') ||
-        lowerBotMsg.includes('agendado') ||
-        lowerBotMsg.includes('he agendado')
-    ) {
+    // Lógica corregida de clasificación
+    if (lowerUserMsg.includes('agendar') || lowerUserMsg.includes('agenda') || 
+        lowerUserMsg.includes('cita') || lowerUserMsg.includes('reunión') ||
+        lowerBotMsg.includes('agendado') || lowerBotMsg.includes('📅')) {
         taskType = 'calendar';
     } 
-    
-    // 🔹 2) LUEGO RECORDATORIOS
-    else if (
-        lowerUserMsg.includes('recordar') || 
-        lowerUserMsg.includes('recuerdame') || 
-        lowerUserMsg.includes('recuérdame') ||
-        lowerUserMsg.includes('avisame') ||
-        lowerUserMsg.includes('avísame') ||
-        lowerUserMsg.includes('recordatorio') ||
-        lowerUserMsg.includes('no olvides') ||
-        lowerUserMsg.includes('que no se me olvide') ||
-        (botResponse.includes('✅') && !lowerUserMsg.includes('agendar')) ||
-        (lowerBotMsg.includes('recordatorio') && !lowerBotMsg.includes('agendado'))
-    ) {
+    // AQUÍ AGREGAMOS TODAS LAS VARIANTES DE RECORDATORIOS
+    else if (lowerUserMsg.includes('recordar') || lowerUserMsg.includes('recuerda') || 
+             lowerUserMsg.includes('recuérda') || lowerUserMsg.includes('recordatorio') ||
+             lowerUserMsg.includes('avísame') || lowerUserMsg.includes('avisame') || 
+             lowerUserMsg.includes('no olvides') || lowerUserMsg.includes('acuérdame') ||
+             botResponse.includes('✅') || lowerBotMsg.includes('recordatorio creado')) {
         taskType = 'reminders';
-    } 
-    
-    // 🔹 3) POR ÚLTIMO, NOTAS
-    else if (
-        lowerUserMsg.includes('nota') || 
-        lowerUserMsg.includes('toma nota') ||
-        lowerUserMsg.includes('anota') || 
-        lowerUserMsg.includes('apunta') ||
-        lowerUserMsg.includes('guardar') ||
-        lowerUserMsg.includes('guarda esto') ||
-        lowerUserMsg.includes('guarda la nota') ||
-        botResponse.includes('📝') ||
-        lowerBotMsg.includes('nota guardada') ||
-        lowerBotMsg.includes('he guardado')
-    ) {
-        taskType = 'notes';
-    }
-    
-    // 🔹 4) SI NO SE DETECTÓ TIPO, CAE COMO RECORDATORIO
-    if (!taskType) {
-        taskType = 'reminders';
+    } else {
+        taskType = 'notes'; // Todo lo que no sea agenda o recordatorio cae aquí
     }
     
     if (!appState.tasks[taskType]) {
         appState.tasks[taskType] = [];
     }
 
-    // Si es evento de calendario, generar archivo .ics
-    if (taskType === 'calendar') {
-        await generateICSForTask(task);
+    // 3. Generación del ICS (ANTES de actualizar la UI)
+    const eventData = extractEventDataFromMessage(task.content);
+
+    // Intentamos generar si es calendario o recordatorio (incluso si faltan datos, extractEventData pondrá defaults)
+    if (taskType === 'calendar' || (taskType === 'reminders' && eventData)) {
+        console.log('⏳ Generando archivo ICS antes de renderizar...');
+        
+        // Esperamos (await) a que se cree el archivo para tener la URL lista
+        const icsCreated = await generateICSForTask(task);
+        
+        if (icsCreated) {
+            console.log('✅ ICS generado:', task.icsFileUrl);
+            
+            // INTENTO DE AUTO-APERTURA
+            if (typeof autoOpenICSFile === 'function') {
+                // Pequeño delay para no bloquear la UI principal
+                setTimeout(() => autoOpenICSFile(task.icsFileUrl), 200);
+            }
+        }
     }
 
+    // 4. Guardamos y actualizamos la UI
     appState.tasks[taskType].push(task);
-    updateTasksUI();
-
-    // Si es calendario, actualizar UI después de generar el archivo
-    if (taskType === 'calendar') {
-        setTimeout(() => {
-            updateTasksUI();
-        }, 100);
-    }
     
-    // Mostrar sección de tareas (estilo original)
+    updateTasksUI(); // El botón aparecerá porque task.icsFileUrl ya existe
     showTasksSection(taskType);
-    
     saveToLocalStorage();
 
-    // Debug opcional
-    console.log('[TASK CREADA]', { taskType, userMessage });
+    console.log('[TASK CREADA]', { taskType, hasFile: !!task.icsFileUrl });
 }
 
 function updateTasksUI() {
@@ -1641,36 +1612,64 @@ function updateTaskBadges() {
 
 function updateTaskList(container, tasks, taskType, emptyMessage) {
     if (!container) return;
-    
+
     if (!tasks || tasks.length === 0) {
         container.innerHTML = `<div class="empty-task-message">${emptyMessage}</div>`;
         return;
     }
-    
+
     let html = '';
+
     tasks.forEach((task, idx) => {
-        const displayContent = task.content.length > 80 
-            ? task.content.substring(0, 80) + '...' 
-            : task.content;
-            
+        const displayContent =
+            task.content && task.content.length > 80
+                ? task.content.substring(0, 80) + '...'
+                : task.content || '';
+
         html += `
-    <div class="task-item" data-task-id="${task.id}">
-        <div class="task-content">${escapeHtml(displayContent)}</div>
-        <div class="task-time">Creado: ${task.created_at}</div>
-        ${false && taskType === 'calendar' && task.icsFileUrl ? `
-        <button class="task-download" onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')" title="Descargar evento">
-            <span class="material-symbols-outlined">download</span>
-        </button>
-        ` : ''}
-        <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})" title="Eliminar">
-            <span class="material-symbols-outlined">close</span>
-        </button>
-    </div>
+<div class="task-item" data-task-id="${task.id}">
+    <div class="task-content">${escapeHtml(displayContent)}</div>
+    <div class="task-time">Creado: ${task.created_at}</div>
+
+    <!-- 📅 Calendario (Agenda o Recordatorio con fecha) -->
+    ${task.icsFileUrl ? `
+    <button class="task-download"
+            onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')"
+            title="Agregar a calendario">
+        <span class="material-symbols-outlined">calendar_month</span>
+    </button>
+    ` : ''}
+
+    <!-- 📝 Notas: copiar / compartir -->
+${taskType === 'notes' ? `
+    <button class="task-copy"
+            onclick='copyNoteToClipboard(${JSON.stringify(task.content).replace(/'/g, "&#39;")})'
+            title="Copiar nota">
+        <span class="material-symbols-outlined">content_copy</span>
+    </button>
+
+    ${typeof navigator !== 'undefined' && navigator.share ? `
+    <button class="task-share"
+            onclick='shareNoteIfAvailable(${JSON.stringify(task.content).replace(/'/g, "&#39;")})'
+            title="Compartir nota">
+        <span class="material-symbols-outlined">share</span>
+    </button>
+    ` : ''}
+    ` : ''}
+
+    <!-- ❌ Eliminar -->
+    <button class="task-delete"
+            onclick="deleteTask('${taskType}', ${idx})"
+            title="Eliminar">
+        <span class="material-symbols-outlined">close</span>
+    </button>
+</div>
 `;
     });
-    
+
     container.innerHTML = html;
 }
+
 
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -2111,7 +2110,8 @@ window.addEventListener('resize', function() {
         elements.overlay.classList.remove('active');
     }
 }); 
-
+window.copyNoteToClipboard = copyNoteToClipboard;
+window.shareNoteIfAvailable = shareNoteIfAvailable;
 // ==================== CONSOLE INFO ====================
 console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
