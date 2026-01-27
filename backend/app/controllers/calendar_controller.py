@@ -1,7 +1,8 @@
+# app/controllers/calendar_controller.py
 import logging
-from flask import jsonify, request
+from flask import Response, request
 
-from calendar_ics import crear_invitacion_ics  # si ya lo moviste a app/, ajusta import
+from app.services.calendar_ics import crear_invitacion_ics
 
 logger = logging.getLogger(__name__)
 
@@ -10,32 +11,33 @@ def calendar_create_ics_controller():
     try:
         data = request.get_json() or {}
 
-        titulo = data.get("titulo")
-        descripcion = data.get("descripcion", "")
-        ubicacion = data.get("ubicacion", "")
-        inicio = data.get("inicio")
-        fin = data.get("fin")
-        timezone = data.get("timezone", "America/Mexico_City")
+        titulo = data.get("title")
+        descripcion = data.get("description", "")
+        ubicacion = data.get("location", "")
+        fecha = data.get("date")
+        hora = data.get("time")
+        duracion = float(data.get("duration", 1))
 
-        if not titulo or not inicio or not fin:
-            return jsonify({
-                "success": False,
-                "error": "Faltan campos obligatorios: titulo, inicio, fin"
-            }), 400
+        if not titulo or not fecha or not hora:
+            return {"error": "Faltan campos obligatorios"}, 400
 
         ics_content = crear_invitacion_ics(
             titulo=titulo,
             descripcion=descripcion,
             ubicacion=ubicacion,
-            fecha=None,
-            hora=None
+            fecha=fecha,
+            hora=hora,
+            duracion_horas=duracion
         )
 
-        return jsonify({
-            "success": True,
-            "ics": ics_content
-        })
+        return Response(
+            ics_content,
+            mimetype="text/calendar",
+            headers={
+                "Content-Disposition": "attachment; filename=evento.ics"
+            }
+        )
 
     except Exception as e:
-        logger.error(f"Error en calendar_create_ics_controller: {e}", exc_info=True)
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error("Error generando ICS", exc_info=True)
+        return {"error": str(e)}, 500
