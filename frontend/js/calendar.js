@@ -194,199 +194,7 @@ async function handleCreateEvent(e) {
 // ==================== EXTRACTOR DE DATOS DEL MENSAJE ====================
 // En calendar.js
 
-// ==================== PARSER DE FECHAS AVANZADO ====================
-function extractEventDataFromMessage(message) {
-    if (!message || typeof message !== 'string') return null;
-    
-    // 1. Helper para obtener fecha LOCAL formato YYYY-MM-DD (Evita bugs de zona horaria UTC)
-    const getLocalDateStr = (dateObj) => {
-        const year = dateObj.getFullYear();
-        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const day = String(dateObj.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const today = new Date();
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    
-    // Configuración por defecto: "Mañana a las 9:00 AM" (Mejor default que 'hoy')
-    const data = {
-        title: 'Evento Agendado', 
-        date: getLocalDateStr(tomorrow), 
-        time: '09:00',
-        location: 'Sin ubicación',
-        duration: 1
-    };
-    
-    const lowerMsg = message.toLowerCase();
-
-    // 2. Extracción de Título (Mejorada para limpiar días de la semana)
-    const intentRegex = /(?:agendar|agenda|programar|cita|reunión|evento|recordatorio|nota|apunta|anota|avisame|avísame|recuerdame|recuérdame)\s+(?:con|de|para|sobre)?\s+([^,.!?\n]+)/i;
-    const intentMatch = message.match(intentRegex);
-    
-    if (intentMatch && intentMatch[1]) {
-        // Quitamos palabras temporales del título para que no quede "Reunión el viernes"
-        let cleanTitle = intentMatch[1]
-            .replace(/\b(mañana|pasado mañana|hoy|ayer|el lunes|el martes|el miercoles|el miércoles|el jueves|el viernes|el sabado|el sábado|el domingo|a las|a la)\b.*/gi, '')
-            .trim();
-            
-        if (cleanTitle.length > 2) {
-            data.title = cleanTitle.charAt(0).toUpperCase() + cleanTitle.slice(1);
-        }
-    } else {
-        // Fallback simple
-        const simpleWords = message.split(' ').slice(0, 5).join(' ').replace(/agendar|agenda/gi, '').trim();
-        if (simpleWords.length > 0) data.title = simpleWords;
-    }
-
-    // 3. LÓGICA DE FECHAS (Aquí está la magia para interpretar "mañana" y días)
-    let dateFound = false;
-
-    // A. "Hoy", "Mañana", "Pasado mañana"
-    if (lowerMsg.includes('hoy')) {
-        data.date = getLocalDateStr(today);
-        dateFound = true;
-    } else if (lowerMsg.includes('pasado mañana')) {
-        const dayAfter = new Date(today);
-        dayAfter.setDate(today.getDate() + 2);
-        data.date = getLocalDateStr(dayAfter);
-        dateFound = true;
-    } else if (lowerMsg.includes('mañana')) {
-        data.date = getLocalDateStr(tomorrow);
-        dateFound = true;
-    } 
-    
-    // B. Días de la semana ("el viernes", "el lunes")
-    if (!dateFound) {
-        const daysOfWeek = {
-            'domingo': 0, 'lunes': 1, 'martes': 2, 'miércoles': 3, 'miercoles': 3,
-            'jueves': 4, 'viernes': 5, 'sábado': 6, 'sabado': 6
-        };
-
-        for (const [dayName, dayIndex] of Object.entries(daysOfWeek)) {
-            if (lowerMsg.includes(dayName)) {
-                const targetDate = new Date(today);
-                const currentDay = today.getDay(); // 0-6
-                
-                // Calcular cuántos días faltan
-                let daysUntil = dayIndex - currentDay;
-                if (daysUntil <= 0) {
-                    daysUntil += 7; // Si es hoy o ya pasó esta semana, agendar para la próxima
-                }
-                
-                targetDate.setDate(today.getDate() + daysUntil);
-                data.date = getLocalDateStr(targetDate);
-                dateFound = true;
-                break;
-            }
-        }
-    }
-
-    // C. Fechas específicas (25/12 o 2024-01-01)
-    if (!dateFound) {
-        const dateMatch = message.match(/(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?/);
-        if (dateMatch) {
-            const day = parseInt(dateMatch[1]);
-            const month = parseInt(dateMatch[2]) - 1; // Meses en JS son 0-11
-            const year = dateMatch[3] ? parseInt(dateMatch[3]) : today.getFullYear();
-            
-            // Ajustar año si es corto (e.g. 24 -> 2024)
-            const fullYear = year < 100 ? 2000 + year : year;
-            
-            const specificDate = new Date(fullYear, month, day);
-            data.date = getLocalDateStr(specificDate);
-        }
-    }
-    
-    // 4. Extracción de Hora (Soporte AM/PM y 24h)
-    // Regex mejorado para capturar "10", "10:30", "10am", "10 de la noche"
-    const timeMatch = message.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.|de la (?:mañana|tarde|noche))?/i);
-    
-    if (timeMatch) {
-        let hour = parseInt(timeMatch[1]);
-        let minutes = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
-        const period = timeMatch[3] ? timeMatch[3].toLowerCase() : '';
-        
-        // Ajuste 12h -> 24h
-        if ((period.includes('pm') || period.includes('tarde') || period.includes('noche')) && hour < 12) {
-            hour += 12;
-        }
-        if ((period.includes('am') || period.includes('mañana')) && hour === 12) {
-            hour = 0;
-        }
-        
-        data.time = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    }
-
-    console.log('📅 Datos procesados:', { msg: message, extracted: data });
-    return data;
-}
-// ==================== GENERADOR DE ICS PARA TAREAS ====================
-function buildICS({ title, description, location, date, time, duration }) {
-    const start = `${date.replace(/-/g, '')}T${time.replace(':', '')}00`;
-    const endDate = new Date(`${date}T${time}`);
-    endDate.setMinutes(endDate.getMinutes() + duration * 60);
-
-    const end =
-        endDate.toISOString()
-            .replace(/[-:]/g, '')
-            .split('.')[0];
-
-    return `
-BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Claria//ES
-CALSCALE:GREGORIAN
-BEGIN:VEVENT
-UID:${crypto.randomUUID()}
-DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z
-SUMMARY:${title}
-DESCRIPTION:${description}
-LOCATION:${location}
-DTSTART:${start}
-DTEND:${end}
-END:VEVENT
-END:VCALENDAR
-`.trim();
-}
-
-async function generateICSForTask(task) {
-    console.group('📅 generateICSForTask');
-
-    const eventData = extractEventDataFromMessage(task.content);
-
-    if (!eventData || !eventData.title) {
-        console.warn('No se pudieron extraer datos del evento');
-        console.groupEnd();
-        return false;
-    }
-
-    const icsContent = buildICS({
-        title: eventData.title,
-        description: task.content,
-        location: eventData.location,
-        date: eventData.date,
-        time: eventData.time,
-        duration: eventData.duration
-    });
-
-    const blob = new Blob([icsContent], { type: 'text/calendar' });
-
-    const base64 = await new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-    });
-
-    task.icsFileUrl = base64;
-    task.icsFileName = `evento_${eventData.date}_${eventData.time.replace(':', '')}.ics`;
-
-    console.log('ICS generado:', task.icsFileName);
-    console.groupEnd();
-
-    return true;
-}
+// Frontend no interpreta texto ni genera ICS: backend provee el ICS ya listo.
 
 
 // ==================== MENSAJES DE ÉXITO/ERROR ====================
@@ -451,64 +259,46 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-async function downloadICSFile(dataUrl, filename) {
-    const isBase64 = dataUrl.startsWith('data:');
-    
-    // OPCIÓN 1: Intentar Web Share API (nativo en móvil)
-    if (isBase64 && navigator.share) {
-        try {
-            // Extraer el contenido Base64
-            const base64Content = dataUrl.split(',')[1];
-            const binaryData = atob(base64Content);
-            const arrayBuffer = new Uint8Array(binaryData.length);
-            
-            for (let i = 0; i < binaryData.length; i++) {
-                arrayBuffer[i] = binaryData.charCodeAt(i);
-            }
-            
-            const blob = new Blob([arrayBuffer], { type: 'text/calendar' });
-            const file = new File([blob], filename, { type: 'text/calendar' });
-            
-            // Intentar compartir (nativo en móvil)
-            await navigator.share({
-                files: [file],
-                title: 'Evento de calendario',
-                text: 'Agregar evento al calendario'
-            });
-            
-            console.log('✅ Evento compartido:', filename);
-            return;
-        } catch (err) {
-            console.log('ℹ️ Share API no disponible, usando descarga estándar');
-        }
-    }
-    
-    // OPCIÓN 2: Descarga estándar (fallback)
-    if (isBase64) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        
-        setTimeout(() => {
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-            }, 100);
-        }, 100);
-    } else {
-        // Método legacy para blob URLs (web)
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        document.body.appendChild(a);
+function downloadICS(icsContent, fileName = 'evento') {
+    if (!icsContent) return;
+
+    console.log('📥 Iniciando flujo de descarga ICS');
+
+    const blob = new Blob([icsContent], {
+        type: 'text/calendar;charset=utf-8'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const finalFileName = `${fileName}.ics`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = finalFileName;
+    a.style.display = 'none';
+
+    document.body.appendChild(a);
+
+    let autoDownloadSucceeded = true;
+
+    try {
+        // 🔥 Intento de autodescarga (best effort)
         a.click();
-        document.body.removeChild(a);
+    } catch (err) {
+        autoDownloadSucceeded = false;
+        console.warn('⚠️ Autodescarga bloqueada por el navegador', err);
     }
-    
-    console.log('✅ Descargando:', filename);
+
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // 🟡 Fallback UX: toast solo si no se descargó automáticamente
+        if (!autoDownloadSucceeded) {
+            showICSDownloadToast(finalFileName, url, finalFileName);
+        }
+    }, 150);
 }
+
 
 function autoOpenICSFile(icsDataUrl) {
     try {
@@ -620,11 +410,29 @@ function autoOpenICSFile(icsDataUrl) {
     }
 }
 
+// ==================== DESCARGAR ICS DESDE BACKEND ====================
+function downloadICSFromBackend(icsPayload) {
+    if (!icsPayload || !icsPayload.ics_content) return;
+
+    const blob = new Blob([icsPayload.ics_content], {
+        type: 'text/calendar;charset=utf-8',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = icsPayload.filename || 'evento.ics';
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
 // ==================== EXPORTAR FUNCIONES ====================
 window.showCalendarModal = showCalendarModal;
 window.closeCalendarModal = closeCalendarModal;
-window.extractEventDataFromMessage = extractEventDataFromMessage;
-window.generateICSForTask = generateICSForTask;
-window.downloadICSFile = downloadICSFile; 
+window.downloadICSFile = downloadICSFile;
+window.downloadICSFromBackend = downloadICSFromBackend;
 
 console.log('✅ Módulo de calendario cargado');
