@@ -15,7 +15,8 @@ def chat_controller():
     """
 
     data = request.get_json(silent=True) or {}
-
+    macro_intent = data.get("macro_intent", None)
+    task_type = data.get("task_type",None)
     user_message = data.get("message", "").strip()
     action = data.get("action", "chat")
 
@@ -32,6 +33,8 @@ def chat_controller():
             user_message=user_message,
             action=action,
             user_key=user_key,
+            macro_intent=macro_intent,
+            task_type=task_type,
         )
         return jsonify(result), 200
 
