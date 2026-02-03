@@ -1,0 +1,425 @@
+/* ==================== LOADING OVERLAY ==================== */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: var(--blanco);
+}
+
+.loading-overlay.active {
+    display: flex;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid var(--blanco);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+}
+
+.loading-overlay p {
+    font-size: 16px;
+    margin-top: 10px;
+}
+
+/* ==================== MODAL PREMIUM ==================== */
+.premium-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.premium-overlay.active {
+    display: flex;
+}
+
+.premium-modal {
+    background: white;
+    border-radius: 20px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 188, 212, 0.3);
+    animation: slideUp 0.4s ease;
+    -webkit-overflow-scrolling: touch;
+}
+
+.premium-modal::-webkit-scrollbar {
+    display: none;
+}
+
+.premium-modal {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.premium-header {
+    background: linear-gradient(135deg, #00BCD4, #0097A7);
+    padding: 15px 20px;
+    text-align: center;
+    color: white;
+}
+
+.premium-icon {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.premium-icon .material-symbols-outlined {
+    font-size: 36px;
+    color: white;
+    font-variation-settings: 'FILL' 1;
+}
+
+.premium-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.premium-body {
+    padding: 20px 20px;
+    text-align: center;
+}
+
+.premium-message {
+    font-size: 14px;
+    color: var(--texto-oscuro);
+    margin-bottom: 8px;
+    line-height: 1.5;
+}
+
+.premium-subtitle {
+    font-size: 13px;
+    color: var(--texto-claro);
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.premium-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: #E0F7FA;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #006064;
+    font-weight: 500;
+}
+
+.feature-item .material-symbols-outlined {
+    font-size: 20px;
+    color: #00BCD4;
+    font-variation-settings: 'FILL' 1;
+}
+
+.premium-footer {
+    padding: 20px 25px 25px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn-premium {
+    background: linear-gradient(135deg, #00BCD4, #0097A7);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+}
+
+.btn-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 188, 212, 0.4);
+}
+
+.btn-premium .material-symbols-outlined {
+    font-size: 22px;
+    font-variation-settings: 'FILL' 1;
+}
+
+.btn-close-premium {
+    background: transparent;
+    color: var(--texto-claro);
+    border: 2px solid var(--gris-borde);
+    padding: 12px 30px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 44px;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.btn-close-premium:hover {
+    background: var(--gris-fondo);
+    border-color: var(--texto-claro);
+}
+
+/* ==================== ALERT MODAL (NUEVA FUNCIONALIDAD) ==================== */
+.alert-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    animation: fadeIn 0.3s ease;
+}
+
+.alert-modal.active {
+    display: flex;
+}
+
+.alert-content {
+    background: white;
+    border-radius: 16px;
+    max-width: 400px;
+    width: 90%;
+    padding: 24px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.3s ease;
+    text-align: center;
+}
+
+.alert-icon {
+    width: 60px;
+    height: 60px;
+    background: #e0f7fa;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+
+.alert-icon .material-symbols-outlined {
+    font-size: 32px;
+    color: #00BCD4;
+}
+
+.alert-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--texto-oscuro);
+    margin-bottom: 8px;
+}
+
+.alert-message {
+    font-size: 14px;
+    color: var(--texto-claro);
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+.alert-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.alert-btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.alert-btn-primary {
+    background: #00BCD4;
+    color: white;
+}
+
+.alert-btn-primary:hover {
+    background: #0097A7;
+}
+
+.alert-btn-secondary {
+    background: #f5f5f5;
+    color: var(--texto-oscuro);
+}
+
+.alert-btn-secondary:hover {
+    background: #e0e0e0;
+}
+
+/* ==================== EVENT DETAILS MODAL ==================== */
+.event-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10002;
+    animation: fadeIn 0.25s ease;
+}
+
+.event-modal-overlay.active {
+    display: flex;
+}
+
+.event-modal {
+    background: #fff;
+    border-radius: 16px;
+    width: 92%;
+    max-width: 460px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+    animation: slideUp 0.25s ease;
+}
+
+.event-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px;
+    background: linear-gradient(135deg, #00BCD4, #0097A7);
+    color: #fff;
+}
+
+.event-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.event-modal-title .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1;
+}
+
+.event-modal-close {
+    background: transparent;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 4px;
+}
+
+.event-modal-close .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.event-modal-body {
+    padding: 16px 18px 6px;
+    display: grid;
+    gap: 10px;
+}
+
+.event-modal-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+}
+
+.event-modal-row.full {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.event-modal-row .label {
+    color: var(--texto-claro);
+    min-width: 110px;
+}
+
+.event-modal-row .value {
+    color: var(--texto-oscuro);
+    text-align: right;
+    word-break: break-word;
+}
+
+.event-modal-link {
+    color: #007c91;
+    text-decoration: underline;
+}
+
+.event-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding: 12px 18px 18px;
+}
+
+.event-modal-btn {
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.event-modal-btn.primary {
+    background: #00BCD4;
+    color: #fff;
+}
+
+.event-modal-btn.primary:hover {
+    background: #0097A7;
+}
+
+.event-modal-btn.secondary {
+    background: #f5f5f5;
+    color: var(--texto-oscuro);
+}
+
+.event-modal-btn.secondary:hover {
+    background: #e0e0e0;
+}

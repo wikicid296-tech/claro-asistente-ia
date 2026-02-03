@@ -1,0 +1,8 @@
+/* src/styles/index.css */
+@import './variables.css';
+@import './base.css';
+@import './sidebar.css';
+@import './tasks.css';
+@import './chat.css';
+@import './modals.css';
+@import './responsive.css';
