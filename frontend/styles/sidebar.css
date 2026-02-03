@@ -10,6 +10,7 @@ nav.sidebar {
     box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
     z-index: 100;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 20px;
 }
 

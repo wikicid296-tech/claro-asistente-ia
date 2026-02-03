@@ -1247,7 +1247,7 @@ function extractPreviewContent(fullContent, taskType) {
         let preview = cleanContent;
 
         preview = preview
-            .replace(/\b(ma??ana|hoy|el lunes|el martes|el mi??rcoles|el jueves|el viernes|el s??bado|el domingo)\b/i, '')
+            .replace(/\b(manana|hoy|el lunes|el martes|el miercoles|el jueves|el viernes|el sabado|el domingo)\b/i, '')
             .replace(/\b(a las|a la|en|para)\b/gi, '')
             .replace(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?)\b/gi, '')
             .replace(/\s{2,}/g, ' ')
@@ -1257,7 +1257,7 @@ function extractPreviewContent(fullContent, taskType) {
             preview = preview.substring(0, 37) + '...';
         }
 
-        return preview || 'Evento sin t??tulo';
+        return preview || 'Evento sin titulo';
     }
 
     if (cleanContent.length > 50) {
@@ -1401,9 +1401,25 @@ function renderTaskPreview(listType, tasks) {
         
         previewTasks.forEach((task, index) => {
             try {
-            const displayText = (task.type === 'calendar' || task.type === 'reminder')
+            const rawTitle =
+                task?.raw?.title ||
+                task?.raw?.titulo ||
+                task?.raw?.summary ||
+                task?.raw?.event_title ||
+                '';
+
+            const inferredText = (task.type === 'calendar' || task.type === 'reminder')
                 ? extractPreviewContent(task.content || '', task.type)
-                : (task.preview || extractPreviewContent(task.content || '', task.type) || task.content || 'Sin t??tulo');
+                : (task.preview || extractPreviewContent(task.content || '', task.type) || task.content || '');
+
+            let displayText = (inferredText || '').trim();
+            if (!displayText || displayText.toLowerCase() === 'evento sin titulo') {
+                displayText = (rawTitle || '').trim() || (task.content || '').trim() || 'Evento sin titulo';
+            }
+
+            if (task.type === 'note' && !displayText) {
+                displayText = 'Nota sin contenido';
+            }
                 const escapedText = escapeHtml(displayText);
                 const escapedContent = escapeHtml(task.content || '');
                 
