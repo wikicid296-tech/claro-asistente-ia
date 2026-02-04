@@ -1060,12 +1060,18 @@ main.content {
 
 .markdown-table tbody tr:nth-child(odd),
 .markdown-table tr:nth-child(odd):not(:first-child) {
-    background: #fff5f5;
+    background: #ff9090;
+    /* border: 1px solid rgb(245, 10, 2);*/
+    
 }
 
 .markdown-table tbody tr:nth-child(even),
 .markdown-table tr:nth-child(even):not(:first-child) {
     background: #ffffff;
+    border: 1px solid transparent;
+    background:
+    /*linear-gradient(90deg, #b11d18 0%, #f48fb1 2%, #ffffff 4%, #ffffff 95%, #f48fb1 98%, #b11d18 100%) border-box;*/
+    background-clip: padding-box, border-box;
 }
 
 .markdown-table td + td,
@@ -1084,8 +1090,8 @@ main.content {
 }
 
 .markdown-table .msg-link:hover {
-    color: #005e66;
-    border-bottom-color: #005e66;
+    color: #d11515;
+    border-bottom-color: #ff0000;
 }
 
 /* ==================== INPUT SECTION ==================== */
