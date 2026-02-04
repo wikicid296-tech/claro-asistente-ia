@@ -744,20 +744,34 @@ function buildAprendeResponse(data) {
     candidates.forEach(pushUnique);
 
     const topFive = Array.from(uniqueById.values()).slice(0, 5);
-    const top = topFive[0];
-    const rest = topFive.slice(1);
+
+    const sanitizeCell = (value) => {
+        if (!value) return 'Curso disponible';
+        return String(value).replace(/\|/g, ' / ').replace(/\n+/g, ' ').trim();
+    };
+
+    const getCourseUrl = (item) => {
+        return (
+            item?.resourceRedirection ||
+            item?.metadata?.resourceRedirection ||
+            item?.url ||
+            item?.metadata?.url ||
+            item?.resourceUrl ||
+            item?.metadata?.resourceUrl ||
+            (item?.courseId ? `https://aprende.org/cursos/${item.courseId}` : 'https://aprende.org')
+        );
+    };
 
     let message = `🎓 Encontré ${topFive.length} cursos relacionados con '${query}':\n\n`;
-    if (top) {
-        message += `**${top.courseName}** (Numero de curso: ${top.courseId})\n\n`;
-    }
+    message += `| Titulo del curso | Enlace  |\n`;
+    message += `| --- | --- |\n`;
 
-    if (rest.length) {
-        message += `**También encontré ${rest.length} cursos más:**\n`;
-        rest.forEach((c) => {
-            message += `- ${c.courseName} (Numero de curso: ${c.courseId})\n`;
-        });
-    }
+    topFive.forEach((course) => {
+        const name = sanitizeCell(course?.courseName || course?.metadata?.courseName);
+        const url = getCourseUrl(course);
+        const linkLabel = 'Click para ver';
+        message += `| ${name} | [${linkLabel}](${url}) |\n`;
+    });
 
     return message.trim();
 }
