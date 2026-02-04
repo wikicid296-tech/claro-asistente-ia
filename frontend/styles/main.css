@@ -1026,6 +1026,68 @@ main.content {
     margin-bottom: 0;
 }
 
+/* ==================== TABLAS (Aprende) ==================== */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin: 10px 0;
+}
+
+.markdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: var(--shadow-sm);
+    background: #fff;
+}
+
+.markdown-table th,
+.markdown-table td {
+    padding: 12px 14px;
+    text-align: left;
+    vertical-align: top;
+    font-size: var(--font-sm);
+    line-height: 1.4;
+}
+
+.markdown-table thead th,
+.markdown-table tr:first-child th {
+    background: #b11d18;
+    color: #fff;
+    font-weight: 700;
+}
+
+.markdown-table tbody tr:nth-child(odd),
+.markdown-table tr:nth-child(odd):not(:first-child) {
+    background: #fff5f5;
+}
+
+.markdown-table tbody tr:nth-child(even),
+.markdown-table tr:nth-child(even):not(:first-child) {
+    background: #ffffff;
+}
+
+.markdown-table td + td,
+.markdown-table th + th {
+    border-left: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.markdown-table tr + tr td {
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.markdown-table .msg-link {
+    color: #007a86;
+    border-bottom-color: #007a86;
+    font-weight: 600;
+}
+
+.markdown-table .msg-link:hover {
+    color: #005e66;
+    border-bottom-color: #005e66;
+}
+
 /* ==================== INPUT SECTION ==================== */
 .input-section {
     background: var(--blanco);
