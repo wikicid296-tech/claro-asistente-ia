@@ -192,216 +192,10 @@ async function handleCreateEvent(e) {
 }
 
 // ==================== EXTRACTOR DE DATOS DEL MENSAJE ====================
-function extractEventDataFromMessage(message) {
-    if (!message || typeof message !== 'string') {
-        return null;
-    }
-    
-    const data = {
-        title: '',
-        date: '',
-        time: '',
-        location: '',
-        duration: 1
-    };
-    
-    // Extraer título (primeras palabras del mensaje)
-    const titleMatch = message.match(/^([^.!?]+)[.!?]/);
-    if (titleMatch) {
-        data.title = titleMatch[1].trim();
-    } else {
-        // Si no hay punto, tomar las primeras 5-7 palabras
-        const words = message.split(' ').slice(0, 7);
-        data.title = words.join(' ').trim();
-    }
-    
-    // Extraer fecha
-    const today = new Date();
-    
-    // Patrones de fecha
-    if (message.toLowerCase().includes('mañana')) {
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        data.date = tomorrow.toISOString().split('T')[0];
-    } else if (message.toLowerCase().includes('hoy')) {
-        data.date = today.toISOString().split('T')[0];
-    } else if (message.toLowerCase().includes('pasado mañana')) {
-        const dayAfterTomorrow = new Date(today);
-        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-        data.date = dayAfterTomorrow.toISOString().split('T')[0];
-    } else {
-        // Buscar patrones de fecha específica (DD/MM/YYYY o YYYY-MM-DD)
-        const datePattern1 = /(\d{1,2})\/(\d{1,2})\/(\d{4})/;
-        const datePattern2 = /(\d{4})-(\d{1,2})-(\d{1,2})/;
-        
-        const match1 = message.match(datePattern1);
-        const match2 = message.match(datePattern2);
-        
-        if (match1) {
-            const [_, day, month, year] = match1;
-            data.date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        } else if (match2) {
-            data.date = match2[0];
-        } else {
-            // Si no hay fecha específica, usar hoy
-            data.date = today.toISOString().split('T')[0];
-        }
-    }
-    
-    // Extraer hora
-    const timePatterns = [
-        /(\d{1,2}):(\d{2})/, // 14:30, 9:00
-        /(\d{1,2})\s*(?:de la|)\s*(mañana|tarde|noche)/i, // 8 de la mañana, 3 tarde, 10 de la noche
-        /a las\s*(\d{1,2})/i, // a las 8, a las 14
-        /(\d{1,2})\s*(?:am|pm)/i // 8am, 3pm
-    ];
-    
-    let timeFound = false;
-    
-    for (const pattern of timePatterns) {
-        const match = message.match(pattern);
-        if (match) {
-            if (pattern === timePatterns[0]) {
-                // Formato 24h: 14:30
-                data.time = match[0];
-                timeFound = true;
-                break;
-            } else if (pattern === timePatterns[1]) {
-                // Formato descriptivo: 8 de la mañana
-                let hour = parseInt(match[1]);
-                const period = match[2].toLowerCase();
-                
-                if (period === 'tarde' || period === 'noche') {
-                    if (hour < 12) hour += 12;
-                }
-                if (period === 'mañana' && hour === 12) {
-                    hour = 0;
-                }
-                
-                data.time = `${hour.toString().padStart(2, '0')}:00`;
-                timeFound = true;
-                break;
-            } else if (pattern === timePatterns[2] || pattern === timePatterns[3]) {
-                // Formato simple: a las 8, o 8am
-                let hour = parseInt(match[1]);
-                const isPM = message.toLowerCase().includes('pm') || 
-                            message.toLowerCase().includes('tarde') || 
-                            message.toLowerCase().includes('noche');
-                
-                if (isPM && hour < 12) hour += 12;
-                if (!isPM && hour === 12) hour = 0;
-                
-                data.time = `${hour.toString().padStart(2, '0')}:00`;
-                timeFound = true;
-                break;
-            }
-        }
-    }
-    
-    // Si no se encontró hora, usar hora por defecto (09:00)
-    if (!timeFound) {
-        data.time = '09:00';
-    }
-    
-    // Extraer lugar
-    const locationPatterns = [
-        /en\s+(?:las?|los?)\s+([^,.!?]+?(?:oficinas|sala|reunión|local|edificio|centro))/i,
-        /en\s+([^,.!?]+)/i,
-        /ubicado\s+en\s+([^,.!?]+)/i,
-        /lugar:\s*([^,.!?]+)/i
-    ];
-    
-    for (const pattern of locationPatterns) {
-        const match = message.match(pattern);
-        if (match) {
-            data.location = match[1].trim();
-            break;
-        }
-    }
-    
-    // Si no se encontró lugar, usar valor por defecto
-    if (!data.location) {
-        data.location = 'Sin ubicación específica';
-    }
-    
-    // Extraer duración si se menciona
-    if (message.match(/\b(media hora|30 min|30 minutos)\b/i)) {
-        data.duration = 0.5;
-    } else if (message.match(/\b(una hora|1 hora|60 min)\b/i)) {
-        data.duration = 1;
-    } else if (message.match(/\b(hora y media|1\.5 horas|90 min)\b/i)) {
-        data.duration = 1.5;
-    } else if (message.match(/\b(2 horas|120 min)\b/i)) {
-        data.duration = 2;
-    }
-    
-    console.log('📋 Datos extraídos del mensaje:', data);
-    return data;
-}
+// En calendar.js
 
-// ==================== GENERADOR DE ICS PARA TAREAS ====================
-async function generateICSForTask(task) {
-    try {
-        // 1. Extraer datos del mensaje del usuario
-        const eventData = extractEventDataFromMessage(task.content);
-        
-        // 2. Si no hay datos válidos, salir
-        if (!eventData || !eventData.title) {
-            console.log('❌ No se pudieron extraer datos válidos del mensaje');
-            return;
-        }
-        
-        // 3. Preparar datos para el backend
-        const requestData = {
-            title: eventData.title,
-            description: task.content || 'Evento generado desde chat',
-            location: eventData.location,
-            date: eventData.date,
-            time: eventData.time,
-            duration: eventData.duration
-        };
-        
-        console.log('📤 Enviando datos para generar .ics:', requestData);
-        
-        // 4. Enviar request al backend
-        const response = await fetch(`${CALENDAR_API_URL}/calendar/create-event`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(requestData)
-        });
-        
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Error al generar el archivo .ics');
-        }
-        
-        // 5. Obtener blob del archivo
-        const blob = await response.blob();
+// Frontend no interpreta texto ni genera ICS: backend provee el ICS ya listo.
 
-        // 6. Convertir blob a Base64
-        const reader = new FileReader();
-        const base64Promise = new Promise((resolve) => {
-             reader.onloadend = () => resolve(reader.result);
-             reader.readAsDataURL(blob);
-        });
-        const base64Data = await base64Promise;
-
-        // 7. Guardar datos en el objeto task
-        task.icsFileUrl = base64Data;  // Ahora es Base64 en lugar de blob URL
-        task.icsFileName = `evento_${eventData.date}_${eventData.time.replace(':', '')}.ics`;
-        
-        console.log('✅ Archivo .ics generado para:', task.id);
-        console.log('📁 Archivo guardado como:', task.icsFileName);
-        
-        return true;
-        
-    } catch (error) {
-        console.error('❌ Error generando .ics:', error);
-        return false;
-    }
-}
 
 // ==================== MENSAJES DE ÉXITO/ERROR ====================
 function showSuccessMessage(message) {
@@ -465,70 +259,180 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-async function downloadICSFile(dataUrl, filename) {
-    const isBase64 = dataUrl.startsWith('data:');
-    
-    // OPCIÓN 1: Intentar Web Share API (nativo en móvil)
-    if (isBase64 && navigator.share) {
-        try {
-            // Extraer el contenido Base64
-            const base64Content = dataUrl.split(',')[1];
-            const binaryData = atob(base64Content);
-            const arrayBuffer = new Uint8Array(binaryData.length);
-            
-            for (let i = 0; i < binaryData.length; i++) {
-                arrayBuffer[i] = binaryData.charCodeAt(i);
-            }
-            
-            const blob = new Blob([arrayBuffer], { type: 'text/calendar' });
-            const file = new File([blob], filename, { type: 'text/calendar' });
-            
-            // Intentar compartir (nativo en móvil)
-            await navigator.share({
-                files: [file],
-                title: 'Evento de calendario',
-                text: 'Agregar evento al calendario'
-            });
-            
-            console.log('✅ Evento compartido:', filename);
-            return;
-        } catch (err) {
-            console.log('ℹ️ Share API no disponible, usando descarga estándar');
-        }
-    }
-    
-    // OPCIÓN 2: Descarga estándar (fallback)
-    if (isBase64) {
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        
-        setTimeout(() => {
-            a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-            }, 100);
-        }, 100);
-    } else {
-        // Método legacy para blob URLs (web)
-        const a = document.createElement('a');
-        a.href = dataUrl;
-        a.download = filename;
-        document.body.appendChild(a);
+function downloadICS(icsContent, fileName = 'evento') {
+    if (!icsContent) return;
+
+    console.log('📥 Iniciando flujo de descarga ICS');
+
+    const blob = new Blob([icsContent], {
+        type: 'text/calendar;charset=utf-8'
+    });
+
+    const url = URL.createObjectURL(blob);
+    const finalFileName = `${fileName}.ics`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = finalFileName;
+    a.style.display = 'none';
+
+    document.body.appendChild(a);
+
+    let autoDownloadSucceeded = true;
+
+    try {
+        // 🔥 Intento de autodescarga (best effort)
         a.click();
-        document.body.removeChild(a);
+    } catch (err) {
+        autoDownloadSucceeded = false;
+        console.warn('⚠️ Autodescarga bloqueada por el navegador', err);
     }
-    
-    console.log('✅ Descargando:', filename);
+
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // 🟡 Fallback UX: toast solo si no se descargó automáticamente
+        if (!autoDownloadSucceeded) {
+            showICSDownloadToast(finalFileName, url, finalFileName);
+        }
+    }, 150);
+}
+
+
+function autoOpenICSFile(icsDataUrl) {
+    try {
+        console.log('🚀 Ejecutando protocolo de apertura automática...');
+        
+        // 1. LIMPIEZA
+        let base64Content = icsDataUrl.includes(',') 
+            ? icsDataUrl.split(',')[1] 
+            : icsDataUrl;
+
+        base64Content = base64Content.replace(/\s/g, '');
+
+        // 2. Decodificar
+        const binary = atob(base64Content);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        
+        const blob = new Blob([bytes], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const filename = `evento_${Date.now()}.ics`;
+
+        // 3. Intentar descarga/apertura
+        let opened = window.open(url, '_blank');
+        
+        if (!opened || opened.closed || typeof opened.closed == 'undefined') {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 4. TOAST EDUCATIVO (Aquí está el cambio de UX)
+        // Verificamos si ya le mostramos el tip antes (para no ser molestos)
+        const hasSeenTip = localStorage.getItem('claria_ics_tip_shown');
+        
+        const toast = document.createElement('div');
+        
+        // Contenido del Toast: Mensaje de éxito + Tip educativo (solo si no lo ha visto muchas veces)
+        let tipHTML = '';
+        if (!hasSeenTip) {
+            tipHTML = `
+                <div style="margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.2); font-size:11px; color:#ffc107;">
+                    💡 <strong>Tip Pro:</strong> Al descargar, haz clic en la flecha de la descarga y elige 
+                    <em>"Abrir siempre archivos de este tipo"</em> para automatizarlo.
+                </div>
+            `;
+            // Marcar que ya vio el tip (opcional: quitar esta línea si quieres que salga siempre)
+            localStorage.setItem('claria_ics_tip_shown', 'true');
+        }
+
+        toast.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:20px;">📅</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:bold; font-size:14px;">Evento Descargado</div>
+                        <div style="font-size:11px; opacity:0.9;">Haz clic para agregarlo a tu calendario</div>
+                    </div>
+                    <button id="manualOpenBtn" style="background:white; color:#333; border:none; padding:6px 12px; border-radius:12px; font-weight:bold; cursor:pointer; font-size:12px; box-shadow:0 2px 5px rgba(0,0,0,0.2);">
+                        ABRIR
+                    </button>
+                </div>
+                ${tipHTML}
+            </div>
+        `;
+
+        toast.style.cssText = `
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            background: #212529; color: white; padding: 16px 20px; border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4); z-index: 10000;
+            animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            min-width: 320px; max-width: 90%; font-family: sans-serif;
+        `;
+        
+        document.body.appendChild(toast);
+        
+        // Botón manual
+        document.getElementById('manualOpenBtn').onclick = () => {
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            toast.remove();
+        };
+
+        // Tiempo de visualización extendido si hay tip
+        const duration = hasSeenTip ? 5000 : 10000;
+
+        setTimeout(() => {
+            if (toast.style) {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translate(-50%, 20px)';
+                toast.style.transition = 'all 0.5s ease';
+            }
+            setTimeout(() => { 
+                if(toast.parentNode) toast.remove(); 
+                window.URL.revokeObjectURL(url);
+            }, 500);
+        }, duration);
+
+        console.log('✅ Apertura finalizada');
+    } catch (err) {
+        console.error('❌ Error:', err);
+    }
+}
+
+// ==================== DESCARGAR ICS DESDE BACKEND ====================
+function downloadICSFromBackend(icsPayload) {
+    if (!icsPayload || !icsPayload.ics_content) return;
+
+    const blob = new Blob([icsPayload.ics_content], {
+        type: 'text/calendar;charset=utf-8',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = icsPayload.filename || 'evento.ics';
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 // ==================== EXPORTAR FUNCIONES ====================
 window.showCalendarModal = showCalendarModal;
 window.closeCalendarModal = closeCalendarModal;
-window.extractEventDataFromMessage = extractEventDataFromMessage;
-window.generateICSForTask = generateICSForTask;
-window.downloadICSFile = downloadICSFile; 
+window.downloadICSFile = downloadICSFile;
+window.downloadICSFromBackend = downloadICSFromBackend;
 
 console.log('✅ Módulo de calendario cargado');

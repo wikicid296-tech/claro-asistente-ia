@@ -1,30 +1,25 @@
 // ==================== CONFIGURACIÓN Y VARIABLES GLOBALES ====================
 const API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'  // Desarrollo local
-    : 'https://claro-asistente-ia.onrender.com';  // Producción
+    ? 'http://localhost:8000'
+    : 'https://claro-asistente-ia.onrender.com';
 
-
-// ==================== CONFIGURACIÓN DE LÍMITE DE MENSAJES ====================
 const MESSAGE_LIMIT = {
-    FREE: 5,  // Límite de mensajes gratis (solo cuenta mensajes del usuario)
+    FREE: 20,
     PRO: Infinity
 };
 
-// Estado del usuario
 const userState = {
     isPro: false,
     messageCount: 0
 };
 
-// Configuración de tokens
 const TOKEN_CONFIG = {
     MAX_TOKENS: 1000,
-    CHARS_PER_TOKEN: 3.5 // Promedio fijo entre 3 y 4
+    CHARS_PER_TOKEN: 3.5
 };
 
-// Estado global de la aplicación
 const appState = {
-    currentMode: 'descubre', // Cambiado de 'busqueda' a 'descubre' para consistencia
+    currentMode: 'descubre',
     conversationHistory: [],
     tasks: {
         reminders: [],
@@ -37,66 +32,47 @@ const appState = {
         mediaType: null
     },
     lastAprendeResource: null,
-    // 🆕 AGREGAR ESTA LÍNEA
-    modeActivatedManually: false,  // Flag para saber si el modo fue activado manualmente
-    isLoadedFromHistory: false  // Flag para saber si la conversación actual fue cargada desde el historial
+    modeActivatedManually: false,
+    isLoadedFromHistory: false
 };
+import { showAlert } from './modules/uiHelpers.js';
+import {
+    processTask,
+    renderSidebarTasks,
+    normalizeTaskPayload
+} from './modules/taskManager.js';
+import { taskStore as taskStoreModule, setTaskStore } from './modules/state.js';
+
+let taskStore = [];
 
 // Elementos del DOM
 const elements = {
-    // Sidebar
     sidebar: document.getElementById('sidebar'),
     overlay: document.getElementById('overlay'),
     menuToggle: document.getElementById('menuToggle'),
     navItems: document.querySelectorAll('.nav-item'),
-    tasksContainer: document.getElementById('tasksContainer'),
-    taskHeaders: document.querySelectorAll('.task-header'),
-    tasksSection: document.getElementById('tasksSection'),
-    taskCategoryHeaders: document.querySelectorAll('.task-category-header'),
-    tasksNavBtn: document.getElementById('tasksNavBtn'),
     newConversationBtn: document.getElementById('newConversationBtn'),
-    clearTasksBtn: document.getElementById('clear-tasks'),
-
-    // Main content
     welcomePage: document.getElementById('welcomePage'),
     chatPage: document.getElementById('chatPage'),
     chatHistory: document.getElementById('chatHistory'),
-
-    // Input
     userInput: document.getElementById('userInput'),
     sendBtn: document.getElementById('sendBtn'),
     addBtn: document.getElementById('addBtn'),
     actionMenu: document.getElementById('actionMenu'),
     actionItems: document.querySelectorAll('.action-item'),
-
-    // Token counter - NUEVO
     tokenCounter: document.getElementById('tokenCounter'),
     currentTokens: document.getElementById('currentTokens'),
     maxTokens: document.getElementById('maxTokens'),
-
-    // Suggestions
     suggestionCards: document.querySelectorAll('.suggestion-card'),
-
-    // Loading
     loadingOverlay: document.getElementById('loadingOverlay'),
-
-    // Task lists
-    remindersList: document.getElementById('reminders-list'),
-    notesList: document.getElementById('notes-list'),
-    calendarList: document.getElementById('calendar-list'),
-
-    // Mode Chip - NUEVO
     modeChipContainer: document.getElementById('modeChipContainer'),
     modeChipText: document.getElementById('modeChipText'),
-    modeChipClose: document.getElementById('modeChipClose')
+    modeChipClose: document.getElementById('modeChipClose'),
+    usageMeter: document.getElementById('usageMeter'),
+    usageFill: document.getElementById('usageFill'),
+    usageText: document.getElementById('usageText')
 };
 
-// 🆕 ELEMENTOS DE CONSUMO
-elements.usageMeter = document.getElementById('usageMeter');
-elements.usageFill = document.getElementById('usageFill');
-elements.usageText = document.getElementById('usageText');
-
-// 🆕 ESTADO DE CONSUMO
 const usageState = {
     consumed: 0,
     limit: 10,
@@ -109,33 +85,31 @@ const usageState = {
 function setMode(mode, { source = 'manual' } = {}) {
     const placeholders = {
         descubre: 'Pregunta lo que quieras',
+        tareas: 'Gestiona tus tareas',
         aprende: 'Pregunta sobre cursos de aprende.org',
         busqueda_web: 'Busca cualquier información en la web...'
     };
 
     const modeNames = {
         descubre: 'Descubre',
+        tareas: 'Gestión de tareas',
         aprende: 'Aprende.org',
         busqueda_web: 'Búsqueda web'
     };
 
-    // 1️⃣ Estado
     appState.currentMode = mode;
     appState.modeActivatedManually = source === 'manual';
 
-    // 2️⃣ Placeholder
     if (elements.userInput) {
         elements.userInput.placeholder = placeholders[mode] || placeholders.descubre;
     }
 
-    // 3️⃣ Chip
     if (mode === 'descubre') {
         hideModeChip();
     } else {
         showModeChip(modeNames[mode], mode);
     }
 
-    // 4️⃣ Sidebar
     elements.navItems.forEach(item => {
         item.classList.toggle(
             'active',
@@ -143,7 +117,6 @@ function setMode(mode, { source = 'manual' } = {}) {
         );
     });
 
-    // 5️⃣ Action menu
     elements.actionItems.forEach(item => {
         item.classList.toggle(
             'selected',
@@ -155,35 +128,30 @@ function setMode(mode, { source = 'manual' } = {}) {
 }
 
 // ==================== FUNCIONES DE CONSUMO ====================
-/**
- * Consulta el endpoint /usage y actualiza el estado
- */
 async function fetchUsageStatus() {
     try {
         const response = await fetch(`${API_URL}/usage`);
-        
+
         if (!response.ok) {
             console.error('Error consultando /usage:', response.status);
             return;
         }
-        
+
         const data = await response.json();
-        // ==================== AUTO WEB SEARCH UX ====================
+
         if (data.auto_triggered === true && data.action === 'busqueda_web_auto') {
             handleAutoWebSearchUX();
         }
 
-        
         if (data.success) {
             usageState.consumed = data.consumed;
             usageState.limit = data.limit;
             usageState.percentage = data.percentage;
             usageState.blocked = data.blocked;
             usageState.warning = data.warning;
-            
+
             updateUsageMeter();
-            
-            // Si está bloqueado, deshabilitar input
+
             if (usageState.blocked) {
                 blockInputDueToUsage();
             }
@@ -192,45 +160,30 @@ async function fetchUsageStatus() {
         console.error('Error fetching usage:', error);
     }
 }
-function handleAutoWebSearchUX() {
-    // 1️⃣ Activar visualmente el modo (SIN marcarlo como manual)
-    setMode('busqueda_web', { source: 'auto' });
 
-    // 2️⃣ Mostrar aviso contextual no intrusivo
+function handleAutoWebSearchUX() {
+    setMode('busqueda_web', { source: 'auto' });
     showAutoWebSearchToast();
 }
 
-
-/**
- * Actualiza la barra visual de consumo
- */
 function updateUsageMeter() {
     if (!elements.usageMeter || !elements.usageFill || !elements.usageText) return;
-    
-    // Mostrar el medidor
+
     elements.usageMeter.style.display = 'flex';
-    
-    // Actualizar ancho de la barra
     elements.usageFill.style.width = `${usageState.percentage}%`;
-    
-    // Actualizar texto
     elements.usageText.textContent = `$${usageState.consumed}/$${usageState.limit}`;
-    
-    // Cambiar color según porcentaje
+
     elements.usageFill.classList.remove('warning', 'danger');
-    
+
     if (usageState.percentage >= 100) {
         elements.usageFill.classList.add('danger');
     } else if (usageState.percentage >= 90) {
         elements.usageFill.classList.add('warning');
     }
-    
+
     console.log(`💰 Consumo: $${usageState.consumed}/$${usageState.limit} (${usageState.percentage}%)`);
 }
 
-/**
- * Bloquea el input cuando se alcanza el límite
- */
 function blockInputDueToUsage() {
     elements.userInput.value = '';
     elements.userInput.placeholder = '🚫 Límite mensual alcanzado ($10 USD)';
@@ -240,16 +193,12 @@ function blockInputDueToUsage() {
     elements.sendBtn.disabled = true;
     elements.sendBtn.style.opacity = '0.5';
     elements.sendBtn.style.cursor = 'not-allowed';
-    
+
     console.warn('🚫 Input bloqueado: Límite de $10 alcanzado');
 }
 
-/**
- * Muestra advertencia cuando está cerca del límite
- */
 function showUsageWarning() {
     if (usageState.warning && !usageState.blocked) {
-        // Mostrar notificación temporal
         const warningMsg = document.createElement('div');
         warningMsg.className = 'usage-warning-toast';
         warningMsg.innerHTML = `
@@ -260,9 +209,9 @@ function showUsageWarning() {
                 <small>Quedan $${(usageState.limit - usageState.consumed).toFixed(2)} de tu límite mensual</small>
             </div>
         `;
-        
+
         document.body.appendChild(warningMsg);
-        
+
         setTimeout(() => {
             warningMsg.style.opacity = '0';
             setTimeout(() => warningMsg.remove(), 300);
@@ -271,9 +220,6 @@ function showUsageWarning() {
 }
 
 // ==================== FUNCIONES DE TOKENS ====================
-/**
- * Estima tokens usando un promedio fijo de 3.5 caracteres por token
- */
 function estimateTokens(text) {
     if (!text || text.length === 0) {
         return 0;
@@ -281,21 +227,15 @@ function estimateTokens(text) {
     return Math.ceil(text.length / TOKEN_CONFIG.CHARS_PER_TOKEN);
 }
 
-/**
- * Actualiza el contador visual y el estado del botón
- */
 function updateTokenCounter(tokens) {
     if (!elements.currentTokens) return;
-    
+
     elements.currentTokens.textContent = tokens;
-    
-    // Cambiar color según porcentaje
+
     const percentage = (tokens / TOKEN_CONFIG.MAX_TOKENS) * 100;
-    
-    // Deshabilitar botón si excede el límite
     const exceedsLimit = tokens > TOKEN_CONFIG.MAX_TOKENS;
     elements.sendBtn.disabled = exceedsLimit;
-    
+
     if (exceedsLimit) {
         elements.tokenCounter.style.color = '#dc3545';
         elements.tokenCounter.style.fontWeight = 'bold';
@@ -319,45 +259,33 @@ function updateTokenCounter(tokens) {
     }
 }
 
-
 // ==================== DETECCIÓN AUTOMÁTICA DE MODO ====================
-/**
- * Detecta palabras clave en el texto y activa el modo correspondiente automáticamente
- */
 function detectModeFromText(text) {
     const lowerText = text ? text.toLowerCase().trim() : '';
-    
-    // Palabras clave para cada modo
+
     const modeKeywords = {
         'aprende': ['aprende', 'aprende.org', 'aprender', 'curso', 'cursos', 'estudio'],
         'busqueda_web': ['google', 'buscar', 'internet', 'web', 'información', 'investigar', 'investigación']
     };
-    
-    // Helper: detecta si una palabra clave aparece como token completo
+
     function matchesKeywordStrict(haystack, keyword) {
         if (!haystack || !keyword) return false;
-        // Escape regex special chars
         const esc = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // Match cuando aparece como token separado
         const pattern = '(^|\\W)' + esc + '(\\W|$)';
         return new RegExp(pattern, 'i').test(haystack);
     }
-    
-    // Si está en modo manual, no cambiar automáticamente
+
     if (appState.modeActivatedManually) {
         return;
     }
-    
-    // No detectar si el texto es muy corto o está vacío
+
     if (!text || text.length < 3) {
         return;
     }
-    
-    // Buscar coincidencias en cada modo
+
     for (const [mode, keywords] of Object.entries(modeKeywords)) {
         for (const keyword of keywords) {
             if (matchesKeywordStrict(lowerText, keyword)) {
-                // Si detectamos la palabra clave y no estamos ya en ese modo, cambiar
                 if (appState.currentMode !== mode) {
                     activateModeAutomatically(mode);
                 }
@@ -365,89 +293,55 @@ function detectModeFromText(text) {
             }
         }
     }
-    
-    // Si no detecta ninguna palabra clave y no está en "descubre", volver a descubre
+
     if (appState.currentMode !== 'descubre' && !appState.modeActivatedManually) {
         deactivateAutoMode();
     }
 }
 
-/**
- * Activa un modo automáticamente y actualiza la UI
- */
 function activateModeAutomatically(mode) {
     setMode(mode, { source: 'auto' });
 }
 
-
-/**
- * Desactiva el modo automático y vuelve a "descubre"
- */
 function deactivateAutoMode() {
     setMode('descubre', { source: 'auto' });
 }
-
 
 // ==================== INICIALIZACIÓN ====================
 document.addEventListener('DOMContentLoaded', async function() {
     initializeEventListeners();
     loadFromLocalStorage();
-    
-    // Actualizar UI de tareas al cargar
-    updateTasksUI();
-    
-    // Inicializar módulo de conversaciones (esperar a que cargue)
+
+    renderTaskSidebar();
+
     await initConversationStorage();
-    
-    // Inicializar contador de tokens
+
     if (elements.maxTokens) {
         elements.maxTokens.textContent = TOKEN_CONFIG.MAX_TOKENS;
     }
     updateTokenCounter(0);
-    
-    // 🆕 CARGAR HISTORIAL DE CONVERSACIONES (ahora que están cargadas las funciones)
+
     setTimeout(() => {
         updateConversationHistoryUI();
     }, 500);
-    
-    // 🆕 CONSULTAR CONSUMO AL CARGAR
+
     fetchUsageStatus();
 });
 
 function initializeEventListeners() {
-    // Toggle sidebar (móvil)
     elements.menuToggle.addEventListener('click', toggleSidebar);
     elements.overlay.addEventListener('click', closeSidebar);
 
-    // Navegación sidebar
     elements.navItems.forEach(item => {
         item.addEventListener('click', handleNavigation);
     });
 
-    // Nueva conversación
     if (elements.newConversationBtn) {
         elements.newConversationBtn.addEventListener('click', startNewConversation);
     }
 
-    // Task category headers (NEW STYLE)
-    elements.taskCategoryHeaders.forEach(header => {
-        header.addEventListener('click', toggleTaskCategory);
-    });
-
-    // Task headers (old style) - ESTILO ORIGINAL QUE QUEREMOS RECUPERAR
-    elements.taskHeaders.forEach(header => {
-        header.addEventListener('click', toggleTaskCard);
-    });
-
-    // Limpiar tareas
-    if (elements.clearTasksBtn) {
-        elements.clearTasksBtn.addEventListener('click', clearAllTasks);
-    }
-    
-    // Botón +
     elements.addBtn.addEventListener('click', toggleActionMenu);
-    
-    // Botón enviar
+
     if (elements.sendBtn) {
         elements.sendBtn.addEventListener('click', function() {
             const text = elements.userInput.value.trim();
@@ -458,63 +352,66 @@ function initializeEventListeners() {
             }
         });
     }
-    
-    // Action items
+
     elements.actionItems.forEach(item => {
         item.addEventListener('click', selectAction);
     });
-    
-    // Suggestion cards
+
     elements.suggestionCards.forEach(card => {
         card.addEventListener('click', handleSuggestionClick);
     });
 
-    // Mode Chip Close Button - NUEVO
     if (elements.modeChipClose) {
-    elements.modeChipClose.addEventListener('click', hideModeChip);
+        elements.modeChipClose.addEventListener('click', hideModeChip);
     }
-    
-    // Input de usuario - actualizar tokens Y detectar modo
-elements.userInput.addEventListener('input', function() {
-    const tokens = estimateTokens(this.value);
-    updateTokenCounter(tokens);
-    
-    // 🆕 DETECTAR MODO AUTOMÁTICAMENTE
-    detectModeFromText(this.value);
-});
 
-    // ===== NUEVO: Detectar clic en input cuando está en límite =====
-elements.userInput.addEventListener('click', function() {
-    if (this.classList.contains('limit-reached')) {
-        showPremiumModal();
-    }
-});
+    elements.userInput.addEventListener('input', function() {
+        const tokens = estimateTokens(this.value);
+        updateTokenCounter(tokens);
+        detectModeFromText(this.value);
+    });
 
+    elements.userInput.addEventListener('click', function() {
+        if (this.classList.contains('limit-reached')) {
+            showPremiumModal();
+        }
+    });
 
-// ===== NUEVO: Detectar focus en input cuando está en límite =====
-elements.userInput.addEventListener('focus', function() {
-    if (this.classList.contains('limit-reached')) {
-        this.blur(); // Quitar el focus
-        showPremiumModal();
-    }
-});
+    elements.userInput.addEventListener('focus', function() {
+        if (this.classList.contains('limit-reached')) {
+            this.blur();
+            showPremiumModal();
+        }
+    });
 
-    // Enter para enviar
     elements.userInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && this.value.trim() && !elements.sendBtn.disabled && !this.disabled) {
-        sendMessage(this.value.trim());
-        this.value = '';
-        updateTokenCounter(0);
-    }
-});
-    
-    // Cerrar menú al hacer clic fuera
+        if (e.key === 'Enter' && this.value.trim() && !elements.sendBtn.disabled && !this.disabled) {
+            sendMessage(this.value.trim());
+            this.value = '';
+            updateTokenCounter(0);
+        }
+    });
+
     document.addEventListener('click', handleOutsideClick);
-    
-    // 🆕 Botón para limpiar historial
+
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
     if (clearHistoryBtn) {
         clearHistoryBtn.addEventListener('click', clearAllConversationHistory);
+    }
+
+    // Las interacciones de la sección de tareas (tanto el header como cada categoría)
+    // se configuran en setupTasksSectionToggle() para evitar manejadores duplicados.
+    setupTasksSectionToggle();
+
+    // Configurar toggles de categorías individuales (si aún se usan)
+    setupCategoryToggles();
+}
+
+// ==================== TOGGLE TASK PREVIEW ====================
+function toggleTaskPreview(taskType) {
+    const preview = document.getElementById(`${taskType}-preview`);
+    if (preview) {
+        preview.classList.toggle('active');
     }
 }
 
@@ -541,29 +438,10 @@ function handleNavigation(e) {
         setMode(section, { source: 'manual' });
     }
 
-    if (section === 'tasks') {
-        if (elements.tasksSection) {
-            elements.tasksSection.classList.toggle('active');
-            elements.tasksSection.style.display = elements.tasksSection.classList.contains('active') ? 'flex' : 'none';
-        }
-        if (elements.tasksContainer) {
-            elements.tasksContainer.classList.toggle('active');
-        }
-    } else {
-        if (elements.tasksSection) {
-            elements.tasksSection.classList.remove('active');
-            elements.tasksSection.style.display = 'none';
-        }
-        if (elements.tasksContainer) {
-            elements.tasksContainer.classList.remove('active');
-        }
-    }
-
     if (window.innerWidth < 900) {
         closeSidebar();
     }
 }
-
 
 function generateNewConversationId() {
     const newId =
@@ -578,28 +456,22 @@ function generateNewConversationId() {
 
 function startNewConversation() {
     try {
-        // 🔑 0️⃣ Guardar conversación anterior en el historial
         if (appState.conversationHistory.length >= 2) {
             saveCurrentConversation();
         }
 
-        // 🆕 1️⃣ Resetear flag de historial
         appState.isLoadedFromHistory = false;
 
-        // 🔑 2️⃣ Generar NUEVO conversationId
         const newSessionId = generateNewConversationId();
         console.log('🔑 Nueva conversationId generada:', newSessionId);
 
-        // 🧹 3️⃣ Reset de estado interno
         appState.conversationHistory = [];
         userState.messageCount = 0;
 
-        // Limpiar UI del chat
         if (elements.chatHistory) {
             elements.chatHistory.innerHTML = '';
         }
 
-        // 🧭 4️⃣ Reset de vistas
         if (elements.welcomePage) {
             elements.welcomePage.style.display = 'flex';
         }
@@ -607,13 +479,11 @@ function startNewConversation() {
             elements.chatPage.style.display = 'none';
         }
 
-        // 🎠 5️⃣ Mostrar carrusel de sugerencias (si existe)
         const carousel = document.getElementById('suggestionsCarousel');
         if (carousel) {
             carousel.style.display = 'block';
         }
 
-        // 🚦 6️⃣ Reset de límites y UI
         if (typeof removeLimitWarning === 'function') {
             removeLimitWarning();
         }
@@ -621,14 +491,12 @@ function startNewConversation() {
             hideModeChip();
         }
 
-        // 🆕 7️⃣ Reset de modo y placeholder
         if (elements.userInput) {
             elements.userInput.placeholder = 'Pregunta lo que quieras';
         }
         appState.currentMode = 'descubre';
         appState.modeActivatedManually = false;
 
-        // 🧩 8️⃣ Reset visual del menú de acciones
         if (elements.actionItems) {
             elements.actionItems.forEach(item => {
                 item.classList.toggle(
@@ -638,10 +506,8 @@ function startNewConversation() {
             });
         }
 
-        // 💾 9️⃣ Persistencia limpia
         saveToLocalStorage();
 
-        // 📌 🔟 Navegación sidebar
         if (elements.navItems) {
             elements.navItems.forEach(item => item.classList.remove('active'));
         }
@@ -650,12 +516,10 @@ function startNewConversation() {
             elements.newConversationBtn.classList.add('active');
         }
 
-        // 📱 1️⃣1️⃣ Responsive
         if (window.innerWidth < 900 && typeof closeSidebar === 'function') {
             closeSidebar();
         }
 
-        // 🔄 Actualizar historial de conversaciones
         updateConversationHistoryUI();
 
         console.log('🆕 Nueva conversación iniciada correctamente');
@@ -664,89 +528,42 @@ function startNewConversation() {
         console.error('❌ Error en startNewConversation:', error);
     }
 }
-/**
- * Guarda la conversación actual en el historial
- */
+
 function saveCurrentConversation() {
-    // No guardar si la conversación fue cargada desde el historial
     if (appState.isLoadedFromHistory) {
         console.log('ℹ️ Conversación saltada (fue cargada desde historial)');
         appState.isLoadedFromHistory = false;
         return null;
     }
-    
-    // Verificar que saveConversation esté disponible
+
     if (typeof saveConversation !== 'function') {
         console.error('❌ saveConversation no está disponible');
         return null;
     }
-    
-    // Solo guardar si hay más de 1 mensaje (al menos 1 usuario + 1 bot)
+
     if (appState.conversationHistory.length >= 2) {
         const userMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'user');
         const botMessages = appState.conversationHistory.filter(m => (m.type || m.role) === 'bot');
-        
-        // Solo guardar si hay al menos 1 mensaje del usuario Y 1 respuesta del bot
+
         if (userMessages.length > 0 && botMessages.length > 0) {
             const firstMessage = userMessages[0];
             const title = firstMessage ? firstMessage.content.substring(0, 50) : 'Conversación sin título';
-            
+
             const conversationId = saveConversation(appState.conversationHistory, title);
-            
-            // Actualizar UI después de guardar
+
             setTimeout(() => {
                 updateConversationHistoryUI();
             }, 100);
-            
+
             console.log('💾 Conversación guardada en historial:', conversationId);
             return conversationId;
         }
     }
-    
+
     return null;
 }
 
-// ==================== TASK MANAGEMENT (ESTILO ORIGINAL) ====================
-function toggleTaskCard(e) {
-    const body = this.nextElementSibling;
-    const isOpen = body.classList.contains('open');
-
-    document.querySelectorAll('.task-body').forEach(b => b.classList.remove('open'));
-    document.querySelectorAll('.task-header').forEach(h => h.classList.remove('collapsed'));
-
-    if (!isOpen) {
-        body.classList.add('open');
-        this.classList.add('collapsed');
-    }
-}
-
-function toggleTaskCategory(e) {
-    e.stopPropagation();
-    const header = e.currentTarget;
-    const category = header.closest('.task-category');
-    if (!category) return;
-
-    const taskList = category.querySelector('.task-list');
-    const toggleIcon = header.querySelector('.task-category-toggle .material-symbols-outlined');
-
-    if (!taskList) return;
-
-    const isVisible = taskList.style.display !== 'none' && taskList.style.display !== '';
-
-    if (isVisible) {
-        taskList.style.display = 'none';
-        if (toggleIcon) {
-            toggleIcon.style.transform = 'rotate(-90deg)';
-        }
-    } else {
-        taskList.style.display = 'flex';
-        if (toggleIcon) {
-            toggleIcon.style.transform = 'rotate(0deg)';
-        }
-    }
-}
 function handleOutsideClick(e) {
-    // ==================== ACTION MENU (+) ====================
     if (elements.actionMenu && elements.actionMenu.classList.contains('active')) {
         const clickedInsideMenu = elements.actionMenu.contains(e.target);
         const clickedAddBtn = elements.addBtn && elements.addBtn.contains(e.target);
@@ -756,7 +573,6 @@ function handleOutsideClick(e) {
         }
     }
 
-    // ==================== SIDEBAR (modo móvil) ====================
     if (
         elements.sidebar &&
         elements.sidebar.classList.contains('active') &&
@@ -765,71 +581,6 @@ function handleOutsideClick(e) {
         !elements.menuToggle.contains(e.target)
     ) {
         closeSidebar();
-    }
-}
-
-function expandTaskSection(taskType) {
-    document.querySelectorAll('.task-body').forEach(body => body.classList.remove('open'));
-    document.querySelectorAll('.task-header').forEach(header => header.classList.remove('collapsed'));
-
-    const targetHeader = document.querySelector(`.task-header[data-task-type="${taskType}"]`);
-    if (targetHeader) {
-        const targetBody = targetHeader.nextElementSibling;
-        targetBody.classList.add('open');
-        targetHeader.classList.add('collapsed');
-    }
-}
-
-function expandTaskCategory(taskType) {
-    const categoryMap = {
-        'reminders': 'reminders',
-        'notes': 'notes',
-        'calendar': 'calendar'
-    };
-
-    const category = categoryMap[taskType];
-    if (!category) return;
-
-    const targetHeader = document.querySelector(`.task-category-header[data-category="${category}"]`);
-    if (targetHeader) {
-        const taskCategory = targetHeader.closest('.task-category');
-        if (taskCategory) {
-            const taskList = taskCategory.querySelector('.task-list');
-            const toggleIcon = targetHeader.querySelector('.task-category-toggle .material-symbols-outlined');
-
-            if (taskList) {
-                taskList.style.display = 'flex';
-                if (toggleIcon) {
-                    toggleIcon.style.transform = 'rotate(0deg)';
-                }
-            }
-        }
-    }
-}
-
-// 🆕 Función para mostrar la sección de tareas (estilo original)
-function showTasksSection(taskType) {
-    // Mostrar la sección de tareas
-    if (elements.tasksSection) {
-        elements.tasksSection.classList.add('active');
-        elements.tasksSection.style.display = 'flex';
-    }
-
-    // Mostrar el contenedor de tareas (estilo antiguo, por compatibilidad)
-    if (elements.tasksContainer) {
-        elements.tasksContainer.classList.add('active');
-    }
-
-    // Expandir la categoría correspondiente
-    if (taskType) {
-        expandTaskCategory(taskType);
-    }
-
-    // Actualizar navegación
-    elements.navItems.forEach(item => item.classList.remove('active'));
-    const tasksNavBtn = document.getElementById('tasksNavBtn');
-    if (tasksNavBtn) {
-        tasksNavBtn.classList.add('active');
     }
 }
 
@@ -846,64 +597,45 @@ function selectAction(e) {
     elements.actionMenu.classList.remove('active');
 }
 
-
 // ==================== MODE CHIP FUNCTIONS ====================
-/**
- * Muestra el chip de modo activo
- */
-/**
- * Muestra el chip de modo activo con ícono dinámico
- */
 function showModeChip(modeName, modeAction) {
     if (!elements.modeChipContainer || !elements.modeChipText) return;
-    
-    // Actualizar texto del chip
+
     elements.modeChipText.textContent = modeName;
-    
-    // Obtener contenedor del ícono
+
     const iconContainer = document.getElementById('modeChipIcon');
     if (iconContainer) {
-        // Limpiar ícono anterior
         iconContainer.innerHTML = '';
-        
-        // Definir íconos según el modo
+
         const icons = {
             'aprende': '<div class="mode-chip-icon-letter">A</div>',
             'tareas': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l2 2 4-4M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
-            'busqueda_web': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>'
+            'busqueda_web': '<svg class="mode-chip-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>'
         };
-        
-        // Insertar el ícono correspondiente
+
         iconContainer.innerHTML = icons[modeAction] || icons['busqueda'];
     }
-    
-    // Mostrar contenedor con animación
+
     elements.modeChipContainer.style.display = 'flex';
-    
-    // 🆕 OCULTAR CARRUSEL cuando hay chip activo
+
     const carousel = document.getElementById('suggestionsCarousel');
     if (carousel) {
         carousel.style.display = 'none';
     }
-    
-    // Guardar modo activo
+
     appState.currentMode = modeAction;
-    
+
     console.log(`✅ Chip activado: ${modeName} (${modeAction})`);
 }
 
-/**
- * Oculta el chip de modo activo y resetea al modo búsqueda
- */
 function hideModeChip() {
     if (!elements.modeChipContainer) return;
-    
+
     elements.modeChipContainer.style.display = 'none';
     if (appState.currentMode !== 'descubre') {
         setMode('descubre', { source: 'manual' });
     }
 }
-
 
 // ==================== SUGGESTION CARDS ====================
 function handleSuggestionClick(e) {
@@ -914,61 +646,76 @@ function handleSuggestionClick(e) {
 // ==================== CHAT FUNCTIONS CON API ====================
 function sendMessage(text) {
     if (!text || !text.trim()) return;
-    
-    // ===== VALIDACIÓN DE LÍMITE DE MENSAJES =====
-if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
-    showPremiumModal();
-    return;
-}
-    
+
+    if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
+        showPremiumModal();
+        return;
+    }
+
     showChatView();
     addMessage('user', text);
 
-    // 🔹 Ya NO tocar modeActivatedManually aquí (se controla al activar el modo/manualmente en la UI)
-    
-    // Incrementar contador de mensajes del usuario
     if (!userState.isPro) {
         userState.messageCount++;
         console.log(`Mensajes enviados: ${userState.messageCount}/${MESSAGE_LIMIT.FREE}`);
-        
-        // NUEVO: Deshabilitar si alcanza el límite
+
         if (userState.messageCount >= MESSAGE_LIMIT.FREE) {
             showLimitWarning();
         }
     }
-    
+
     showLoading();
-    
+
     callAPI(text)
-    .then(response => {
-        addMessage('bot', response);
-        
-        if (isTaskMessage(text, response)) {
-            processTask(text, response);
-        }
-        
-        // 🆕 ACTUALIZAR CONSUMO DESPUÉS DE CADA MENSAJE
-        fetchUsageStatus();
-        
-        // 🆕 MOSTRAR ADVERTENCIA SI ESTÁ CERCA DEL LÍMITE
-        setTimeout(() => {
-            showUsageWarning();
-        }, 500);
-    })
+        .then(data => {
+            // Normalizar payload (root/nested) para estabilizar flujo ICS
+            const normalized = normalizeTaskPayload(data);
+
+            let botMessage = normalized.response || data.response;
+            if (data.aprende_ia_used) {
+                const aprendeMessage = buildAprendeResponse(data);
+                if (aprendeMessage) {
+                    botMessage = aprendeMessage;
+                }
+            }
+
+            addMessage('bot', botMessage);
+
+            // 1) Si backend manda tasks agrupadas, refrescar sidebar desde backend
+            if (normalized.tasks) {
+                try {
+                    renderSidebarTasks(normalized.tasks);
+                } catch (err) {
+                    console.warn('No se pudo renderizar sidebar desde backend:', err);
+                }
+            }
+
+            // 2) SOLO procesar task cuando sea cierre real (action === 'task')
+            //    (evita guardar tareas incompletas y disparar ICS en followup)
+            if (normalized.action === 'task' && normalized.task) {
+                processTask(text, normalized);
+            }
+
+            fetchUsageStatus();
+
+            setTimeout(() => {
+                showUsageWarning();
+            }, 500);
+        })
         .catch(error => {
             console.error('Error completo:', error);
-            
+
             let errorMessage = 'Lo siento, ocurrió un error al procesar tu solicitud. Por favor, intenta nuevamente.';
-            
-            if (error.status === 429 || 
-                (error.message && (error.message.toLowerCase().includes('token') || 
-                                  error.message.toLowerCase().includes('limit') ||
-                                  error.message.toLowerCase().includes('rate')))) {
+
+            if (error.status === 429 ||
+                (error.message && (error.message.toLowerCase().includes('token') ||
+                    error.message.toLowerCase().includes('limit') ||
+                    error.message.toLowerCase().includes('rate')))) {
                 errorMessage = 'Lo sentimos, has alcanzado tu límite de tokens. 🚫 Te recomendamos actualizar a una cuenta Pro para seguir disfrutando sin interrupciones.';
             } else if (!navigator.onLine) {
                 errorMessage = 'No hay conexión a internet. Por favor, verifica tu conexión e intenta nuevamente.';
             }
-            
+
             addMessage('bot', errorMessage);
         })
         .finally(() => {
@@ -977,69 +724,113 @@ if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
         });
 }
 
+function buildAprendeResponse(data) {
+    const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+    if (!candidates.length) return null;
+
+    const query = data?.query || '';
+    const topCandidate = (Array.isArray(data?.top) && data.top[0]) ? data.top[0] : candidates[0];
+
+    const uniqueById = new Map();
+    const pushUnique = (item) => {
+        if (!item) return;
+        const key = item.courseId || item.metadata?.courseId || item.courseName;
+        if (!uniqueById.has(key)) {
+            uniqueById.set(key, item);
+        }
+    };
+
+    pushUnique(topCandidate);
+    candidates.forEach(pushUnique);
+
+    const topFive = Array.from(uniqueById.values()).slice(0, 5);
+
+    const sanitizeCell = (value) => {
+        if (!value) return 'Curso disponible';
+        return String(value).replace(/\|/g, ' / ').replace(/\n+/g, ' ').trim();
+    };
+
+    const getCourseUrl = (item) => {
+        return (
+            item?.resourceRedirection ||
+            item?.metadata?.resourceRedirection ||
+            item?.url ||
+            item?.metadata?.url ||
+            item?.resourceUrl ||
+            item?.metadata?.resourceUrl ||
+            (item?.courseId ? `https://aprende.org/cursos/${item.courseId}` : 'https://aprende.org')
+        );
+    };
+
+    let message = `🎓 Encontré ${topFive.length} cursos relacionados con '${query}':\n\n`;
+    message += `| Titulo del curso | Enlace  |\n`;
+    message += `| --- | --- |\n`;
+
+    topFive.forEach((course) => {
+        const name = sanitizeCell(course?.courseName || course?.metadata?.courseName);
+        const url = getCourseUrl(course);
+        const linkLabel = 'Click para ver';
+        message += `| ${name} | [${linkLabel}](${url}) |\n`;
+    });
+
+    return message.trim();
+}
+
 // ==================== API CALLS ====================
 async function callAPI(message) {
     try {
-    const conversationId = sessionStorage.getItem('claroAssistant_sessionId');
+        const conversationId = sessionStorage.getItem('claroAssistant_sessionId');
 
-    const response = await fetch(`${API_URL}/chat`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Conversation-Id': conversationId   // 👈 CLAVE
-        },
-        body: JSON.stringify({
-            message: message,
-            action: appState.currentMode
-        })
-    });
-        
-        // ===== MANEJAR ERROR 429 (RATE LIMIT) =====
+        const response = await fetch(`${API_URL}/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Conversation-Id': conversationId
+            },
+            body: JSON.stringify({
+                message: message,
+                action: appState.currentMode,
+                macro_intent: detectMacroIntent(message),
+                task_type: detectTaskType(message)
+            })
+        });
+
         if (response.status === 429) {
             const errorData = await response.json();
             throw new Error(errorData.message || '⏱️ Por favor espera unos segundos antes de enviar otro mensaje');
         }
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
-            // 🆕 NUEVA LÓGICA: Priorizar Video > PDF > Página completa
             if (data.aprende_ia_used) {
-                // PRIORIDAD 1: Si hay video, usar el video
                 if (data.url_video) {
                     appState.lastAprendeResource = {
                         url: data.url_video,
-                        tipo: 'video'  // Forzar tipo video
+                        tipo: 'video'
                     };
                     console.log('🎥 Video de Aprende.org detectado:', appState.lastAprendeResource);
-                } 
-                // PRIORIDAD 2: Si hay PDF, usar el PDF
-                else if (data.url_pdf) {
+                } else if (data.url_pdf) {
                     appState.lastAprendeResource = {
                         url: data.url_pdf,
-                        tipo: 'pdf'  // Forzar tipo PDF
+                        tipo: 'pdf'
                     };
                     console.log('📄 PDF de Aprende.org detectado:', appState.lastAprendeResource);
-                } 
-                // PRIORIDAD 3: Si no hay ni video ni PDF, usar la página completa
-                else if (data.url_recurso) {
+                } else if (data.url_recurso) {
                     appState.lastAprendeResource = {
                         url: data.url_recurso,
-                        tipo: data.tipo_recurso || 'curso'  // Página completa del curso
+                        tipo: data.tipo_recurso || 'curso'
                     };
                     console.log('📚 Página de Aprende.org detectada:', appState.lastAprendeResource);
                 }
             } else {
                 appState.lastAprendeResource = null;
             }
-            
-            // =====================================================
-            // 🆕 TELCEL: detectar URL de buscador y añadir link (sin iframe)
-            // =====================================================
+
             if (data.action === 'telcel' && Array.isArray(data.relevant_urls)) {
                 const telcelSearchUrl = data.relevant_urls.find(
                     url => typeof url === 'string' && url.includes('telcel.com/buscador?')
@@ -1048,21 +839,23 @@ async function callAPI(message) {
                 if (telcelSearchUrl) {
                     console.log('🔎 Telcel buscador detectado:', telcelSearchUrl);
 
-                    // Añadir enlace al texto de respuesta si no está presente
                     if (!data.response.includes(telcelSearchUrl)) {
                         data.response += `\n\n🔗 **Consulta directa en Telcel:** ` +
                             `[Abrir buscador de Telcel](${telcelSearchUrl})`;
                     }
                 }
             }
-            
-            return data.response;
+
+            return data;
         } else {
             throw new Error(data.error || 'Error desconocido');
         }
     } catch (error) {
-        console.error('API Error:', error);
-        throw error;
+        console.error('Error en la llamada a la API:', error);
+        return {
+            success: false,
+            response: 'Error al comunicarse con el servidor.'
+        };
     }
 }
 
@@ -1078,12 +871,11 @@ async function initConversationStorage() {
             resolve();
         }).catch(e => {
             console.error('❌ Error cargando módulo de conversaciones:', e);
-            // Definir funciones vacías como fallback
             saveConversation = () => null;
             loadConversations = () => [];
             loadConversationById = () => null;
-            deleteConversation = () => {};
-            clearConversations = () => {};
+            deleteConversation = () => { };
+            clearConversations = () => { };
             resolve();
         });
     });
@@ -1093,7 +885,6 @@ function showChatView() {
     elements.welcomePage.style.display = 'none';
     elements.chatPage.style.display = 'flex';
 
-    // Ocultar carrusel cuando hay chat activo
     const carousel = document.getElementById('suggestionsCarousel');
     if (carousel) {
         carousel.style.display = 'none';
@@ -1101,66 +892,52 @@ function showChatView() {
 }
 
 function addMessage(type, content) {
-    // Crear contenedor principal del mensaje
     const messageContainer = document.createElement('div');
     messageContainer.className = 'message-container ' + type;
-    
-    // Crear avatar
+
     const avatarDiv = document.createElement('div');
     avatarDiv.className = 'message-avatar ' + type;
-    
+
     if (type === 'bot') {
-        // Avatar del bot (logo de Claro)
         avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
     } else {
-        // Avatar del usuario (Material Icon)
         avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
     }
-    
-    // Crear contenedor del contenido
+
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    
-    // Crear el mensaje
+
     const messageDiv = document.createElement('div');
     messageDiv.className = 'msg ' + type;
-    
+
     const formattedContent = formatMessage(content);
     messageDiv.innerHTML = formattedContent;
-    
-    // Ensamblar estructura
+
     contentDiv.appendChild(messageDiv);
     messageContainer.appendChild(avatarDiv);
     messageContainer.appendChild(contentDiv);
 
-    // 🆕 AGREGAR VISOR SI HAY RECURSO DE APRENDE.ORG
-if (type === 'bot' && appState.lastAprendeResource) {
-    const { url, tipo } = appState.lastAprendeResource;
-    
-    console.log('📺 Creando visor para:', url, '- Tipo:', tipo);
-    
-    const mediaViewer = createMediaViewer(url, tipo);
-    contentDiv.appendChild(mediaViewer);
-    
-    // Limpiar después de usar para no mostrarlo en mensajes posteriores
-    appState.lastAprendeResource = null;
-}
-    
-    
-    
-    // Agregar al chat
+    if (type === 'bot' && appState.lastAprendeResource) {
+        const { url, tipo } = appState.lastAprendeResource;
+
+        console.log('📺 Creando visor para:', url, '- Tipo:', tipo);
+
+        const mediaViewer = createMediaViewer(url, tipo);
+        contentDiv.appendChild(mediaViewer);
+
+        appState.lastAprendeResource = null;
+    }
+
     elements.chatHistory.appendChild(messageContainer);
-    
-    // Scroll automático
+
     setTimeout(() => {
         elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
     }, 100);
-    
-    // Guardar en historial
-    appState.conversationHistory.push({ 
-        type, 
+
+    appState.conversationHistory.push({
+        type,
         content: content,
-        timestamp: new Date().toISOString() 
+        timestamp: new Date().toISOString()
     });
 }
 
@@ -1169,7 +946,7 @@ function formatMessage(content) {
     content = content.replace(/<!--[\s\S]*?-->/g, '');
     content = content.replace(/<!-+/g, '');
     content = content.replace(/-+>/g, '');
-    
+
     const escapeHtml = (text) => {
         const map = {
             '&': '&amp;',
@@ -1178,67 +955,68 @@ function formatMessage(content) {
         };
         return text.replace(/[&<>]/g, m => map[m]);
     };
-    
+
     content = content.replace(/(?:\|?.+\|.+\n(?:\|?[-:| ]+)+\n(?:\|?.+\|.+\n?)+)/g, (tableMatch) => {
         const rows = tableMatch.trim().split('\n').filter(row => row.trim());
-        
+
         if (rows.length < 2) return tableMatch;
-        
+
         let tableHtml = '<div class="table-container"><table class="markdown-table">';
-        
+
         rows.forEach((row, rowIndex) => {
             const cleanRow = row.trim().replace(/^\||\|$/g, '');
             const cells = cleanRow.split('|').map(cell => cell.trim());
-            
+
             if (cells.length === 0) return;
-            
+
             const isHeaderRow = rowIndex === 0;
             const isSeparatorRow = rowIndex === 1 && cells.every(cell => cell.replace(/[-:]/g, '').trim() === '');
-            
+
             if (isSeparatorRow) {
                 return;
             }
-            
+
             tableHtml += '<tr>';
-            
+
             cells.forEach((cell, cellIndex) => {
                 let cellContent = escapeHtml(cell);
-                
+
                 cellContent = cellContent
                     .replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>')
                     .replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>')
                     .replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>')
                     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
-                
+
                 const tag = isHeaderRow ? 'th' : 'td';
                 tableHtml += `<${tag}>${cellContent}</${tag}>`;
             });
-            
+
             tableHtml += '</tr>';
         });
-        
+
         tableHtml += '</table></div>';
         return tableHtml;
     });
-    
+
     let lines = content.split('\n');
-    
+
     let formatted = lines.map((line) => {
         if (line.includes('</table>') || line.includes('<div class="table-container">')) {
             return line;
         }
-        
+
         if (line.trim().match(/^-{3,}$/)) {
             return '<hr class="msg-divider" />';
         }
-        
+
         if (line.trim() === '') {
             return '<div class="msg-spacer"></div>';
         }
-            if (line.startsWith('#### ')) {
-        return `<h4 class="msg-header">${escapeHtml(line.substring(5))}</h4>`;
-      }
-        
+
+        if (line.startsWith('#### ')) {
+            return `<h4 class="msg-header">${escapeHtml(line.substring(5))}</h4>`;
+        }
+
         if (line.startsWith('### ')) {
             return `<h3 class="msg-header">${escapeHtml(line.substring(4))}</h3>`;
         }
@@ -1248,116 +1026,103 @@ function formatMessage(content) {
         if (line.startsWith('# ')) {
             return `<h1 class="msg-header">${escapeHtml(line.substring(2))}</h1>`;
         }
-        
+
         if (line.startsWith('> ')) {
             return `<div class="msg-quote">${escapeHtml(line.substring(2))}</div>`;
         }
-        
+
         if (line.match(/^[\s]*[-\*•]\s+/)) {
             const listContent = line.replace(/^[\s]*[-\*•]\s+/, '');
             return `<li class="msg-list-item">${escapeHtml(listContent)}</li>`;
         }
-        
+
         if (line.match(/^[\s]*\d+\.\s+/)) {
             const listContent = line.replace(/^[\s]*\d+\.\s+/, '');
             return `<li class="msg-list-item numbered">${escapeHtml(listContent)}</li>`;
         }
-        
+
         return `<p class="msg-paragraph">${escapeHtml(line)}</p>`;
     });
-    
+
     let html = formatted.join('');
-    
+
     html = html.replace(/(?![^<]*<\/table>)\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/(?![^<]*<\/table>)(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?![^<]*<\/table>)`([^`]+)`/g, '<code class="msg-code">$1</code>');
     html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
-    html = html.replace(/(?![^<]*<\/table>)(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function(match) {
+    html = html.replace(/(?![^<]*<\/table>)(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function (match) {
         return `<a href="${match}" target="_blank" rel="noopener" class="msg-link">${match}</a>`;
     });
-    
+
     html = html.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
     html = html.replace(/📝/g, '<span style="color: #17a2b8;">📝</span>');
     html = html.replace(/📅/g, '<span style="color: #ffc107;">📅</span>');
     html = html.replace(/❌/g, '<span style="color: #dc3545;">❌</span>');
     html = html.replace(/⚠️/g, '<span style="color: #ff9800;">⚠️</span>');
     html = html.replace(/😊/g, '<span style="font-size: 1.2em;">😊</span>');
-    
+
     return html;
 }
-
 
 // ==================== CREAR VISOR DE MEDIOS ====================
 function createMediaViewer(url, type) {
     const viewerDiv = document.createElement('div');
     viewerDiv.className = 'message-media-viewer';
-    
+
     const contentDiv = document.createElement('div');
     contentDiv.className = 'media-content';
-    
+
     if (type === 'video') {
-    const video = document.createElement('video');
-    video.src = url;
-    video.controls = true;
-    video.controlsList = 'nodownload';
-    video.disablePictureInPicture = true;
-    video.preload = 'metadata';
-    video.style.width = '100%';
-    video.style.maxHeight = '500px';
-    video.style.borderRadius = '8px';
-    video.style.backgroundColor = '#000';
-    
-    // 🆕 Event listeners para debugging
-    video.addEventListener('loadstart', () => {
-        console.log('🎬 Video: Iniciando carga...');
-    });
-    
-    video.addEventListener('loadedmetadata', () => {
-        console.log('✅ Video: Metadata cargada');
-    });
-    
-    video.addEventListener('error', (e) => {
-        console.error('❌ Error cargando video:', e);
-        console.error('Error code:', video.error?.code);
-        console.error('Error message:', video.error?.message);
-    });
-    
-    video.addEventListener('canplay', () => {
-        console.log('✅ Video: Listo para reproducir');
-    });
-    
-    contentDiv.appendChild(video);
+        const video = document.createElement('video');
+        video.src = url;
+        video.controls = true;
+        video.controlsList = 'nodownload';
+        video.disablePictureInPicture = true;
+        video.preload = 'metadata';
+        video.style.width = '100%';
+        video.style.maxHeight = '500px';
+        video.style.borderRadius = '8px';
+        video.style.backgroundColor = '#000';
 
-    // ✅ Aplicar solo protección anti-clic derecho (SIN overlay)
-    applyMediaProtection(video);
-    
-    // ❌ ELIMINADO: Ya no crear overlay que bloquea clics
-    // const overlay = document.createElement('div');
-    // overlay.className = 'media-protection-overlay';
-    // contentDiv.appendChild(overlay);
+        video.addEventListener('loadstart', () => {
+            console.log('🎬 Video: Iniciando carga...');
+        });
 
-        
+        video.addEventListener('loadedmetadata', () => {
+            console.log('✅ Video: Metadata cargada');
+        });
+
+        video.addEventListener('error', (e) => {
+            console.error('❌ Error cargando video:', e);
+            console.error('Error code:', video.error?.code);
+            console.error('Error message:', video.error?.message);
+        });
+
+        video.addEventListener('canplay', () => {
+            console.log('✅ Video: Listo para reproducir');
+        });
+
+        contentDiv.appendChild(video);
+
+        applyMediaProtection(video);
+
     } else if (type === 'pdf') {
         const iframe = document.createElement('iframe');
         iframe.src = url + '#toolbar=0&navpanes=0&scrollbar=0';
         iframe.setAttribute('sandbox', 'allow-same-origin');
-        
+
         contentDiv.appendChild(iframe);
-        
+
     } else if (type === 'image') {
         const img = document.createElement('img');
         img.src = url;
         img.alt = 'Contenido de Aprende.org';
-        
-        // Protección
+
         img.addEventListener('contextmenu', (e) => e.preventDefault());
         img.addEventListener('dragstart', (e) => e.preventDefault());
-        
+
         contentDiv.appendChild(img);
-    }
-    
-    // 🆕 NUEVO: SOPORTE PARA CURSOS DE APRENDE.ORG
-    else if (type === 'curso' || type === 'diplomado' || type === 'ruta' || type === 'especialidad') {
+    } else if (type === 'curso' || type === 'diplomado' || type === 'ruta' || type === 'especialidad') {
         const iframe = document.createElement('iframe');
         iframe.src = url;
         iframe.className = 'aprende-iframe';
@@ -1367,15 +1132,11 @@ function createMediaViewer(url, type) {
         iframe.style.borderRadius = '8px';
         iframe.setAttribute('allowfullscreen', 'true');
         iframe.setAttribute('loading', 'lazy');
-        
-        // Log para debugging
-        console.log('✅ Iframe de curso creado:', url);
-        
-        contentDiv.appendChild(iframe);
-    }
 
-    // CASO GENÉRICO: PÁGINAS WEB
-    else if (type === 'webpage') {
+        console.log('✅ Iframe de curso creado:', url);
+
+        contentDiv.appendChild(iframe);
+    } else if (type === 'webpage') {
         const iframe = document.createElement('iframe');
         iframe.src = url;
         iframe.className = 'webpage-iframe';
@@ -1385,12 +1146,9 @@ function createMediaViewer(url, type) {
         iframe.style.borderRadius = '8px';
         iframe.setAttribute('allowfullscreen', 'true');
         iframe.setAttribute('loading', 'lazy');
-        
+
         contentDiv.appendChild(iframe);
-    }
-    
-    // CASO POR DEFECTO: Si no coincide con ningún tipo, crear iframe genérico
-    else {
+    } else {
         console.warn('⚠️ Tipo desconocido:', type, '- Creando iframe genérico');
         const iframe = document.createElement('iframe');
         iframe.src = url;
@@ -1401,39 +1159,63 @@ function createMediaViewer(url, type) {
         iframe.style.borderRadius = '8px';
         iframe.setAttribute('allowfullscreen', 'true');
         iframe.setAttribute('loading', 'lazy');
-        
+
         contentDiv.appendChild(iframe);
     }
-    
+
     viewerDiv.appendChild(contentDiv);
     return viewerDiv;
 }
 
+// ==================== NOTAS: COPIAR / COMPARTIR ====================
+async function copyNoteToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        console.log('📝 Nota copiada al portapapeles');
+        showSuccessMessage('📝 Nota copiada. Puedes pegarla en tu app de notas.');
+    } catch (err) {
+        console.error('❌ Error copiando nota:', err);
+        showErrorMessage('No se pudo copiar la nota');
+    }
+}
 
-// ==================== PROTECCIÓN ANTI-DESCARGA AVANZADA ====================
+async function shareNoteIfAvailable(text) {
+    if (!navigator.share) {
+        console.log('ℹ️ Web Share API no disponible');
+        await copyNoteToClipboard(text);
+        return;
+    }
+
+    try {
+        await navigator.share({
+            title: 'Nota de Claria',
+            text
+        });
+        console.log('📤 Nota compartida');
+    } catch (err) {
+        console.log('ℹ️ Share cancelado o no disponible, copiando nota');
+        await copyNoteToClipboard(text);
+    }
+}
+
 function applyMediaProtection(mediaElement) {
     if (!mediaElement) return;
-    
-    // 1. Prevenir clic derecho
+
     mediaElement.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         e.stopPropagation();
         return false;
     });
-    
-    // 2. Prevenir arrastre
+
     mediaElement.addEventListener('dragstart', (e) => {
         e.preventDefault();
         return false;
     });
-    
-    // 3. Deshabilitar selección
+
     mediaElement.style.userSelect = 'none';
     mediaElement.style.webkitUserSelect = 'none';
-    
-    // 4. Bloquear combinaciones de teclado
+
     document.addEventListener('keydown', (e) => {
-        // Bloquear Ctrl+S, Ctrl+P, PrtScn, F12
         if (
             (e.ctrlKey && (e.key === 's' || e.key === 'p')) ||
             e.key === 'PrintScreen' ||
@@ -1444,258 +1226,821 @@ function applyMediaProtection(mediaElement) {
             return false;
         }
     });
-    
+
     console.log('🔒 Protección anti-descarga activada');
 }
 
 // ==================== TASK MANAGEMENT ====================
-function isTaskMessage(userMsg, botMsg) {
-    const lowerUserMsg = userMsg.toLowerCase().trim();
-    const lowerBotMsg = botMsg.toLowerCase();
-    
-    // ============ PASO 1: EXCLUIR MENSAJES CORTOS Y PALABRAS SUELTAS ============
-    if (lowerUserMsg.length < 15 || !lowerUserMsg.includes(' ')) {
-        return false;
+
+
+function bindDeleteButtons() {
+    document.querySelectorAll('.task-preview-btn.delete').forEach(btn => {
+        if (btn.__deleteBound) return; // evita duplicados
+        btn.__deleteBound = true;
+
+        btn.addEventListener('click', () => {
+            const taskId = btn.dataset.taskId;
+            console.log('🖱️ Click eliminar tarea:', taskId);
+            deleteTask(taskId); // 👉 llama al backend
+        });
+    });
+}
+
+
+function extractPreviewContent(fullContent, taskType) {
+    let content = fullContent || '';
+
+    const cleanContent = content
+        .replace(/^(anota|apunta|nota|escribe)\s*/i, '')
+        .replace(/^(recuerdame|recuérdame|recordatorio|recordar)\s*/i, '')
+        .replace(/^(agenda|agendar|evento|cita|reunión|reunion)\s*/i, '')
+        .replace(/^(que|qué|para|sobre|acerca de)\s*/i, '')
+        .trim();
+
+    if (taskType === 'calendar' || taskType === 'reminder') {
+        let preview = cleanContent;
+
+        preview = preview
+            .replace(/\b(manana|hoy|el lunes|el martes|el miercoles|el jueves|el viernes|el sabado|el domingo)\b/i, '')
+            .replace(/\b(a las|a la|en|para)\b/gi, '')
+            .replace(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|a\.m\.|p\.m\.)?)\b/gi, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+
+        if (preview.length > 40) {
+            preview = preview.substring(0, 37) + '...';
+        }
+
+        return preview || 'Evento sin titulo';
     }
-    
-    // ============ PASO 2: EXCLUIR PREGUNTAS ============
-    const questionWords = ['qué', 'que', 'cómo', 'como', 'cuál', 'cual', 'cuáles', 
-                          'cuales', 'dónde', 'donde', 'cuándo', 'cuando', 'por qué', 
-                          'porque', 'quién', 'quien'];
-    
-    if (questionWords.some(q => lowerUserMsg.includes(q)) && 
-        !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
-        return false;
+
+    if (cleanContent.length > 50) {
+        return cleanContent.substring(0, 47) + '...';
     }
-    
-    // ============ PASO 3: EXCLUIR PALABRAS DE CONSULTA ============
-    const consultaWords = ['dime', 'dimelo', 'dame', 'muestra', 'explica', 'explicame',
-                           'ayuda', 'ayudame', 'busca', 'encuentra', 'hablame', 'háblame'];
-    
-    if (consultaWords.some(w => lowerUserMsg.startsWith(w)) && 
-        !botMsg.includes('✅') && !botMsg.includes('📝') && !botMsg.includes('📅')) {
-        return false;
+
+    return cleanContent || 'Nota sin contenido';
+}
+function showICSInfoAlert(task) {
+    if (!task?.raw?.ics) return;
+
+    console.log('📣 Mostrando alerta informativa ICS', {
+        taskId: task.id,
+        type: task.type
+    });
+
+    showAlert({
+        icon: 'calendar_month',
+        title: 'Evento creado',
+        message: 'Puedes importar este evento en tu app de calendario favorita (Google Calendar, Outlook, Apple Calendar).',
+        actionText: 'Descargar archivo',
+        onAction: () => {
+            console.log('🖱️ Click desde alerta → descargar ICS');
+            downloadICS(task.raw.ics, task.content || 'evento');
+        }
+    });
+}
+
+
+// ==================== RENDERIZADO COMPLETO DEL SIDEBAR ====================
+function renderTaskSidebar() {
+    try {
+        console.log('🔄 Renderizando sidebar de tareas...', { total: taskStore.length });
+        
+        // Filtrar tareas por tipo
+        const notes = taskStore.filter(t => t.type === 'note');
+        const reminders = taskStore.filter(t => t.type === 'reminder');
+        const calendar = taskStore.filter(t => t.type === 'calendar');
+        
+        console.log('📊 Distribución de tareas:', {
+            notes: notes.length,
+            reminders: reminders.length,
+            calendar: calendar.length
+        });
+        
+        // Renderizar cada categoría
+        renderTaskPreview('notes', notes);
+        renderTaskPreview('reminders', reminders);
+        renderTaskPreview('calendar', calendar);
+        
+        // Actualizar contadores
+        updateSidebarCounters();
+        
+        // Actualizar visibilidad según estado de contracción
+        updateTasksVisibility();
+        
+        console.log('✅ Sidebar renderizado correctamente');
+        // Bind download handlers for ICS buttons rendered in the sidebar
+        try {
+            bindICSDownloadButtons();
+        } catch (e) {
+            console.warn('⚠️ bindICSDownloadButtons fallo:', e);
+        }
+    } catch (error) {
+        console.error('❌ Error en renderTaskSidebar:', error);
     }
-    
-    // ============ PASO 4: VERBOS / FRASES DE TAREA ============
-    const taskVerbs = {
-        // Frases típicas de recordatorios
-        reminders: [
-            'recuerdame', 'recuérdame', 'recordarme', 'avisame', 'avísame',
-            'recordatorio', 'no olvides', 'que no se me olvide'
-        ],
-        // Frases típicas de notas
-        notes: [
-            'nota', 'toma nota', 'anota', 'apunta',
-            'guarda esto', 'guardar esto', 'guarda la nota'
-        ],
-        // Frases típicas de agenda / calendario
-        calendar: [
-            'agendar', 'agenda ', 'agrega a la agenda',
-            'pon en la agenda', 'programar', 'programa ',
-            'cita para', 'agenda una cita'
-        ]
-    };
-    
-    let hasTaskVerb = false;
-    for (const category in taskVerbs) {
-        if (taskVerbs[category].some(verb => lowerUserMsg.includes(verb))) {
-            hasTaskVerb = true;
-            break;
+}
+
+// Asociar handlers a botones de descarga ICS del sidebar (sin inline JS)
+function bindICSDownloadButtons() {
+    document.querySelectorAll('.task-preview-btn.download').forEach(btn => {
+        // Avoid binding multiple times
+        if (btn.__icsBound) return;
+
+        btn.addEventListener('click', () => {
+            const taskId = btn.dataset.taskId;
+            const task = taskStore.find(t => t.id === taskId);
+
+            console.log('🖱️ Click descargar ICS (sidebar)', { taskId, hasICS: !!task?.raw?.ics });
+
+            if (!task || !task.raw || !task.raw.ics) {
+                console.warn('❌ No se encontró ICS para la tarea', taskId);
+                showErrorMessage('No se encontró el archivo .ics para esta tarea.');
+                return;
+            }
+
+            // Llamada centralizada a la función de descarga (gesto de usuario)
+            downloadICS(task.raw.ics, task.content || 'evento');
+        });
+
+        btn.__icsBound = true;
+    });
+}
+
+// ==================== RENDERIZADO DE PREVIEWS CON ESTILO ====================
+function renderTaskPreview(listType, tasks) {
+    try {
+        const preview = document.getElementById(`${listType}-preview`);
+        const navItem = document.getElementById(`nav-${listType}`);
+        
+        if (!preview) {
+            console.error(`❌ Elemento preview no encontrado: ${listType}-preview`);
+            return;
+        }
+        
+        const emptyMessages = {
+            'notes': 'Sin notas',
+            'reminders': 'Sin recordatorios',
+            'calendar': 'Sin eventos'
+        };
+        
+        // Si no hay tareas
+        if (!tasks || tasks.length === 0) {
+            console.log(`ℹ️ No hay tareas para: ${listType}`);
+            preview.innerHTML = `<div class="task-preview-empty">${emptyMessages[listType]}</div>`;
+            if (navItem) {
+                navItem.classList.remove('has-tasks');
+                const toggleIcon = navItem.querySelector('.nav-toggle .material-symbols-outlined');
+                if (toggleIcon) {
+                    toggleIcon.textContent = 'chevron_right';
+                }
+            }
+            return;
+        }
+        
+        console.log(`📝 Renderizando ${tasks.length} tareas para: ${listType}`);
+        
+        // Marcar que tiene tareas
+        if (navItem) {
+            navItem.classList.add('has-tasks');
+            const toggleIcon = navItem.querySelector('.nav-toggle .material-symbols-outlined');
+            if (toggleIcon) {
+                toggleIcon.textContent = 'expand_more';
+            }
+        }
+        
+        let html = '';
+        
+        // Mostrar hasta 3 tareas en preview (máximo)
+        const previewTasks = tasks.slice(0, 3);
+        
+        previewTasks.forEach((task, index) => {
+            try {
+            const rawTitle =
+                task?.raw?.title ||
+                task?.raw?.titulo ||
+                task?.raw?.summary ||
+                task?.raw?.event_title ||
+                '';
+
+            const inferredText = (task.type === 'calendar' || task.type === 'reminder')
+                ? extractPreviewContent(task.content || '', task.type)
+                : (task.preview || extractPreviewContent(task.content || '', task.type) || task.content || '');
+
+            let displayText = (inferredText || '').trim();
+            if (!displayText || displayText.toLowerCase() === 'evento sin titulo') {
+                displayText = (rawTitle || '').trim() || (task.content || '').trim() || 'Evento sin titulo';
+            }
+
+            if (task.type === 'note' && !displayText) {
+                displayText = 'Nota sin contenido';
+            }
+                const escapedText = escapeHtml(displayText);
+                const escapedContent = escapeHtml(task.content || '');
+                
+                // Extraer fecha y hora si existen
+                let datetimeHtml = '';
+                if (task.fecha || task.hora) {
+                    const fecha = task.fecha || '';
+                    const hora = task.hora || '';
+                    const separator = (fecha && hora) ? ' ' : '';
+                    datetimeHtml = `
+                        <div class="task-preview-time">
+                            <small>${fecha}${separator}${hora}</small>
+                        </div>
+                    `;
+                }
+                
+                // Determinar tipo de reunión si existe
+                let meetingTypeHtml = '';
+                if (task.meeting_type) {
+                    const typeClass = task.meeting_type === 'virtual' ? 'virtual' : 'presencial';
+                    const typeText = task.meeting_type === 'virtual' ? 'Virtual' : 'Presencial';
+                    meetingTypeHtml = `
+                        <div class="task-preview-badge ${typeClass}">
+                            ${typeText}
+                        </div>
+                    `;
+                }
+                
+                // Botones de acción
+                let actionButtons = '';
+                
+                // Botón para copiar notas
+                if (task.type === 'note') {
+                    actionButtons += `
+                        <button class="task-preview-btn copy" onclick="copyNoteToClipboard('${escapedContent.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="Copiar nota">
+                            <span class="material-symbols-outlined">content_copy</span>
+                        </button>
+                    `;
+                }
+                
+                // Botón para descargar ICS (sin inline JS)
+                if (task.raw && task.raw.ics) {
+                    actionButtons += `
+                        <button
+                            class="task-preview-btn download"
+                            data-task-id="${task.id}"
+                            title="Descargar evento">
+                            <span class="material-symbols-outlined">calendar_month</span>
+                        </button>
+                    `;
+                }
+                
+                // Botón para eliminar (siempre presente)
+                            actionButtons += `
+            
+                <button class="task-preview-btn delete"
+                        data-task-id="${task.id}"
+                        title="Eliminar">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            `;
+
+                
+                // Badge para tareas pendientes
+                let pendingBadge = '';
+                if (task.status === 'pending') {
+                    pendingBadge = '<div class="task-pending-badge">Pendiente</div>';
+                }
+                
+                html += `
+<div class="task-preview-item" data-task-id="${task.id}">
+    <div class="task-preview-content">${escapedText}</div>
+    ${datetimeHtml}
+    ${meetingTypeHtml}
+    ${pendingBadge}
+    <div class="task-preview-actions">
+        ${actionButtons}
+    </div>
+</div>
+                `;
+                
+            } catch (taskError) {
+                console.error(`❌ Error renderizando tarea ${index}:`, taskError);
+            }
+        });
+        
+        // Si hay más de 3 tareas, mostrar indicador
+        if (tasks.length > 3) {
+            html += `<div class="task-preview-more" onclick="expandAllTasks('${listType}')">+${tasks.length - 3} más</div>`;
+        }
+        
+        preview.innerHTML = html;
+        
+        // Aplicar estilos dinámicos si es necesario
+        applyTaskPreviewStyles(preview, listType);
+        
+    } catch (error) {
+        console.error(`❌ Error en renderTaskPreview para ${listType}:`, error);
+        const preview = document.getElementById(`${listType}-preview`);
+        if (preview) {
+            preview.innerHTML = `<div class="task-preview-empty error">Error al cargar tareas</div>`;
         }
     }
-    
-    // ============ PASO 5: O SI EL BOT CONFIRMA CON EMOJIS ============
-    const hasBotEmoji = botMsg.includes('✅') || botMsg.includes('📝') || botMsg.includes('📅');
-    const botConfirms = lowerBotMsg.includes('he creado') || 
-                       lowerBotMsg.includes('he guardado') || 
-                       lowerBotMsg.includes('he agendado');
-    
-    // ============ DECISIÓN FINAL ============
-    return hasTaskVerb || (hasBotEmoji && botConfirms);
+}
+async function deleteTask(taskId) {
+    console.log('🗑️ Eliminando tarea:', taskId);
+
+    try {
+        const res = await fetch(`/api/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-User-Key': userKey   // 🔑 usa el mismo userKey del chat
+            }
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+            console.warn('❌ Error eliminando tarea', data);
+            return;
+        }
+
+        console.log('✅ Tarea eliminada, actualizando sidebar');
+
+        // 🔁 Reemplazar fuente de verdad
+        taskStore = [];
+        hydrateTaskStoreFromBackend(data.tasks);
+
+        renderTaskSidebar();
+        updateSidebarCounters();
+        bindDeleteButtons();
+
+
+    } catch (err) {
+        console.error('❌ Error en deleteTask()', err);
+    }
+}
+function hydrateTaskStoreFromBackend(tasks) {
+    if (!tasks) return;
+
+    const { calendar = [], reminder = [], note = [] } = tasks;
+
+    calendar.forEach(t => taskStore.push({ ...t, type: 'calendar', raw: t }));
+    reminder.forEach(t => taskStore.push({ ...t, type: 'reminder', raw: t }));
+    note.forEach(t => taskStore.push({ ...t, type: 'note', raw: t }));
 }
 
+// ==================== FUNCIONES AUXILIARES ====================
+function expandAllTasks(listType) {
+    const navItem = document.getElementById(`nav-${listType}`);
+    const preview = document.getElementById(`${listType}-preview`);
+    
+    if (navItem && preview) {
+        preview.classList.add('expanded');
+        const toggleIcon = navItem.querySelector('.nav-toggle .material-symbols-outlined');
+        if (toggleIcon) {
+            toggleIcon.textContent = 'expand_less';
+        }
+        
+        // Si hay más de 3 tareas, cargar todas
+        const tasks = taskStore.filter(t => t.type === listType.replace('s', ''));
+        if (tasks.length > 3) {
+            renderFullTaskList(listType, tasks);
+        }
+    }
+}
 
-async function processTask(userMessage, botResponse) {
-    const timestamp = new Date().toLocaleString('es-MX', {
-        day: '2-digit',
-        month: '2-digit', 
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+function renderFullTaskList(listType, tasks) {
+    const preview = document.getElementById(`${listType}-preview`);
+    if (!preview) return;
+    
+    // Similar a renderTaskPreview pero muestra todas las tareas
+    let html = '';
+    
+    tasks.forEach(task => {
+        const displayText = task.preview || extractPreviewContent(task.content || '', task.type) || task.content || 'Sin título';
+        const escapedText = escapeHtml(displayText);
+        const escapedContent = escapeHtml(task.content || '');
+        
+        // ... código similar para construir cada tarea ...
+        // (puedes reutilizar la lógica de renderTaskPreview)
     });
     
-    const task = {
-        content: userMessage,
-        response: botResponse,
-        created_at: timestamp,
-        completed: false,
-        id: Date.now() + Math.random().toString(36).substr(2, 9)
+    preview.innerHTML = html;
+}
+
+function applyTaskPreviewStyles(previewElement, listType) {
+    // Aplicar colores según el tipo de tarea
+    const colorMap = {
+        'notes': '#00BCD4',
+        'reminders': '#FF9800',
+        'calendar': '#4CAF50'
     };
     
-    let taskType = null;
-    const lowerUserMsg = userMessage.toLowerCase();
-    const lowerBotMsg = botResponse.toLowerCase();
+    const color = colorMap[listType] || '#00BCD4';
     
-    // 🔹 1) PRIORIZAR AGENDA / CALENDARIO
-    if (
-        lowerUserMsg.includes('agendar') || 
-        lowerUserMsg.includes('agenda ') ||
-        lowerUserMsg.includes('agrega a la agenda') ||
-        lowerUserMsg.includes('pon en la agenda') ||
-        lowerUserMsg.includes('programar') ||
-        lowerUserMsg.includes('programa ') ||
-        (lowerUserMsg.includes('cita') && !lowerUserMsg.includes('recordar')) ||
-        botResponse.includes('📅') ||
-        lowerBotMsg.includes('agendado') ||
-        lowerBotMsg.includes('he agendado')
-    ) {
-        taskType = 'calendar';
-    } 
-    
-    // 🔹 2) LUEGO RECORDATORIOS
-    else if (
-        lowerUserMsg.includes('recordar') || 
-        lowerUserMsg.includes('recuerdame') || 
-        lowerUserMsg.includes('recuérdame') ||
-        lowerUserMsg.includes('avisame') ||
-        lowerUserMsg.includes('avísame') ||
-        lowerUserMsg.includes('recordatorio') ||
-        lowerUserMsg.includes('no olvides') ||
-        lowerUserMsg.includes('que no se me olvide') ||
-        (botResponse.includes('✅') && !lowerUserMsg.includes('agendar')) ||
-        (lowerBotMsg.includes('recordatorio') && !lowerBotMsg.includes('agendado'))
-    ) {
-        taskType = 'reminders';
-    } 
-    
-    // 🔹 3) POR ÚLTIMO, NOTAS
-    else if (
-        lowerUserMsg.includes('nota') || 
-        lowerUserMsg.includes('toma nota') ||
-        lowerUserMsg.includes('anota') || 
-        lowerUserMsg.includes('apunta') ||
-        lowerUserMsg.includes('guardar') ||
-        lowerUserMsg.includes('guarda esto') ||
-        lowerUserMsg.includes('guarda la nota') ||
-        botResponse.includes('📝') ||
-        lowerBotMsg.includes('nota guardada') ||
-        lowerBotMsg.includes('he guardado')
-    ) {
-        taskType = 'notes';
-    }
-    
-    // 🔹 4) SI NO SE DETECTÓ TIPO, CAE COMO RECORDATORIO
-    if (!taskType) {
-        taskType = 'reminders';
-    }
-    
-    if (!appState.tasks[taskType]) {
-        appState.tasks[taskType] = [];
-    }
-
-    // Si es evento de calendario, generar archivo .ics
-    if (taskType === 'calendar') {
-        await generateICSForTask(task);
-    }
-
-    appState.tasks[taskType].push(task);
-    updateTasksUI();
-
-    // Si es calendario, actualizar UI después de generar el archivo
-    if (taskType === 'calendar') {
-        setTimeout(() => {
-            updateTasksUI();
-        }, 100);
-    }
-    
-    // Mostrar sección de tareas (estilo original)
-    showTasksSection(taskType);
-    
-    saveToLocalStorage();
-
-    // Debug opcional
-    console.log('[TASK CREADA]', { taskType, userMessage });
-}
-
-function updateTasksUI() {
-    updateTaskList(elements.remindersList, appState.tasks.reminders, 'reminders', 'No hay recordatorios pendientes');
-    updateTaskList(elements.notesList, appState.tasks.notes, 'notes', 'No hay notas');
-    updateTaskList(elements.calendarList, appState.tasks.calendar, 'calendar', 'No hay eventos programados');
-    updateTaskBadges();
-}
-
-function updateTaskBadges() {
-    const totalTasks = (appState.tasks.reminders?.length || 0) +
-                      (appState.tasks.notes?.length || 0) +
-                      (appState.tasks.calendar?.length || 0);
-
-    // Actualizar badge en navegación
-    const tasksCountNav = document.getElementById('tasksCountNav');
-    if (tasksCountNav) {
-        tasksCountNav.textContent = `(${totalTasks})`;
-    }
-
-    console.log(`📊 Tareas actualizadas: ${totalTasks} en total`);
-}
-
-function updateTaskList(container, tasks, taskType, emptyMessage) {
-    if (!container) return;
-    
-    if (!tasks || tasks.length === 0) {
-        container.innerHTML = `<div class="empty-task-message">${emptyMessage}</div>`;
-        return;
-    }
-    
-    let html = '';
-    tasks.forEach((task, idx) => {
-        const displayContent = task.content.length > 80 
-            ? task.content.substring(0, 80) + '...' 
-            : task.content;
-            
-        html += `
-    <div class="task-item" data-task-id="${task.id}">
-        <div class="task-content">${escapeHtml(displayContent)}</div>
-        <div class="task-time">Creado: ${task.created_at}</div>
-        ${false && taskType === 'calendar' && task.icsFileUrl ? `
-        <button class="task-download" onclick="downloadICSFile('${task.icsFileUrl}', '${task.icsFileName}')" title="Descargar evento">
-            <span class="material-symbols-outlined">download</span>
-        </button>
-        ` : ''}
-        <button class="task-delete" onclick="deleteTask('${taskType}', ${idx})" title="Eliminar">
-            <span class="material-symbols-outlined">close</span>
-        </button>
-    </div>
-`;
+    // Aplicar borde izquierdo con color específico
+    previewElement.querySelectorAll('.task-preview-item').forEach(item => {
+        item.style.borderLeftColor = color;
     });
-    
-    container.innerHTML = html;
 }
 
+function updateSidebarCounters() {
+    try {
+        const noteCount = taskStore.filter(t => t.type === 'note').length;
+        const reminderCount = taskStore.filter(t => t.type === 'reminder').length;
+        const calendarCount = taskStore.filter(t => t.type === 'calendar').length;
+        const totalTasks = noteCount + reminderCount + calendarCount;
+        
+        console.log('🔢 Actualizando contadores:', { noteCount, reminderCount, calendarCount, totalTasks });
+        
+        // Actualizar contadores individuales
+        const noteCounter = document.querySelector('#noteCount');
+        const reminderCounter = document.querySelector('#reminderCount');
+        const calendarCounter = document.querySelector('#calendarCount');
+        
+        if (noteCounter) {
+            noteCounter.textContent = noteCount > 0 ? `(${noteCount})` : '';
+            noteCounter.style.color = noteCount > 0 ? '#DA291C' : '#999';
+        }
+        
+        if (reminderCounter) {
+            reminderCounter.textContent = reminderCount > 0 ? `(${reminderCount})` : '';
+            reminderCounter.style.color = reminderCount > 0 ? '#DA291C' : '#999';
+        }
+        
+        if (calendarCounter) {
+            calendarCounter.textContent = calendarCount > 0 ? `(${calendarCount})` : '';
+            calendarCounter.style.color = calendarCount > 0 ? '#DA291C' : '#999';
+        }
+        
+        // Actualizar contador total en el header
+        const tasksHeader = document.querySelector('.tasks-section-header');
+        if (tasksHeader) {
+            // Eliminar contador anterior si existe
+            const existingTotal = tasksHeader.querySelector('.tasks-total-count');
+            if (existingTotal) existingTotal.remove();
+            
+            // Agregar nuevo contador si hay tareas
+            if (totalTasks > 0) {
+                const totalSpan = document.createElement('span');
+                totalSpan.className = 'tasks-total-count';
+                totalSpan.textContent = totalTasks;
+                totalSpan.style.cssText = `
+                    background: #DA291C;
+                    color: white;
+                    font-size: 11px;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    margin-left: 8px;
+                    font-weight: 600;
+                    animation: pulse 2s infinite;
+                `;
+                
+                const titleText = tasksHeader.querySelector('.title-text');
+                if (titleText) {
+                    titleText.appendChild(totalSpan);
+                }
+                
+                // Marcar que tiene tareas
+                tasksHeader.classList.add('has-tasks');
+            } else {
+                tasksHeader.classList.remove('has-tasks');
+            }
+        }
+        
+    } catch (error) {
+        console.error('❌ Error en updateSidebarCounters:', error);
+    }
+}
+
+function updateTasksVisibility() {
+    const tasksContent = document.getElementById('taskSectionContent');
+    if (!tasksContent) return;
+
+    const isCollapsed = tasksContent.classList.contains('collapsed');
+
+    // Mostrar/ocultar elementos dentro de la sección de tareas
+    const elementsToToggle = [
+        ...tasksContent.querySelectorAll('.nav-item'),
+        ...tasksContent.querySelectorAll('.task-preview-list')
+    ];
+
+    elementsToToggle.forEach(el => {
+        if (isCollapsed) {
+            el.style.display = 'none';
+            el.style.opacity = '0';
+            el.style.height = '0';
+            el.style.overflow = 'hidden';
+        } else {
+            el.style.display = '';
+            setTimeout(() => {
+                el.style.opacity = '1';
+                el.style.height = '';
+                el.style.overflow = '';
+            }, 10);
+        }
+    });
+}
+
+// ==================== FUNCIÓN PARA ESCAPAR HTML ====================
 function escapeHtml(text) {
+    if (!text) return '';
+    
     const div = document.createElement('div');
     div.textContent = text;
-    return div.innerHTML;
+    return div.innerHTML
+        .replace(/'/g, "&#39;")
+        .replace(/"/g, "&quot;")
+        .replace(/\n/g, '<br>');
 }
 
-function deleteTask(taskType, index) {
-    appState.tasks[taskType].splice(index, 1);
-    updateTasksUI();
-    saveToLocalStorage();
+// ==================== FUNCIONES PARA CONTRACCIÓN/EXPANSIÓN DE TAREAS ====================
+function setupTasksSectionToggle() {
+    const header = document.getElementById('taskSectionHeader');
+    const content = document.getElementById('taskSectionContent');
+
+    if (!header || !content) return;
+
+    // Icono dentro del header
+    const headerToggleIcon = header.querySelector('.nav-toggle .material-symbols-outlined');
+
+    // Estado inicial: si hay preferencia en localStorage úsala, si no, colapsada por defecto
+    const storedPref = localStorage.getItem('claria_tasks_collapsed');
+    const isCollapsed = storedPref !== null ? storedPref === 'true' : true;
+
+    header.classList.toggle('expanded', !isCollapsed);
+    content.classList.toggle('collapsed', isCollapsed);
+
+    // Sincronizar icono
+    if (headerToggleIcon) {
+        headerToggleIcon.textContent = content.classList.contains('collapsed') ? 'chevron_right' : 'expand_less';
+    }
+
+    // Aplicar visibilidad inicial y atributos ARIA
+    header.setAttribute('role', 'button');
+    header.setAttribute('aria-expanded', String(!content.classList.contains('collapsed')));
+    updateTasksVisibility();
+
+    // Toggle al hacer clic en el header
+    header.addEventListener('click', function(e) {
+        e.stopPropagation();
+
+        const nowCollapsed = content.classList.toggle('collapsed');
+        header.classList.toggle('expanded', !nowCollapsed);
+
+        if (headerToggleIcon) {
+            headerToggleIcon.textContent = nowCollapsed ? 'chevron_right' : 'expand_less';
+        }
+
+        header.setAttribute('aria-expanded', String(!nowCollapsed));
+        localStorage.setItem('claria_tasks_collapsed', nowCollapsed ? 'true' : 'false');
+        updateTasksVisibility();
+    });
+
+    // Configurar toggles individuales para recordatorios, notas y agenda
+    ['reminders', 'notes', 'calendar'].forEach(listType => {
+        const navItem = document.getElementById(`nav-${listType}`);
+        const preview = document.getElementById(`${listType}-preview`);
+
+        if (!navItem || !preview) return;
+
+        // estado inicial
+        preview.classList.remove('active');
+
+        navItem.addEventListener('click', function(e) {
+            // Evitar toggle si se clickeó un botón de acción dentro del nav
+            if (e.target.closest('.task-preview-btn')) return;
+
+            preview.classList.toggle('active');
+            const toggleIcon = navItem.querySelector('.nav-toggle .material-symbols-outlined');
+            if (toggleIcon) {
+                toggleIcon.textContent = preview.classList.contains('active') ? 'expand_less' : 'chevron_right';
+            }
+        });
+    });
 }
 
-function clearAllTasks() {
-    appState.tasks = { 
-        reminders: [], 
-        notes: [], 
-        calendar: [] 
-    };
-    updateTasksUI();
-    saveToLocalStorage();
+// ==================== TOGGLE DE CATEGORÍAS INDIVIDUALES ====================
+function setupCategoryToggles() {
+    document.querySelectorAll('.task-nav-item').forEach(navItem => {
+        navItem.addEventListener('click', function(e) {
+            // Solo toggle si no estamos en un botón de acción
+            if (e.target.closest('.task-preview-btn')) return;
+            
+            const listType = this.id.replace('nav-', '');
+            const preview = document.getElementById(`${listType}-preview`);
+            const toggleIcon = this.querySelector('.nav-toggle .material-symbols-outlined');
+            
+            if (preview && toggleIcon) {
+                preview.classList.toggle('expanded');
+                toggleIcon.textContent = preview.classList.contains('expanded') 
+                    ? 'expand_less' 
+                    : 'expand_more';
+            }
+        });
+    });
 }
 
-window.deleteTask = deleteTask;
-window.clearAllTasks = clearAllTasks;
+window.deleteTaskFromStore = function(taskId) {
+    if (confirm('¿Eliminar esta tarea?')) {
+        taskStore = taskStore.filter(t => t.id !== taskId);
+        renderTaskSidebar();
+        saveToLocalStorage();
+        console.log('🗑️ Tarea eliminada:', taskId);
+        
+        // Mostrar notificación
+        showSuccessMessage('Tarea eliminada');
+    }
+};
+
+function showSuccessMessage(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #28a745;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10001;
+        font-size: 14px;
+        animation: slideInRight 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function showErrorMessage(message) {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: #dc3545;
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        z-index: 10001;
+        font-size: 14px;
+        animation: slideInRight 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        toast.style.transition = 'all 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+// ✅ FUNCIÓN MEJORADA PARA DESCARGAR ICS CON MEJOR UX
+function downloadICS(icsContent, filename = 'evento') {
+    console.log('⬇️ downloadICS ejecutado');
+
+    if (!icsContent) {
+        console.warn('❌ downloadICS: contenido vacío');
+        return;
+    }
+
+    const blob = new Blob([icsContent], {
+        type: 'text/calendar;charset=utf-8'
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.ics`;
+
+    document.body.appendChild(a);
+    a.click();
+
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    console.log('✅ Descarga ICS disparada');
+}
+
+// ✅ NOTIFICACIÓN DE DESCARGA MEJORADA
+function showICSDownloadToast(eventName, blobUrl, filename, downloadElement) {
+    const toast = document.createElement('div');
+    toast.className = 'ics-download-toast';
+    toast.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="font-size:24px;">📅</span>
+                <div style="flex:1;">
+                    <div style="font-weight:bold; font-size:14px;">Evento de Calendario Listo</div>
+                    <div style="font-size:12px; opacity:0.9;">"${eventName.substring(0, 40)}${eventName.length > 40 ? '...' : ''}"</div>
+                </div>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:4px;">
+                <button id="icsDownloadBtn" style="flex:1; background:#DA291C; color:white; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer; font-size:13px;">
+                    📥 Descargar .ICS
+                </button>
+                <button id="icsCancelBtn" style="background:#f5f5f5; color:#666; border:1px solid #ddd; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:13px;">
+                    Cancelar
+                </button>
+            </div>
+            <div style="font-size:11px; color:#666; margin-top:4px; padding-top:4px; border-top:1px solid #eee;">
+                <strong>💡 Tip:</strong> El archivo .ics se puede importar en Google Calendar, Outlook o Apple Calendar
+            </div>
+        </div>
+    `;
+    
+    toast.style.cssText = `
+        position: fixed; bottom: 20px; right: 20px;
+        background: white; padding: 16px; border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 10000;
+        animation: slideInRight 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        min-width: 300px; max-width: 90%; border-left: 4px solid #DA291C;
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Event listeners para los botones
+    document.getElementById('icsDownloadBtn').addEventListener('click', () => {
+        downloadElement.click();
+        setTimeout(() => {
+            document.body.removeChild(downloadElement);
+            URL.revokeObjectURL(blobUrl);
+            toast.remove();
+            showSuccessMessage('✅ Evento descargado. Ábrelo para agregarlo a tu calendario.');
+        }, 100);
+    });
+    
+    document.getElementById('icsCancelBtn').addEventListener('click', () => {
+        document.body.removeChild(downloadElement);
+        URL.revokeObjectURL(blobUrl);
+        toast.remove();
+    });
+    
+    // Auto-eliminar después de 15 segundos
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100px)';
+            toast.style.transition = 'all 0.5s ease';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.remove();
+                    document.body.removeChild(downloadElement);
+                    URL.revokeObjectURL(blobUrl);
+                }
+            }, 500);
+        }
+    }, 15000);
+}
+
+
+
+function restoreChatHistory() {
+    if (!elements.chatHistory || appState.conversationHistory.length === 0) return;
+
+    elements.chatHistory.innerHTML = '';
+
+    appState.conversationHistory.forEach(msg => {
+        const type = msg.type || 'user';
+        addMessageToUI(type, msg.content);
+    });
+
+    setTimeout(() => {
+        elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
+    }, 100);
+}
+
+function addMessageToUI(type, content) {
+    const messageContainer = document.createElement('div');
+    messageContainer.className = 'message-container ' + type;
+
+    const avatarDiv = document.createElement('div');
+    avatarDiv.className = 'message-avatar ' + type;
+
+    if (type === 'bot') {
+        avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
+    } else {
+        avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
+    }
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'msg ' + type;
+    messageDiv.innerHTML = formatMessage(content);
+
+    contentDiv.appendChild(messageDiv);
+    messageContainer.appendChild(avatarDiv);
+    messageContainer.appendChild(contentDiv);
+
+    elements.chatHistory.appendChild(messageContainer);
+}
 
 // ==================== LOADING ====================
 function showLoading() {
@@ -1709,94 +2054,80 @@ function hideLoading() {
 // ==================== LOCAL STORAGE ====================
 function saveToLocalStorage() {
     try {
+        const persistedTasks = (taskStoreModule && taskStoreModule.length)
+            ? taskStoreModule
+            : taskStore;
         const data = {
             conversationHistory: appState.conversationHistory.slice(-50),
-            tasks: appState.tasks,
+            taskStore: persistedTasks,
             currentMode: appState.currentMode,
             sessionId: sessionStorage.getItem('claroAssistant_sessionId'),
-            messageCount: userState.messageCount,  // NUEVO
-            isPro: userState.isPro  // NUEVO
+            messageCount: userState.messageCount,
+            isPro: userState.isPro,
+            lastUpdated: new Date().toISOString()
         };
+
         localStorage.setItem('claroAssistant_state', JSON.stringify(data));
+        console.log('💾 Estado guardado en localStorage');
     } catch (e) {
-        console.error('Error guardando en localStorage:', e);
+        console.error('❌ Error guardando en localStorage:', e);
     }
 }
 
 function loadFromLocalStorage() {
     try {
         let currentSessionId = sessionStorage.getItem('claroAssistant_sessionId');
-        
+
         if (!currentSessionId) {
-            currentSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            currentSessionId = generateNewConversationId();
             sessionStorage.setItem('claroAssistant_sessionId', currentSessionId);
-            localStorage.removeItem('claroAssistant_state');
-            console.log('Nueva sesion iniciada');
+            console.log('🆕 Nueva sesión iniciada:', currentSessionId);
             return;
         }
-        
+
         const saved = localStorage.getItem('claroAssistant_state');
         if (saved) {
             const data = JSON.parse(saved);
-            
+            const savedTasks = data.taskStore || data.tasks || [];
+            if (savedTasks.length) {
+                taskStore = savedTasks;
+                setTaskStore(savedTasks);
+            }
+
             if (data.sessionId === currentSessionId) {
                 appState.conversationHistory = data.conversationHistory || [];
-                appState.tasks = data.tasks || { reminders: [], notes: [], calendar: [] };
+
                 appState.currentMode = data.currentMode || 'descubre';
                 userState.messageCount = data.messageCount || 0;
                 userState.isPro = data.isPro || false;
-                
-                // NUEVO: Deshabilitar input si ya alcanzó el límite
-                if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
-                    showLimitWarning();
-                }
-                
+
+                console.log('📂 Estado cargado desde localStorage:', {
+                    messages: appState.conversationHistory.length,
+                    tasks: taskStore.length,
+                    mode: appState.currentMode
+                });
+
                 if (appState.conversationHistory.length > 0) {
                     showChatView();
-                    elements.chatHistory.innerHTML = '';
-                    
-                    appState.conversationHistory.forEach(msg => {
-                        const messageContainer = document.createElement('div');
-                        messageContainer.className = 'message-container ' + msg.type;
-                        
-                        const avatarDiv = document.createElement('div');
-                        avatarDiv.className = 'message-avatar ' + msg.type;
-                        
-                        if (msg.type === 'bot') {
-                            avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
-                        } else {
-                            avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
-                        }
-                        
-                        const contentDiv = document.createElement('div');
-                        contentDiv.className = 'message-content';
-                        
-                        const messageDiv = document.createElement('div');
-                        messageDiv.className = 'msg ' + msg.type;
-                        messageDiv.innerHTML = formatMessage(msg.content);
-                        
-                        contentDiv.appendChild(messageDiv);
-                        messageContainer.appendChild(avatarDiv);
-                        messageContainer.appendChild(contentDiv);
-                        
-                        elements.chatHistory.appendChild(messageContainer);
-                    });
-                    
-                    console.log('Conversacion restaurada');
+                    restoreChatHistory();
                 }
-                
-                updateTasksUI();
-                console.log('Tareas cargadas:', appState.tasks);
-                console.log(`Mensajes usados: ${userState.messageCount}/${MESSAGE_LIMIT.FREE}`);
+
+                renderTaskSidebar();
+
             } else {
-                console.log('Nueva pestana - chat limpio');
+                console.log('📱 Nueva pestaña - estado limpio');
+                sessionStorage.setItem('claroAssistant_sessionId', currentSessionId);
+                if (savedTasks.length) {
+                    renderTaskSidebar();
+                }
             }
         }
     } catch (e) {
-        console.error('Error cargando desde localStorage:', e);
+        console.error('❌ Error cargando desde localStorage:', e);
+        localStorage.removeItem('claroAssistant_state');
+        taskStore = [];
     }
 }
-
 
 // ==================== FUNCIONES DEL MODAL PREMIUM ====================
 function showPremiumModal() {
@@ -1814,15 +2145,10 @@ function closePremiumModal() {
 }
 
 // ==================== FUNCIONES DE HISTORIAL DE CONVERSACIONES ====================
-/**
- * Importa las funciones necesarias de chatStorage
- */
 let saveConversation, loadConversations, loadConversationById, deleteConversation, clearConversations;
 
-// Carga inmediata del módulo de chatStorage
-(async function() {
+(async function () {
     try {
-        // Intenta cargar las funciones del módulo ES6
         const module = await import('./chatStorage.js');
         saveConversation = module.saveConversation;
         loadConversations = module.loadConversations;
@@ -1832,51 +2158,46 @@ let saveConversation, loadConversations, loadConversationById, deleteConversatio
         console.log('✅ Módulo de almacenamiento de conversaciones cargado');
     } catch (e) {
         console.error('❌ Error cargando módulo de conversaciones:', e);
-        
-        // Fallback: definir funciones básicas si falla la importación
+
         saveConversation = (messages, title) => {
             console.warn('Fallback: saveConversation llamado');
             return null;
         };
         loadConversations = () => [];
         loadConversationById = () => null;
-        deleteConversation = () => {};
-        clearConversations = () => {};
+        deleteConversation = () => { };
+        clearConversations = () => { };
     }
 })();
 
-/**
- * Actualiza la UI del listado de conversaciones en el sidebar
- */
 function updateConversationHistoryUI() {
     const historyList = document.getElementById('conversationHistoryList');
     if (!historyList) return;
-    
-    // Validar que las funciones de almacenamiento estén cargadas
+
     if (typeof loadConversations !== 'function') {
         console.warn('⚠️ Las funciones de almacenamiento aún no están cargadas');
         return;
     }
-    
+
     const conversations = loadConversations();
-    
+
     if (conversations.length === 0) {
         historyList.innerHTML = '<div class="no-conversations">Sin conversaciones</div>';
         return;
     }
-    
+
     historyList.innerHTML = '';
-    
+
     conversations.forEach(conversation => {
         const item = document.createElement('div');
         item.className = 'history-item';
         item.dataset.conversationId = conversation.id;
-        
+
         const title = document.createElement('span');
         title.className = 'history-item-title';
         title.textContent = conversation.title;
         title.addEventListener('click', () => loadConversationFromHistory(conversation.id));
-        
+
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'history-item-delete';
         deleteBtn.innerHTML = '✕';
@@ -1886,73 +2207,64 @@ function updateConversationHistoryUI() {
             updateConversationHistoryUI();
             console.log('🗑️ Conversación eliminada');
         });
-        
+
         item.appendChild(title);
         item.appendChild(deleteBtn);
         historyList.appendChild(item);
     });
 }
-/**
- * Carga una conversación del historial
- */
+
 function loadConversationFromHistory(conversationId) {
     if (typeof loadConversationById !== 'function') {
         console.error('❌ loadConversationById no está disponible');
         return;
     }
-    
+
     const conversation = loadConversationById(conversationId);
-    
+
     if (conversation) {
-        // Guardar conversación actual antes de cargar una nueva
         saveCurrentConversation();
-        
-        // Generar nuevo session ID para esta conversación
+
         const newSessionId = generateNewConversationId();
-        
-        // Cargar los mensajes
+
         appState.conversationHistory = conversation.messages || [];
-        
-        // 🆕 MARCAR que fue cargada desde el historial
+
         appState.isLoadedFromHistory = true;
-        
-        // Mostrar vista de chat
+
         showChatView();
         elements.chatHistory.innerHTML = '';
-        
-        // Renderizar mensajes
+
         appState.conversationHistory.forEach(msg => {
             const messageContainer = document.createElement('div');
             messageContainer.className = 'message-container ' + (msg.type || msg.role);
-            
+
             const avatarDiv = document.createElement('div');
             avatarDiv.className = 'message-avatar ' + (msg.type || msg.role);
-            
+
             if ((msg.type || msg.role) === 'bot') {
                 avatarDiv.innerHTML = '<img src="images/logo_claro.png" alt="Claro Assistant">';
             } else {
                 avatarDiv.innerHTML = '<span class="material-symbols-outlined">account_circle</span>';
             }
-            
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            
+
             const messageDiv = document.createElement('div');
             messageDiv.className = 'msg ' + (msg.type || msg.role);
             messageDiv.innerHTML = formatMessage(msg.content);
-            
+
             contentDiv.appendChild(messageDiv);
             messageContainer.appendChild(avatarDiv);
             messageContainer.appendChild(contentDiv);
-            
+
             elements.chatHistory.appendChild(messageContainer);
         });
-        
-        // Scroll al final
+
         setTimeout(() => {
             elements.chatHistory.scrollTop = elements.chatHistory.scrollHeight;
         }, 100);
-        
+
         saveToLocalStorage();
         updateConversationHistoryUI();
         console.log('📂 Conversación cargada desde historial:', conversationId);
@@ -1960,9 +2272,7 @@ function loadConversationFromHistory(conversationId) {
         console.error('❌ No se pudo cargar la conversación:', conversationId);
     }
 }
-/**
- * Limpia todo el historial de conversaciones
- */
+
 function clearAllConversationHistory() {
     if (confirm('¿Eliminar todo el historial de conversaciones? Esta acción no se puede deshacer.')) {
         clearConversations();
@@ -1971,62 +2281,22 @@ function clearAllConversationHistory() {
     }
 }
 
-// Exponer funciones globalmente
 window.saveCurrentConversation = saveCurrentConversation;
-window.loadConversationFromHistofry = loadConversationFromHistory;
+window.loadConversationFromHistory = loadConversationFromHistory;
 window.clearAllConversationHistory = clearAllConversationHistory;
-
-
-// ==================== CARRUSEL DE SUGERENCIAS ====================
-document.addEventListener('DOMContentLoaded', function() {
-    // Solo funcionalidad de scroll con arrastre (SIN clics)
-    const carouselContainer = document.querySelector('.carousel-container');
-    if (carouselContainer) {
-        let isDown = false;
-        let startX;
-        let scrollLeft;
-        
-        carouselContainer.addEventListener('mousedown', (e) => {
-            isDown = true;
-            startX = e.pageX - carouselContainer.offsetLeft;
-            scrollLeft = carouselContainer.scrollLeft;
-            carouselContainer.style.cursor = 'grabbing';
-        });
-        
-        carouselContainer.addEventListener('mouseleave', () => {
-            isDown = false;
-            carouselContainer.style.cursor = 'grab';
-        });
-        
-        carouselContainer.addEventListener('mouseup', () => {
-            isDown = false;
-            carouselContainer.style.cursor = 'grab';
-        });
-        
-        carouselContainer.addEventListener('mousemove', (e) => {
-            if (!isDown) return;
-            e.preventDefault();
-            const x = e.pageX - carouselContainer.offsetLeft;
-            const walk = (x - startX) * 2;
-            carouselContainer.scrollLeft = scrollLeft - walk;
-        });
-    }
-});
-
 
 // ==================== FUNCIONES PARA DESHABILITAR INPUT ====================
 function showLimitWarning() {
     elements.userInput.value = '';
     elements.userInput.placeholder = '⚠️ Límite alcanzado - Hazte Pro';
-    elements.userInput.readOnly = true; // Cambiar a solo lectura en lugar de disabled
+    elements.userInput.readOnly = true;
     elements.userInput.style.cursor = 'pointer';
     elements.userInput.style.fontWeight = '500';
     elements.userInput.style.color = '#DA291C';
     elements.sendBtn.disabled = true;
     elements.sendBtn.style.opacity = '0.5';
     elements.sendBtn.style.cursor = 'not-allowed';
-    
-    // Agregar clase para identificar estado de límite
+
     elements.userInput.classList.add('limit-reached');
 }
 
@@ -2039,51 +2309,36 @@ function removeLimitWarning() {
     elements.sendBtn.disabled = false;
     elements.sendBtn.style.opacity = '1';
     elements.sendBtn.style.cursor = 'pointer';
-    
-    // Remover clase de límite
+
     elements.userInput.classList.remove('limit-reached');
 }
 
 function upgradeToPro() {
-    // Solo cerrar el modal sin mostrar alerta
     closePremiumModal();
-    
-    // OPCIONAL: Si quieres redirigir a una página real de upgrade:
-    // window.location.href = '/upgrade';
-    
-    // OPCIONAL: Para testing, puedes activar Pro temporalmente descomentando estas líneas:
-    /*
-    userState.isPro = true;
-    userState.messageCount = 0;
-    enableInput();
-    saveToLocalStorage();
-    console.log('✅ Modo Pro activado (testing)');
-    */
 }
 
-// Event Listeners para el modal
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const btnUpgradePro = document.getElementById('btnUpgradePro');
     const btnClosePremium = document.getElementById('btnClosePremium');
     const premiumOverlay = document.getElementById('premiumOverlay');
-    
+
     if (btnUpgradePro) {
         btnUpgradePro.addEventListener('click', upgradeToPro);
     }
-    
+
     if (btnClosePremium) {
         btnClosePremium.addEventListener('click', closePremiumModal);
     }
-    
-    // Cerrar al hacer clic fuera del modal
+
     if (premiumOverlay) {
-        premiumOverlay.addEventListener('click', function(e) {
+        premiumOverlay.addEventListener('click', function (e) {
             if (e.target === premiumOverlay) {
                 closePremiumModal();
             }
         });
     }
 });
+
 function showAutoWebSearchToast() {
     const toast = document.createElement('div');
     toast.className = 'auto-web-toast';
@@ -2103,16 +2358,38 @@ function showAutoWebSearchToast() {
     }, 4000);
 }
 
+function detectMacroIntent(message) {
+    const t = (message || '').toLowerCase();
+    const taskKeywords = [
+        'anota', 'apunta', 'nota',
+        'recuerdame', 'recuérdame', 'recordatorio',
+        'agenda', 'agendar', 'evento', 'cita', 'reunión', 'junta'
+    ];
+    return taskKeywords.some(k => t.includes(k)) ? 'task' : 'chat';
+}
 
-// ==================== RESPONSIVE HANDLERS ====================
-window.addEventListener('resize', function() {
+function detectTaskType(message) {
+    const t = (message || '').toLowerCase();
+    if (t.includes('agenda') || t.includes('agendar') || t.includes('evento') || t.includes('cita')) {
+        return 'calendar';
+    }
+    if (t.includes('recuerdame') || t.includes('recuérdame') || t.includes('recordatorio')) {
+        return 'reminder';
+    }
+    return 'note';
+}
+
+window.addEventListener('resize', function () {
     if (window.innerWidth >= 900) {
         elements.sidebar.classList.remove('active');
         elements.overlay.classList.remove('active');
     }
-}); 
+});
 
-// ==================== CONSOLE INFO ====================
+window.copyNoteToClipboard = copyNoteToClipboard;
+window.shareNoteIfAvailable = shareNoteIfAvailable;
+window.downloadICS = downloadICS;
+
 console.log('%c🚀 Claro·Assistant Initialized', 'color: #DA291C; font-size: 16px; font-weight: bold;');
 console.log('%cAPI URL:', 'color: #00BCD4; font-weight: bold;', API_URL);
 console.log('%cToken Limit:', 'color: #28a745; font-weight: bold;', TOKEN_CONFIG.MAX_TOKENS);

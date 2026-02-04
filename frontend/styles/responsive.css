@@ -1,0 +1,216 @@
+/* ==================== RESPONSIVE ==================== */
+
+/* Tablet: 2 columnas */
+@media (min-width: 640px) {
+    .suggestions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Desktop: 3 columnas */
+@media (min-width: 900px) {
+    .app {
+        display: grid;
+        grid-template-columns: 280px 1fr;
+        grid-template-rows: 56px 1fr;
+    }
+
+    header.topbar {
+        grid-column: 1 / -1;
+        padding: 0 24px;
+    }
+
+    .menu-toggle {
+        display: none;
+    }
+
+    nav.sidebar {
+        position: static;
+        top: auto;
+        left: 0;
+        box-shadow: none;
+        border-right: 1px solid var(--gris-borde);
+    }
+
+    .sidebar-overlay {
+        display: none !important;
+    }
+
+    main.content {
+        grid-column: 2;
+    }
+
+    .welcome-area {
+        padding: 40px 32px 160px;
+    }
+
+    .suggestions-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .hero-title {
+        font-size: 32px;
+    }
+
+    .hero-logo {
+        width: 70px;
+        height: 70px;
+    }
+
+    .action-menu {
+        left: 300px;
+        max-width: 350px;
+    }
+
+    .input-section {
+        left: 280px;
+    }
+}
+
+/* Tablet & Móvil */
+@media (max-width: 768px) {
+    .message-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .message-avatar.user .material-symbols-outlined {
+        font-size: 22px;
+    }
+
+    .message-content {
+        max-width: 70%;
+    }
+
+    .message-content:has(.message-media-viewer) {
+        max-width: 95%;
+    }
+
+    .token-counter {
+        font-size: 10px;
+    }
+
+    .premium-modal {
+        max-width: 95%;
+    }
+
+    .premium-features {
+        grid-template-columns: 1fr;
+    }
+
+    .premium-header h2 {
+        font-size: 20px;
+    }
+
+    .premium-icon {
+        width: 70px;
+        height: 70px;
+    }
+
+    .premium-icon .material-symbols-outlined {
+        font-size: 40px;
+    }
+
+    .usage-meter {
+        gap: 6px;
+        margin-right: 5px;
+    }
+
+    .usage-bar {
+        width: 60px;
+        height: 5px;
+    }
+
+    .usage-text {
+        font-size: 10px;
+        min-width: 45px;
+    }
+
+    .usage-warning-toast {
+        top: 60px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        font-size: 12px;
+        padding: 10px 14px;
+    }
+
+    .task-preview-list {
+        margin: 0 0 12px 20px;
+        padding: 6px;
+    }
+
+    .task-preview-item {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+}
+
+@media (max-width: 600px) {
+    .mode-chip {
+        font-size: 13px;
+        padding: 8px 14px;
+        gap: 6px;
+    }
+
+    .mode-chip-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    .mode-chip-close {
+        font-size: 16px;
+        width: 18px;
+        height: 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    .usage-bar {
+        width: 50px;
+    }
+
+    .usage-text {
+        font-size: 9px;
+        min-width: 40px;
+    }
+}
+
+/* FIX ESPECÍFICO PARA iOS */
+@supports (padding: env(safe-area-inset-top)) {
+    .premium-modal {
+        max-height: 70vh;
+        margin: 20px;
+    }
+
+    .premium-header {
+        padding: 15px 15px;
+    }
+
+    .premium-body {
+        padding: 15px 15px;
+    }
+
+    .premium-footer {
+        padding: 15px 20px 20px;
+    }
+}
+
+/* Prevenir zoom en inputs - CRÍTICO para iOS */
+@supports (-webkit-touch-callout: none) {
+    input, textarea, select {
+        font-size: 16px !important;
+    }
+
+    input::placeholder, textarea::placeholder {
+        font-size: 16px !important;
+    }
+
+    .input-wrapper input {
+        font-size: 16px !important;
+    }
+
+    .input-wrapper input::placeholder {
+        font-size: 16px !important;
+    }
+}

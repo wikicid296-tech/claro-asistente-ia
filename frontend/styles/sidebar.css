@@ -1,0 +1,329 @@
+/* ==================== SIDEBAR ==================== */
+nav.sidebar {
+    position: fixed;
+    left: -280px;
+    top: 56px;
+    bottom: 0;
+    width: 280px;
+    background: var(--blanco);
+    transition: left 0.3s ease;
+    box-shadow: 4px 0 20px rgba(0, 0, 0, 0.15);
+    z-index: 100;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+nav.sidebar.active {
+    left: 0;
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 56px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99;
+}
+
+.sidebar-overlay.active {
+    display: block;
+}
+
+.sidebar-logo {
+    width: 100%;
+    height: auto;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 20px;
+}
+
+.sidebar-logo img {
+    max-width: 150px;
+    height: auto;
+    object-fit: contain;
+}
+
+.sidebar-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.sidebar-title .claro {
+    color: var(--rojo);
+}
+
+.nav-item {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    color: var(--texto-claro);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    margin-bottom: 8px;
+    font-size: var(--font-md);
+    transition: all 0.2s;
+    text-decoration: none;
+}
+
+.nav-item:hover {
+    background: var(--gris-fondo);
+}
+
+.nav-item.active {
+    background: #e8f5f7;
+    color: var(--azul);
+    font-weight: 500;
+}
+
+.nav-item svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.nav-item.disabled {
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.nav-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.nav-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    transition: transform 0.2s ease;
+}
+
+.section-title {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: #999;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.section-title.title-text {
+    color: var(--texto-oscuro);
+    font-size: 13px;
+}
+
+/* ==================== TASKS SECTION HEADER (COLLAPSIBLE) ==================== */
+.tasks-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+    padding: 8px 0;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.tasks-section-header:hover {
+    opacity: 0.8;
+}
+
+.tasks-section-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+/* ==================== HISTORIAL DE CONVERSACIONES ==================== */
+.history-list {
+    max-height: 200px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 4px 0;
+}
+
+.history-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.history-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+.history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    background: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    color: var(--texto-oscuro);
+}
+
+.history-item:hover {
+    background: #e8f5f7;
+    border-color: var(--azul);
+}
+
+.history-item-content {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.history-item-title {
+    flex: 1;
+    min-width: 0;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    font-weight: 500;
+    color: #333;
+}
+
+.history-item-meta {
+    font-size: 11px;
+    color: #999;
+}
+
+.history-item-delete {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+}
+
+.history-item-delete svg {
+    width: 16px;
+    height: 16px;
+}
+
+.history-item-delete:hover {
+    color: #dc3545;
+}
+
+.history-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.clear-history-btn {
+    flex: 1;
+    padding: 8px 10px;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #666;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.clear-history-btn:hover {
+    background: #ffebee;
+    border-color: #dc3545;
+    color: #dc3545;
+}
+
+.clear-history-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.no-conversations {
+    padding: 12px;
+    color: #999;
+    font-size: 13px;
+}
+
+/* ==================== SECCIÓN COLAPSABLE DE TAREAS ==================== */
+.section-title.collapsible {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    transition: background 0.2s ease;
+}
+
+.section-title.collapsible:hover {
+    background: var(--gris-fondo);
+}
+
+.section-title.collapsible .nav-toggle {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease;
+}
+
+.section-title.collapsible .nav-toggle .material-symbols-outlined {
+    font-size: 20px;
+    color: var(--texto-claro);
+}
+
+.task-section-content {
+    max-height: 1000px;
+    overflow: hidden;
+    opacity: 1;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.task-section-content.collapsed {
+    max-height: 0;
+    opacity: 0;
+}
+
+.task-section-content:not(.collapsed) ~ .section-title.collapsible .nav-toggle,
+.section-title.collapsible.expanded .nav-toggle {
+    transform: rotate(90deg);
+}
