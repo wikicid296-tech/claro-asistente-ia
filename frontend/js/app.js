@@ -392,6 +392,10 @@ function initializeEventListeners() {
         }
     });
 
+    if (elements.chatHistory) {
+        elements.chatHistory.addEventListener('click', handleAprendeLinkClick);
+    }
+
     document.addEventListener('click', handleOutsideClick);
 
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
@@ -917,8 +921,12 @@ function addMessage(type, content) {
 
         console.log('📺 Creando visor para:', url, '- Tipo:', tipo);
 
+        const renderZone = document.createElement('div');
+        renderZone.className = 'aprende-render-zone';
+
         const mediaViewer = createMediaViewer(url, tipo);
-        contentDiv.appendChild(mediaViewer);
+        renderZone.appendChild(mediaViewer);
+        contentDiv.appendChild(renderZone);
 
         appState.lastAprendeResource = null;
     }
@@ -980,7 +988,7 @@ function formatMessage(content) {
                     .replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>')
                     .replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>')
                     .replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>')
-                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
+                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => buildMessageLinkHtml(label, url));
 
                 const tag = isHeaderRow ? 'th' : 'td';
                 tableHtml += `<${tag}>${cellContent}</${tag}>`;
@@ -1044,9 +1052,9 @@ function formatMessage(content) {
     html = html.replace(/(?![^<]*<\/table>)\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/(?![^<]*<\/table>)(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?![^<]*<\/table>)`([^`]+)`/g, '<code class="msg-code">$1</code>');
-    html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
+    html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => buildMessageLinkHtml(label, url));
     html = html.replace(/(?![^<]*<\/table>)(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function (match) {
-        return `<a href="${match}" target="_blank" rel="noopener" class="msg-link">${match}</a>`;
+        return buildMessageLinkHtml(match, match);
     });
 
     html = html.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
@@ -1364,6 +1372,98 @@ function bindICSDownloadButtons() {
 
         btn.__icsBound = true;
     });
+}
+
+function isAprendeLink(url) {
+    return typeof url === 'string' && url.toLowerCase().includes('aprende.org');
+}
+
+function escapeHtmlAttribute(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function buildMessageLinkHtml(label, url) {
+    const safeUrl = escapeHtmlAttribute(url);
+    const safeLabel = label;
+    const aprendeLink = isAprendeLink(url);
+    const baseClass = aprendeLink ? 'msg-link aprende-link' : 'msg-link';
+    const targetAttr = aprendeLink ? '' : ' target="_blank" rel="noopener"';
+    const dataAttr = aprendeLink ? ` data-aprende-url="${safeUrl}"` : '';
+
+    return `<a href="${safeUrl}"${targetAttr} class="${baseClass}"${dataAttr}>${safeLabel}</a>`;
+}
+
+function buildAprendeActions(url) {
+    const actions = document.createElement('div');
+    actions.className = 'media-actions aprende-actions';
+    actions.innerHTML = `
+        <a class="media-action-btn" href="${escapeHtmlAttribute(url)}" target="_blank" rel="noopener">
+            Abrir en plataforma
+        </a>
+    `;
+    return actions;
+}
+
+function renderAprendeInlineViewer(linkElement, url) {
+    if (!linkElement) return;
+
+    const messageContent = linkElement.closest('.message-content');
+    if (!messageContent) return;
+
+    let renderZone = messageContent.querySelector('.aprende-render-zone');
+    let existingViewer = messageContent.querySelector('.message-media-viewer');
+
+    if (!renderZone) {
+        renderZone = document.createElement('div');
+        renderZone.className = 'aprende-render-zone';
+
+        if (existingViewer && existingViewer.parentElement) {
+            existingViewer.parentElement.insertBefore(renderZone, existingViewer);
+            renderZone.appendChild(existingViewer);
+        } else {
+            messageContent.appendChild(renderZone);
+        }
+    }
+
+    let viewer = renderZone.querySelector('.message-media-viewer');
+    if (!viewer) {
+        viewer = createMediaViewer(url, 'curso');
+        renderZone.appendChild(viewer);
+    }
+
+    viewer.classList.add('aprende-inline-viewer');
+
+    const iframe = viewer.querySelector('iframe');
+    if (iframe) {
+        iframe.src = url;
+    }
+
+    let actions = renderZone.querySelector('.media-actions.aprende-actions');
+    if (!actions) {
+        actions = buildAprendeActions(url);
+        renderZone.appendChild(actions);
+    } else {
+        const link = actions.querySelector('.media-action-btn');
+        if (link) {
+            link.href = url;
+        }
+    }
+}
+
+function handleAprendeLinkClick(e) {
+    const link = e.target.closest('a.aprende-link');
+    if (!link) return;
+
+    const url = link.getAttribute('data-aprende-url') || link.getAttribute('href');
+    if (!url) return;
+
+    e.preventDefault();
+
+    renderAprendeInlineViewer(link, url);
 }
 
 // ==================== MODAL DETALLE TAREA (SIDEBAR) ====================
