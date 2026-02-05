@@ -392,6 +392,10 @@ function initializeEventListeners() {
         }
     });
 
+    if (elements.chatHistory) {
+        elements.chatHistory.addEventListener('click', handleAprendeLinkClick);
+    }
+
     document.addEventListener('click', handleOutsideClick);
 
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
@@ -647,11 +651,6 @@ function handleSuggestionClick(e) {
 function sendMessage(text) {
     if (!text || !text.trim()) return;
 
-    if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
-        showPremiumModal();
-        return;
-    }
-
     showChatView();
     addMessage('user', text);
 
@@ -659,8 +658,8 @@ function sendMessage(text) {
         userState.messageCount++;
         console.log(`Mensajes enviados: ${userState.messageCount}/${MESSAGE_LIMIT.FREE}`);
 
-        if (userState.messageCount >= MESSAGE_LIMIT.FREE) {
-            showLimitWarning();
+        if (userState.messageCount === MESSAGE_LIMIT.FREE) {
+            showPremiumModal();
         }
     }
 
@@ -922,8 +921,12 @@ function addMessage(type, content) {
 
         console.log('📺 Creando visor para:', url, '- Tipo:', tipo);
 
+        const renderZone = document.createElement('div');
+        renderZone.className = 'aprende-render-zone';
+
         const mediaViewer = createMediaViewer(url, tipo);
-        contentDiv.appendChild(mediaViewer);
+        renderZone.appendChild(mediaViewer);
+        contentDiv.appendChild(renderZone);
 
         appState.lastAprendeResource = null;
     }
@@ -985,7 +988,7 @@ function formatMessage(content) {
                     .replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>')
                     .replace(/(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>')
                     .replace(/`([^`]+)`/g, '<code class="msg-code">$1</code>')
-                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
+                    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => buildMessageLinkHtml(label, url));
 
                 const tag = isHeaderRow ? 'th' : 'td';
                 tableHtml += `<${tag}>${cellContent}</${tag}>`;
@@ -1049,9 +1052,9 @@ function formatMessage(content) {
     html = html.replace(/(?![^<]*<\/table>)\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/(?![^<]*<\/table>)(?<!\*)\*([^\*]+)\*(?!\*)/g, '<em>$1</em>');
     html = html.replace(/(?![^<]*<\/table>)`([^`]+)`/g, '<code class="msg-code">$1</code>');
-    html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="msg-link">$1</a>');
+    html = html.replace(/(?![^<]*<\/table>)\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => buildMessageLinkHtml(label, url));
     html = html.replace(/(?![^<]*<\/table>)(?<!href="|">)(https?:\/\/[^\s<>"]+)(?![^<]*<\/a>)/g, function (match) {
-        return `<a href="${match}" target="_blank" rel="noopener" class="msg-link">${match}</a>`;
+        return buildMessageLinkHtml(match, match);
     });
 
     html = html.replace(/✅/g, '<span style="color: #28a745;">✅</span>');
@@ -1335,6 +1338,11 @@ function renderTaskSidebar() {
         } catch (e) {
             console.warn('⚠️ bindICSDownloadButtons fallo:', e);
         }
+        try {
+            setupTaskPreviewDelegation();
+        } catch (e) {
+            console.warn('⚠️ setupTaskPreviewDelegation fallo:', e);
+        }
     } catch (error) {
         console.error('❌ Error en renderTaskSidebar:', error);
     }
@@ -1364,6 +1372,198 @@ function bindICSDownloadButtons() {
 
         btn.__icsBound = true;
     });
+}
+
+function isAprendeLink(url) {
+    return typeof url === 'string' && url.toLowerCase().includes('aprende.org');
+}
+
+function escapeHtmlAttribute(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function buildMessageLinkHtml(label, url) {
+    const safeUrl = escapeHtmlAttribute(url);
+    const safeLabel = label;
+    const aprendeLink = isAprendeLink(url);
+    const baseClass = aprendeLink ? 'msg-link aprende-link' : 'msg-link';
+    const targetAttr = aprendeLink ? '' : ' target="_blank" rel="noopener"';
+    const dataAttr = aprendeLink ? ` data-aprende-url="${safeUrl}"` : '';
+
+    return `<a href="${safeUrl}"${targetAttr} class="${baseClass}"${dataAttr}>${safeLabel}</a>`;
+}
+
+function buildAprendeActions(url) {
+    const actions = document.createElement('div');
+    actions.className = 'media-actions aprende-actions';
+    actions.innerHTML = `
+        <a class="media-action-btn" href="${escapeHtmlAttribute(url)}" target="_blank" rel="noopener">
+            Abrir en plataforma
+        </a>
+    `;
+    return actions;
+}
+
+function renderAprendeInlineViewer(linkElement, url) {
+    if (!linkElement) return;
+
+    const messageContent = linkElement.closest('.message-content');
+    if (!messageContent) return;
+
+    let renderZone = messageContent.querySelector('.aprende-render-zone');
+    let existingViewer = messageContent.querySelector('.message-media-viewer');
+
+    if (!renderZone) {
+        renderZone = document.createElement('div');
+        renderZone.className = 'aprende-render-zone';
+
+        if (existingViewer && existingViewer.parentElement) {
+            existingViewer.parentElement.insertBefore(renderZone, existingViewer);
+            renderZone.appendChild(existingViewer);
+        } else {
+            messageContent.appendChild(renderZone);
+        }
+    }
+
+    let viewer = renderZone.querySelector('.message-media-viewer');
+    if (!viewer) {
+        viewer = createMediaViewer(url, 'curso');
+        renderZone.appendChild(viewer);
+    }
+
+    viewer.classList.add('aprende-inline-viewer');
+
+    const iframe = viewer.querySelector('iframe');
+    if (iframe) {
+        iframe.src = url;
+    }
+
+    let actions = renderZone.querySelector('.media-actions.aprende-actions');
+    if (!actions) {
+        actions = buildAprendeActions(url);
+        renderZone.appendChild(actions);
+    } else {
+        const link = actions.querySelector('.media-action-btn');
+        if (link) {
+            link.href = url;
+        }
+    }
+}
+
+function handleAprendeLinkClick(e) {
+    const link = e.target.closest('a.aprende-link');
+    if (!link) return;
+
+    const url = link.getAttribute('data-aprende-url') || link.getAttribute('href');
+    if (!url) return;
+
+    e.preventDefault();
+
+    renderAprendeInlineViewer(link, url);
+}
+
+// ==================== MODAL DETALLE TAREA (SIDEBAR) ====================
+let taskPreviewDelegationSetup = false;
+
+function setupTaskPreviewDelegation() {
+    if (taskPreviewDelegationSetup) return;
+
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
+    sidebar.addEventListener('click', (e) => {
+        const previewItem = e.target.closest('.task-preview-item');
+        if (previewItem && !e.target.closest('.task-preview-btn')) {
+            const taskId = previewItem.dataset.taskId;
+            const task = taskStore.find(t => t.id === taskId);
+            if (task) {
+                showTaskDetailsModal(task);
+            }
+            return;
+        }
+    });
+
+    taskPreviewDelegationSetup = true;
+}
+
+function showTaskDetailsModal(task) {
+    const existing = document.querySelector('.event-modal-overlay');
+    if (existing) {
+        existing.remove();
+    }
+
+    const isNote = task.type === 'note';
+    const rawTitle =
+        (task.raw && (task.raw.title || task.raw.titulo || task.raw.summary || task.raw.event_title)) || '';
+    const titleSource = isNote
+        ? (rawTitle || task.content || 'Detalle')
+        : (extractPreviewContent(task.content || '', task.type) || task.content || 'Detalle');
+    const title = escapeHtml(titleSource);
+    const fecha = escapeHtml(task.fecha || '');
+    const hora = escapeHtml(task.hora || '');
+    const location = escapeHtml(task.location || '');
+    const meetingType = escapeHtml(task.meeting_type || '');
+    const meetingLink = escapeHtml(task.meeting_link || task.raw?.meeting_link || '');
+    const rawName = task.raw?.ics_filename || task.content || 'evento';
+    const safeName = rawName.replace(/\.ics$/i, '');
+
+    const dateLine = [fecha, hora].filter(Boolean).join(' ');
+    const hasIcs = !!task.raw?.ics;
+    const noteContent = escapeHtml(task.content || '');
+    const headerIcon = isNote ? 'note' : 'event';
+    const headerLabel = isNote ? 'Nota' : 'Evento';
+
+    const modalHtml = `
+        <div class="event-modal-overlay active" id="eventModalOverlay">
+            <div class="event-modal">
+                <div class="event-modal-header">
+                    <div class="event-modal-title">
+                        <span class="material-symbols-outlined">${headerIcon}</span>
+                        <span>${headerLabel}: ${title}</span>
+                    </div>
+                    <button class="event-modal-close" id="eventModalClose" aria-label="Cerrar">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="event-modal-body">
+                    ${isNote ? `<div class="event-modal-row full"><span class="label">Contenido</span><span class="value">${noteContent}</span></div>` : ''}
+                    ${!isNote && dateLine ? `<div class="event-modal-row"><span class="label">Fecha y hora</span><span class="value">${dateLine}</span></div>` : ''}
+                    ${!isNote && location ? `<div class="event-modal-row"><span class="label">Ubicación</span><span class="value">${location}</span></div>` : ''}
+                    ${!isNote && meetingType ? `<div class="event-modal-row"><span class="label">Tipo</span><span class="value">${meetingType}</span></div>` : ''}
+                    ${!isNote && meetingLink ? `<div class="event-modal-row"><span class="label">Liga</span><span class="value"><a class="event-modal-link" href="${meetingLink}" target="_blank" rel="noopener noreferrer">${meetingLink}</a></span></div>` : ''}
+                </div>
+                <div class="event-modal-actions">
+                    ${!isNote && hasIcs ? `<button class="event-modal-btn primary" id="eventModalDownload">Descargar ICS</button>` : ''}
+                    <button class="event-modal-btn secondary" id="eventModalCloseBtn">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const overlay = document.getElementById('eventModalOverlay');
+    const closeBtn = document.getElementById('eventModalClose');
+    const closeBtnFooter = document.getElementById('eventModalCloseBtn');
+    const downloadBtn = document.getElementById('eventModalDownload');
+
+    const close = () => overlay?.remove();
+
+    closeBtn?.addEventListener('click', close);
+    closeBtnFooter?.addEventListener('click', close);
+    overlay?.addEventListener('click', (ev) => {
+        if (ev.target === overlay) close();
+    });
+
+    if (downloadBtn && hasIcs) {
+        downloadBtn.addEventListener('click', () => {
+            downloadICS(task.raw.ics, safeName);
+        });
+    }
 }
 
 // ==================== RENDERIZADO DE PREVIEWS CON ESTILO ====================
