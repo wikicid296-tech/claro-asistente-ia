@@ -126,12 +126,9 @@ def process_task(
         state.intent = "task_enrichment"
         state.awaiting_slot = candidates[0] if candidates else None
 
-        # 👇 Importante: en slots guardamos un snapshot plano de la tarea
-        # para que continue_task pueda consumirlo.
         state.slots = {
             **agent_result,
             "task_type": ttype,
-            "content": normalized,
         }
 
         # Garantía: followup_question NO nulo
@@ -166,13 +163,17 @@ def process_task(
     task_entity = Task(
         user_key=final_user_key,
         type=safe_task_type,
-        content=normalized,
+        content=agent_result.get("content"),
         description=analysis.get("description"),
-        fecha=analysis.get("fecha"),
-        hora=analysis.get("hora"),
+        fecha=agent_result.get("fecha") or analysis.get("fecha"),
+        hora=agent_result.get("hora") or analysis.get("hora"),
         meeting_type=analysis.get("meeting_type"),
         meeting_link=analysis.get("meeting_link"),
-        location=analysis.get("location"),
+        location=(
+            agent_result.get("ubicacion")
+            or agent_result.get("lugar")
+            or analysis.get("location")
+        ),
         status="active",
     )
 

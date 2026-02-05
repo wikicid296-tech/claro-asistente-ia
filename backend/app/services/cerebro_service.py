@@ -2,7 +2,8 @@
 
 import logging
 import re
-from typing import Dict, Any, cast
+from datetime import datetime, timedelta, date
+from typing import Dict, Any, cast, Optional, Tuple
 
 from app.services.channel_message_service import build_chat_messages
 from app.services.prompt_service import build_system_prompt
@@ -283,6 +284,255 @@ def procesar_chat_web(
         }
 
     # -------------------------------------------------
+    # CONSULTA DE TAREAS (task_query) - PRIORIDAD ABSOLUTA
+    # ⚠️ NO DEBE DEPENDER DE LLM
+    # -------------------------------------------------
+    def _parse_task_date(task: Task) -> Optional[date]:
+        if not getattr(task, "fecha", None):
+            return None
+        try:
+            return datetime.strptime(task.fecha, "%Y-%m-%d").date()
+        except Exception:
+            return None
+
+    def _detect_date_range(text: str) -> Tuple[Optional[date], Optional[date], Optional[str]]:
+        today = date.today()
+
+        if "pasado mañana" in text or "pasado manana" in text:
+            target = today + timedelta(days=2)
+            return target, target, "pasado mañana"
+
+        if "mañana" in text or "manana" in text:
+            target = today + timedelta(days=1)
+            return target, target, "mañana"
+
+        if "hoy" in text:
+            return today, today, "hoy"
+
+        if "esta semana" in text:
+            start = today - timedelta(days=today.weekday())
+            end = start + timedelta(days=6)
+            return start, end, "esta semana"
+
+        m = re.search(r"pr[oó]ximos?\s+(\d+)\s+d[ií]as", text)
+        if m:
+            try:
+                days = int(m.group(1))
+            except Exception:
+                days = 0
+            if days > 0:
+                start = today
+                end = today + timedelta(days=days - 1)
+                label = f"próximos {days} días"
+                return start, end, label
+
+        return None, None, None
+
+    def _build_task_table(
+        calendar_tasks: list[Task],
+        reminder_tasks: list[Task],
+        notes_tasks: list[Task],
+    ) -> str:
+        max_rows_per_type = 10
+
+        def _sanitize(value: Optional[str]) -> str:
+            if not value:
+                return "-"
+            return str(value).replace("|", " / ").replace("\n", " ").strip() or "-"
+
+        def _normalize_title(content: Optional[str]) -> str:
+            if not content:
+                return "-"
+            raw = str(content).strip()
+            words = raw.split()
+            if not words:
+                return "-"
+
+            # Remover prefijos instruccionales comunes, sin truncar títulos válidos.
+            prefixes = {
+                "recuerdame", "recuérdame", "recordar", "recordatorio",
+                "agenda", "agendar", "evento", "cita",
+                "nota", "anota", "apunta", "escribe",
+            }
+            first = words[0].lower()
+            if first in prefixes and len(words) > 1:
+                title = " ".join(words[1:])
+            else:
+                title = raw
+
+            title = title.strip(" -:,.")
+            if not title:
+                return "-"
+            return title[0].upper() + title[1:]
+
+        def _format_created_at(task: Task) -> str:
+            ts = getattr(task, "created_at", None)
+            if ts is None:
+                return "-"
+            try:
+                return datetime.fromtimestamp(float(ts)).strftime("%Y-%m-%d")
+            except Exception:
+                return "-"
+
+        def _get_date(task: Task) -> Optional[date]:
+            return _parse_task_date(task)
+
+        def _get_time(task: Task) -> Optional[str]:
+            hora = getattr(task, "hora", None)
+            return hora if hora else None
+
+        def _is_today(task: Task) -> bool:
+            dt = _get_date(task)
+            return bool(dt and dt == date.today())
+
+        def _is_tomorrow(task: Task) -> bool:
+            dt = _get_date(task)
+            return bool(dt and dt == date.today() + timedelta(days=1))
+
+        def _status_label(task: Task) -> str:
+            if _is_today(task):
+                return "hoy"
+            if _is_tomorrow(task):
+                return "mañana"
+            return _sanitize(getattr(task, "status", None))
+
+        def _sort_key(task: Task) -> tuple:
+            dt = _get_date(task)
+            hora = _get_time(task) or "23:59"
+            if dt:
+                return (0, dt, hora)
+            created = getattr(task, "created_at", 0.0) or 0.0
+            return (1, datetime.fromtimestamp(float(created)).date(), "23:59")
+
+        def _build_table_for_type(tasks: list[Task], tlabel: str) -> str:
+            if not tasks:
+                return f"### {tlabel}\nSin tareas.\n"
+
+            ordered = sorted(tasks, key=_sort_key)
+            total = len(ordered)
+            visible = ordered[:max_rows_per_type]
+
+            lines = [
+                f"### {tlabel} ({total})",
+                "| Título | Fecha | Hora | Ubicación/Link | Creado |",
+                "| --- | --- | --- | --- | --- |",
+            ]
+
+            for t in visible:
+                title = _normalize_title(getattr(t, "content", None))
+                fecha = _sanitize(getattr(t, "fecha", None))
+                hora = _sanitize(getattr(t, "hora", None))
+                meeting_type = getattr(t, "meeting_type", None)
+                meeting_link = _sanitize(getattr(t, "meeting_link", None))
+                location = _sanitize(getattr(t, "location", None))
+                if meeting_type == "virtual":
+                    place = f"Link: {meeting_link}" if meeting_link != "-" else "-"
+                elif meeting_type == "presencial":
+                    place = f"Ubicación: {location}" if location != "-" else "-"
+                else:
+                    if meeting_link != "-":
+                        place = f"Link: {meeting_link}"
+                    elif location != "-":
+                        place = location
+                    else:
+                        place = "-"
+                created_at = _format_created_at(t)
+                lines.append(
+                    f"| {title} | {fecha} | {hora} | {place} | {created_at} |"
+                )
+
+            if total > max_rows_per_type:
+                remaining = total - max_rows_per_type
+                lines.append("")
+                lines.append(f"Mostrando {max_rows_per_type} de {total}. Faltan {remaining}.")
+
+            lines.append("")
+            return "\n".join(lines)
+
+        return "\n".join([
+            _build_table_for_type(calendar_tasks, "Eventos"),
+            _build_table_for_type(reminder_tasks, "Recordatorios"),
+            _build_table_for_type(notes_tasks, "Notas"),
+        ]).strip()
+
+    QUERY_PATTERNS = (
+        "qué hay",
+        "que hay",
+        "cuántas",
+        "cuantos",
+        "tenemos",
+        "muéstrame",
+        "mostrar",
+        "lista",
+        "agenda hoy",
+        "tareas activas",
+        "recordatorios",
+        "que eventos tengo",
+        "mi agenda",
+        "esta semana",
+    )
+
+    normalized_message = (user_message or "").lower()
+    logger.info("🔎 Evaluando task_query (early) contra: '%s'", normalized_message)
+
+    if any(p in normalized_message for p in QUERY_PATTERNS):
+        logger.info("📊 TASK QUERY detectado (early)")
+
+        tasks = get_tasks_grouped(user_key)
+
+        start_date, end_date, range_label = _detect_date_range(normalized_message)
+        if start_date and end_date:
+            logger.info("🗓️ Rango detectado: %s -> %s (%s)", start_date, end_date, range_label)
+        else:
+            logger.info("🗓️ Sin rango detectado para task_query")
+
+        calendar_tasks = tasks.get("calendar", [])
+        reminder_tasks = tasks.get("reminder", [])
+        notes_tasks = tasks.get("note", [])
+
+        if start_date and end_date:
+            calendar_tasks = [
+                t for t in calendar_tasks
+                if (dt := _parse_task_date(t)) and start_date <= dt <= end_date
+            ]
+            reminder_tasks = [
+                t for t in reminder_tasks
+                if (dt := _parse_task_date(t)) and start_date <= dt <= end_date
+            ]
+
+        total_calendar = len(calendar_tasks)
+        total_reminder = len(reminder_tasks)
+        total_notes = len(notes_tasks)
+
+        if range_label:
+            response_text = (
+                f"📅 Para {range_label}, tienes {total_calendar} eventos y "
+                f"{total_reminder} recordatorios activos."
+                f" Además, has guardado {total_notes} notas."
+            )
+        else:
+            response_text = (
+                f"📅 Tienes {total_calendar} eventos y "
+                f"{total_reminder} recordatorios activos."
+                f" Además, has guardado {total_notes} notas."
+            )
+
+        table_text = _build_task_table(calendar_tasks, reminder_tasks, notes_tasks)
+
+        return {
+            "success": True,
+            "response": f"{response_text}\n\n{table_text}",
+            "context": "🗓️ GESTIÓN DE TAREAS",
+            "context_reset": False,
+            "action": "task_query",
+            "tasks": {
+                "calendar": [t.__dict__ for t in calendar_tasks],
+                "reminder": [t.__dict__ for t in reminder_tasks],
+                "note": [t.__dict__ for t in notes_tasks],
+            },
+        }
+
+    # -------------------------------------------------
     # Analizar contexto via LLM/service para detectar macro intent y task_type
     # (compatibilidad: preferir parámetros explícitos si vienen desde el controller)
     try:
@@ -375,48 +625,6 @@ def procesar_chat_web(
         # ⛔️ CORTA EJECUCIÓN TOTAL
         return result
 
-    # -------------------------------------------------
-    # CONSULTA DE TAREAS (task_query)
-    # -------------------------------------------------
-    QUERY_PATTERNS = (
-        "qué hay",
-        "que hay",
-        "cuántas",
-        "cuantos",
-        "tenemos",
-        "muéstrame",
-        "mostrar",
-        "lista",
-        "agenda hoy",
-        "tareas activas",
-        "recordatorios",
-    )
-
-    if any(p in (user_message or "").lower() for p in QUERY_PATTERNS):
-        logger.info("📊 TASK QUERY detectado")
-
-        tasks = get_tasks_grouped(user_key)
-
-        total_calendar = len(tasks.get("calendar", []))
-        total_reminder = len(tasks.get("reminder", []))
-
-        return {
-            "success": True,
-            "response": (
-                f"📅 Tienes {total_calendar} eventos y "
-                f"{total_reminder} recordatorios activos."
-            ),
-            "context": "🗓️ GESTIÓN DE TAREAS",
-            "context_reset": False,
-            "action": "task_query",
-            "tasks": {
-                "calendar": [t.__dict__ for t in tasks.get("calendar", [])],
-                "reminder": [t.__dict__ for t in tasks.get("reminder", [])],
-                "note": [t.__dict__ for t in tasks.get("note", [])],
-            },
-        }
-
-    # -------------------------------------------------
     # GESTIÓN DE TAREAS (macro-intent) - PRIORIDAD ALTA
     # -------------------------------------------------
     # Si el front indica macro_intent="task", procesar tarea

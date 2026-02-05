@@ -933,6 +933,41 @@ main.content {
     pointer-events: none;
 }
 
+.media-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    align-items: center;
+}
+
+.media-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: #DA291C;
+    color: #fff;
+    font-weight: 600;
+    font-size: 13px;
+    text-decoration: none;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 4px 12px rgba(218, 41, 28, 0.2);
+}
+
+.media-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(218, 41, 28, 0.3);
+}
+
+.aprende-render-zone {
+    margin-top: 12px;
+}
+
+.aprende-render-zone .media-content iframe {
+    height: 420px;
+}
+
 .media-protection-overlay {
     position: absolute;
     top: 0;
