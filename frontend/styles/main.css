@@ -180,6 +180,7 @@ nav.sidebar.active {
 
 .nav-item:hover {
     background: var(--gris-fondo);
+    color: red
 }
 
 .nav-item.active {
