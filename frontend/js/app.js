@@ -647,11 +647,6 @@ function handleSuggestionClick(e) {
 function sendMessage(text) {
     if (!text || !text.trim()) return;
 
-    if (!userState.isPro && userState.messageCount >= MESSAGE_LIMIT.FREE) {
-        showPremiumModal();
-        return;
-    }
-
     showChatView();
     addMessage('user', text);
 
@@ -659,8 +654,8 @@ function sendMessage(text) {
         userState.messageCount++;
         console.log(`Mensajes enviados: ${userState.messageCount}/${MESSAGE_LIMIT.FREE}`);
 
-        if (userState.messageCount >= MESSAGE_LIMIT.FREE) {
-            showLimitWarning();
+        if (userState.messageCount === MESSAGE_LIMIT.FREE) {
+            showPremiumModal();
         }
     }
 
@@ -1335,6 +1330,11 @@ function renderTaskSidebar() {
         } catch (e) {
             console.warn('⚠️ bindICSDownloadButtons fallo:', e);
         }
+        try {
+            setupTaskPreviewDelegation();
+        } catch (e) {
+            console.warn('⚠️ setupTaskPreviewDelegation fallo:', e);
+        }
     } catch (error) {
         console.error('❌ Error en renderTaskSidebar:', error);
     }
@@ -1364,6 +1364,106 @@ function bindICSDownloadButtons() {
 
         btn.__icsBound = true;
     });
+}
+
+// ==================== MODAL DETALLE TAREA (SIDEBAR) ====================
+let taskPreviewDelegationSetup = false;
+
+function setupTaskPreviewDelegation() {
+    if (taskPreviewDelegationSetup) return;
+
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
+    sidebar.addEventListener('click', (e) => {
+        const previewItem = e.target.closest('.task-preview-item');
+        if (previewItem && !e.target.closest('.task-preview-btn')) {
+            const taskId = previewItem.dataset.taskId;
+            const task = taskStore.find(t => t.id === taskId);
+            if (task) {
+                showTaskDetailsModal(task);
+            }
+            return;
+        }
+    });
+
+    taskPreviewDelegationSetup = true;
+}
+
+function showTaskDetailsModal(task) {
+    const existing = document.querySelector('.event-modal-overlay');
+    if (existing) {
+        existing.remove();
+    }
+
+    const isNote = task.type === 'note';
+    const rawTitle =
+        (task.raw && (task.raw.title || task.raw.titulo || task.raw.summary || task.raw.event_title)) || '';
+    const titleSource = isNote
+        ? (rawTitle || task.content || 'Detalle')
+        : (extractPreviewContent(task.content || '', task.type) || task.content || 'Detalle');
+    const title = escapeHtml(titleSource);
+    const fecha = escapeHtml(task.fecha || '');
+    const hora = escapeHtml(task.hora || '');
+    const location = escapeHtml(task.location || '');
+    const meetingType = escapeHtml(task.meeting_type || '');
+    const meetingLink = escapeHtml(task.meeting_link || task.raw?.meeting_link || '');
+    const rawName = task.raw?.ics_filename || task.content || 'evento';
+    const safeName = rawName.replace(/\.ics$/i, '');
+
+    const dateLine = [fecha, hora].filter(Boolean).join(' ');
+    const hasIcs = !!task.raw?.ics;
+    const noteContent = escapeHtml(task.content || '');
+    const headerIcon = isNote ? 'note' : 'event';
+    const headerLabel = isNote ? 'Nota' : 'Evento';
+
+    const modalHtml = `
+        <div class="event-modal-overlay active" id="eventModalOverlay">
+            <div class="event-modal">
+                <div class="event-modal-header">
+                    <div class="event-modal-title">
+                        <span class="material-symbols-outlined">${headerIcon}</span>
+                        <span>${headerLabel}: ${title}</span>
+                    </div>
+                    <button class="event-modal-close" id="eventModalClose" aria-label="Cerrar">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+                <div class="event-modal-body">
+                    ${isNote ? `<div class="event-modal-row full"><span class="label">Contenido</span><span class="value">${noteContent}</span></div>` : ''}
+                    ${!isNote && dateLine ? `<div class="event-modal-row"><span class="label">Fecha y hora</span><span class="value">${dateLine}</span></div>` : ''}
+                    ${!isNote && location ? `<div class="event-modal-row"><span class="label">Ubicación</span><span class="value">${location}</span></div>` : ''}
+                    ${!isNote && meetingType ? `<div class="event-modal-row"><span class="label">Tipo</span><span class="value">${meetingType}</span></div>` : ''}
+                    ${!isNote && meetingLink ? `<div class="event-modal-row"><span class="label">Liga</span><span class="value"><a class="event-modal-link" href="${meetingLink}" target="_blank" rel="noopener noreferrer">${meetingLink}</a></span></div>` : ''}
+                </div>
+                <div class="event-modal-actions">
+                    ${!isNote && hasIcs ? `<button class="event-modal-btn primary" id="eventModalDownload">Descargar ICS</button>` : ''}
+                    <button class="event-modal-btn secondary" id="eventModalCloseBtn">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    const overlay = document.getElementById('eventModalOverlay');
+    const closeBtn = document.getElementById('eventModalClose');
+    const closeBtnFooter = document.getElementById('eventModalCloseBtn');
+    const downloadBtn = document.getElementById('eventModalDownload');
+
+    const close = () => overlay?.remove();
+
+    closeBtn?.addEventListener('click', close);
+    closeBtnFooter?.addEventListener('click', close);
+    overlay?.addEventListener('click', (ev) => {
+        if (ev.target === overlay) close();
+    });
+
+    if (downloadBtn && hasIcs) {
+        downloadBtn.addEventListener('click', () => {
+            downloadICS(task.raw.ics, safeName);
+        });
+    }
 }
 
 // ==================== RENDERIZADO DE PREVIEWS CON ESTILO ====================

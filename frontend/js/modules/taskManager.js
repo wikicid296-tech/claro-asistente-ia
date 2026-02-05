@@ -581,7 +581,13 @@ function showTaskDetailsModal(task) {
         existing.remove();
     }
 
-    const title = escapeHtml(extractPreviewContent(task.content || '', task.type) || task.content || 'Detalle');
+    const isNote = task.type === 'note';
+    const rawTitle =
+        (task.raw && (task.raw.title || task.raw.titulo || task.raw.summary || task.raw.event_title)) || '';
+    const titleSource = isNote
+        ? (rawTitle || task.content || 'Detalle')
+        : (extractPreviewContent(task.content || '', task.type) || task.content || 'Detalle');
+    const title = escapeHtml(titleSource);
     const fecha = escapeHtml(task.fecha || '');
     const hora = escapeHtml(task.hora || '');
     const location = escapeHtml(task.location || '');
@@ -592,7 +598,6 @@ function showTaskDetailsModal(task) {
 
     const dateLine = [fecha, hora].filter(Boolean).join(' ');
     const hasIcs = !!task.raw?.ics;
-    const isNote = task.type === 'note';
     const noteContent = escapeHtml(task.content || '');
     const headerIcon = isNote ? 'note' : 'event';
     const headerLabel = isNote ? 'Nota' : 'Evento';

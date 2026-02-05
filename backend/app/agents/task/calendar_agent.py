@@ -1,20 +1,90 @@
 from __future__ import annotations
+
+import json
+import logging
 from typing import Dict, Any
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.services.datetime_normalizer_service import normalize_datetime_from_text
 from app.services.calendar_ics import crear_invitacion_ics
+from app.services.groq_service import run_groq_completion
+from app.clients.groq_client import get_groq_client, get_groq_api_key
+
+
+logger = logging.getLogger(__name__)
+
+now = datetime.now(ZoneInfo("America/Mexico_City"))
+now_iso = now.isoformat(timespec="minutes")
+today = now.strftime("%Y-%m-%d")
+
+
+SYSTEM_PROMPT = f"""
+Eres un normalizador de eventos de calendario.
+
+FECHA Y HORA ACTUAL (referencia absoluta):
+- Fecha: {today}
+- Fecha y hora ISO: {now_iso}
+- Zona horaria: America/Mexico_City
+
+Devuelve ÚNICAMENTE un JSON con:
+- titulo: string
+- descripcion: string
+- fecha: YYYY-MM-DD | null
+- hora: HH:MM | null
+- ubicacion: string | null
+
+Reglas:
+-Debes omitir en el titulo las palabras instruccionales como "Agendar", "Programar", "Crear evento"
+- Todas las fechas relativas deben resolverse usando ESTA referencia
+- titulo debe ser corto y limpio (sin fecha ni hora)
+- descripcion puede ampliar el contexto
+- NO inventes datos
+- NO uses markdown
+"""
+
+
+def normalize_calendar_event(text: str) -> Dict[str, Any]:
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": text},
+    ]
+
+    raw = run_groq_completion(
+        messages=messages,
+        groq_client=get_groq_client(),
+        groq_api_key=get_groq_api_key(),
+        temperature=0.0,
+        max_tokens=250,
+    )
+
+    logger.info("📅 CalendarAgent.normalize_calendar_event | raw=%r", raw)
+
+    if not raw or not raw.strip():
+        return {}
+
+    cleaned = raw.strip()
+
+    if cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        cleaned = cleaned.strip()
+        lines = cleaned.splitlines()
+        if lines and lines[0].strip().lower() == "json":
+            cleaned = "\n".join(lines[1:]).strip()
+
+    try:
+        data = json.loads(cleaned)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    return {}
 
 
 class CalendarTaskAgent:
-    """
-    Agente de eventos de calendario (DEBUG).
-
-    Responsabilidades:
-    - NO pregunta directamente
-    - NO inventa datos
-    - Señala carencias reales (fecha / hora / link)
-    """
-
     def handle(
         self,
         *,
@@ -23,104 +93,62 @@ class CalendarTaskAgent:
         state: Any = None,
     ) -> Dict[str, Any]:
 
-        print("\n================ CALENDAR TASK AGENT ================")
-        print("📥 CONTENT:")
-        print(content)
-
-        print("\n📥 ANALYSIS RAW:")
-        print(analysis)
-
-        # -------------------------------------------------
-        # 1) Detectar carencias desde analysis
-        # -------------------------------------------------
-        missing_fields = analysis.get("missing_fields", []) or []
-        missing = set(missing_fields)
-
-        print("\n🔎 MISSING FIELDS:")
-        print(missing)
+        missing = set(analysis.get("missing_fields", []) or [])
 
         needs_meeting_link = "meeting_link" in missing
 
-        fecha_from_analysis = analysis.get("fecha")
-        hora_from_analysis = analysis.get("hora")
+        dt = normalize_datetime_from_text(text=content)
+        fecha = dt.get("fecha")
+        hora = dt.get("hora")
 
-        print("\n🕒 FECHA / HORA DESDE ANALYSIS:")
-        print("fecha:", fecha_from_analysis)
-        print("hora :", hora_from_analysis)
+        needs_datetime = not (fecha and hora)
 
-        # Regla correcta: fecha Y hora son obligatorias
-        needs_datetime = not (fecha_from_analysis and hora_from_analysis)
-
-        print("\n❓ NEEDS DATETIME?:", needs_datetime)
-
-        enrichment_candidates: list[str] = []
-
+        enrichment_candidates = []
         if needs_meeting_link:
             enrichment_candidates.append("meeting_link")
-
         if needs_datetime:
             enrichment_candidates.append("datetime")
 
-        print("\n✨ ENRICHMENT CANDIDATES:")
-        print(enrichment_candidates)
+        llm = normalize_calendar_event(content)
 
-        # -------------------------------------------------
-        # 2) Normalización FASE 8 (solo si no faltan datos)
-        # -------------------------------------------------
-        fecha: str | None = fecha_from_analysis
-        hora: str | None = hora_from_analysis
-        ics: str | None = None
+        titulo = llm.get("titulo", content)
+        descripcion = llm.get("descripcion", titulo)
+        ubicacion = llm.get("ubicacion")
 
-        if not needs_datetime:
-            print("\n🛠️ NORMALIZING DATETIME FROM CONTENT...")
-            dt = normalize_datetime_from_text(text=content)
-            print("➡️ normalize_datetime_from_text output:", dt)
+        fecha = llm.get("fecha") or fecha
+        hora = llm.get("hora") or hora
 
-            fecha = dt.get("fecha")
-            hora = dt.get("hora")
+        ics = None
+        if fecha and hora:
+            ics = crear_invitacion_ics(
+                titulo=titulo,
+                descripcion=descripcion,
+                fecha=fecha,
+                hora=hora,
+            )
 
-            print("✅ NORMALIZED:")
-            print("fecha:", fecha)
-            print("hora :", hora)
+        logger.info(
+            "CalendarAgent.handle | result=%s",
+            json.dumps({
+                "task_type": "calendar",
+                "content": titulo,
+                "fecha": fecha,
+                "hora": hora,
+                "ubicacion": ubicacion,
+                "needs_followup": bool(enrichment_candidates),
+                "enrichment_candidates": enrichment_candidates,
+            }, ensure_ascii=False)
+        )
 
-            # ---------------------------------------------
-            # 3) Generación de ICS
-            # ---------------------------------------------
-            if fecha and hora:
-                try:
-                    print("\n📆 GENERATING ICS...")
-                    ics = crear_invitacion_ics(
-                        titulo=content,
-                        descripcion=content,
-                        fecha=fecha,
-                        hora=hora,
-                    )
-                    print("✅ ICS GENERATED (length):", len(ics))
-                except Exception as e:
-                    print("❌ ERROR GENERATING ICS:", e)
-                    ics = None
-            else:
-                print("\n⚠️ ICS NOT GENERATED (missing fecha or hora)")
-
-        else:
-            print("\n⏭️ SKIPPING NORMALIZATION & ICS (needs follow-up)")
-
-        result = {
+        return {
             "task_type": "calendar",
             "status": "created",
-            "content": content,
-
+            "content": titulo,
             "fecha": fecha,
             "hora": hora,
+            "ubicacion": ubicacion,
             "ics": ics,
-
             "enrichment_candidates": enrichment_candidates,
             "needs_followup": bool(enrichment_candidates),
             "followup_question": None,
         }
-
-        print("\n📤 FINAL RESULT:")
-        print(result)
-        print("================ END CALENDAR TASK AGENT ================\n")
-
-        return result
