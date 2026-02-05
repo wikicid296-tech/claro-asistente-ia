@@ -4,6 +4,7 @@ import logging
 import re
 
 from app.services.task_calendar_service import generate_ics_for_task
+from app.services.task_content_synthesizer import synthesize_task_content
 from app.stores.task_store import add_task, get_tasks_grouped
 from app.domain.task import Task
 
@@ -173,7 +174,7 @@ def continue_task(*, state: Any, user_message: str) -> Dict[str, Any]:
     task = Task(
         user_key=(updated.get("user_key") or task_snapshot.get("user_key") or getattr(state, "user_key", "") or ""),
         type=task_type,
-        content=updated.get("content", task_snapshot.get("content", "")),
+        content=synthesize_task_content(updated.get("content", task_snapshot.get("content", ""))),
         description=updated.get("description"),
         meeting_type=updated.get("meeting_type"),
         meeting_link=updated.get("meeting_link"),

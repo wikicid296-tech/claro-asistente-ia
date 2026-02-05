@@ -1,3 +1,4 @@
+from logging import Logger
 from openai import OpenAI
 import dotenv
 import re
@@ -66,6 +67,7 @@ def run_web_search(user_query: str) -> dict:
         }
 
     except Exception as e:
+        Logger.info(f"Error during web search: {e}")
         return {
             "content": "No fue posible realizar la búsqueda web en este momento.",
             "sources": [],
