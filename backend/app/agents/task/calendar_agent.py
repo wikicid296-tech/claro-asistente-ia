@@ -114,6 +114,8 @@ class CalendarTaskAgent:
         titulo = llm.get("titulo", content)
         descripcion = llm.get("descripcion", titulo)
         ubicacion = llm.get("ubicacion")
+        if not ubicacion:
+            ubicacion = "No especificado"
 
         fecha = llm.get("fecha") or fecha
         hora = llm.get("hora") or hora
