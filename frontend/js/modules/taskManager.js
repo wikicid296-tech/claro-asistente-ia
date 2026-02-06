@@ -274,7 +274,7 @@ function extractPreviewContent(fullContent, taskType) {
     const cleanContent = content
         .replace(/^(anota|apunta|nota|escribe)\s*/i, '')
         .replace(/^(recuerdame|recuérdame|recordatorio|recordar)\s*/i, '')
-        .replace(/^(agenda|agendar|evento|cita|reunión|reunion)\s*/i, '')
+        .replace(/^(agenda|agendar|evento|cita)\s*/i, '')
         .replace(/^(que|qué|para|sobre|acerca de)\s*/i, '')
         .trim();
 
@@ -590,17 +590,21 @@ function showTaskDetailsModal(task) {
     const title = escapeHtml(titleSource);
     const fecha = escapeHtml(task.fecha || '');
     const hora = escapeHtml(task.hora || '');
-    const location = escapeHtml(task.location || '');
+    const rawLocation = task.location || '';
+    const location = escapeHtml(rawLocation);
     const meetingType = escapeHtml(task.meeting_type || '');
     const meetingLink = escapeHtml(task.meeting_link || task.raw?.meeting_link || '');
     const rawName = task.raw?.ics_filename || task.content || 'evento';
     const safeName = rawName.replace(/\.ics$/i, '');
 
     const dateLine = [fecha, hora].filter(Boolean).join(' ');
+    const shouldShowLocation = !isNote;
+    const locationDisplay = rawLocation ? location : 'No especificado';
     const hasIcs = !!task.raw?.ics;
     const noteContent = escapeHtml(task.content || '');
-    const headerIcon = isNote ? 'note' : 'event';
-    const headerLabel = isNote ? 'Nota' : 'Evento';
+    const headerIcon = isNote ? 'note' : (task.type === 'reminder' ? 'notifications' : 'event');
+    const headerLabel = isNote ? 'Nota' : (task.type === 'reminder' ? 'Recordatorio' : 'Evento');
+    const contentLabel = isNote ? 'Contenido' : 'Título';
 
     const modalHtml = `
         <div class="event-modal-overlay active" id="eventModalOverlay">
@@ -608,16 +612,16 @@ function showTaskDetailsModal(task) {
                 <div class="event-modal-header">
                     <div class="event-modal-title">
                         <span class="material-symbols-outlined">${headerIcon}</span>
-                        <span>${headerLabel}: ${title}</span>
+                        <span>${headerLabel}</span>
                     </div>
                     <button class="event-modal-close" id="eventModalClose" aria-label="Cerrar">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
                 <div class="event-modal-body">
-                    ${isNote ? `<div class="event-modal-row full"><span class="label">Contenido</span><span class="value">${noteContent}</span></div>` : ''}
+                    ${noteContent ? `<div class="event-modal-row full"><span class="label">${contentLabel}</span><span class="value">${noteContent}</span></div>` : ''}
                     ${!isNote && dateLine ? `<div class="event-modal-row"><span class="label">Fecha y hora</span><span class="value">${dateLine}</span></div>` : ''}
-                    ${!isNote && location ? `<div class="event-modal-row"><span class="label">Ubicación</span><span class="value">${location}</span></div>` : ''}
+                    ${shouldShowLocation ? `<div class="event-modal-row"><span class="label">Ubicación</span><span class="value">${locationDisplay}</span></div>` : ''}
                     ${!isNote && meetingType ? `<div class="event-modal-row"><span class="label">Tipo</span><span class="value">${meetingType}</span></div>` : ''}
                     ${!isNote && meetingLink ? `<div class="event-modal-row"><span class="label">Liga</span><span class="value"><a class="event-modal-link" href="${meetingLink}" target="_blank" rel="noopener noreferrer">${meetingLink}</a></span></div>` : ''}
                 </div>

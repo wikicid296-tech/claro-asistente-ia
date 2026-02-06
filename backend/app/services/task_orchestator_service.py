@@ -21,7 +21,13 @@ def _select_agent(ttype: str):
     return NoteTaskAgent()
 
 
-def _followup_question_for(slot: Optional[str], ttype: str) -> str:
+def _followup_question_for(
+    slot: Optional[str],
+    ttype: str,
+    *,
+    fecha: Optional[str] = None,
+    hora: Optional[str] = None,
+) -> str:
     """
     Pregunta determinista para follow-up, alineada a slots soportados.
     """
@@ -29,8 +35,18 @@ def _followup_question_for(slot: Optional[str], ttype: str) -> str:
         return "🔗 ¿Ya tienes la liga de la reunión?"
     if slot == "datetime":
         # usable tanto para calendar como reminder
+        has_fecha = bool(fecha)
+        has_hora = bool(hora)
         if ttype == "reminder":
+            if has_fecha and not has_hora:
+                return "⏰ ¿A qué hora quieres que te lo recuerde?"
+            if has_hora and not has_fecha:
+                return "🗓️ ¿Qué día quieres que te lo recuerde?"
             return "⏰ ¿Qué día y a qué hora quieres que te lo recuerde?"
+        if has_fecha and not has_hora:
+            return "🕐 ¿A qué hora será el evento?"
+        if has_hora and not has_fecha:
+            return "🗓️ ¿En qué fecha será el evento?"
         return "🕒 ¿En qué fecha y hora será el evento?"
     # fallback
     return "🤔 ¿Puedes darme un poco más de información?"
@@ -129,10 +145,20 @@ def process_task(
         state.slots = {
             **agent_result,
             "task_type": ttype,
+            "location": (
+                agent_result.get("ubicacion")
+                or agent_result.get("lugar")
+                or analysis.get("location")
+            ),
         }
 
         # Garantía: followup_question NO nulo
-        followup_q = _followup_question_for(state.awaiting_slot, ttype)
+        followup_q = _followup_question_for(
+            state.awaiting_slot,
+            ttype,
+            fecha=agent_result.get("fecha") or analysis.get("fecha"),
+            hora=agent_result.get("hora") or analysis.get("hora"),
+        )
         agent_result["followup_question"] = followup_q
 
         # También reflejar candidates normalizados para el front/debug
@@ -173,6 +199,7 @@ def process_task(
             agent_result.get("ubicacion")
             or agent_result.get("lugar")
             or analysis.get("location")
+            or ("No especificado" if safe_task_type in ("calendar", "reminder") else None)
         ),
         status="active",
     )

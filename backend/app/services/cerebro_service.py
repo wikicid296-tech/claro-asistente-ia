@@ -96,7 +96,8 @@ def _build_task_response(task_result: Dict[str, Any], state) -> Dict[str, Any]:
             FOLLOWUP_QUESTIONS = {
                 "meeting_link": "🔗 ¿Ya tienes la liga de la reunión?",
                 # 'datetime' es genérico; el copy correcto debe venir del orquestador
-                "datetime": "🕒 ¿En qué fecha y hora?",
+                "date": "🗓️ ¿En qué fecha?",
+                "time": "🕐 ¿A que hora?"
             }
             followup_text = FOLLOWUP_QUESTIONS.get(
                 awaiting_slot or "",
@@ -426,16 +427,16 @@ def procesar_chat_web(
                 meeting_link = _sanitize(getattr(t, "meeting_link", None))
                 location = _sanitize(getattr(t, "location", None))
                 if meeting_type == "virtual":
-                    place = f"Link: {meeting_link}" if meeting_link != "-" else "-"
+                    place = f"Link: {meeting_link}" if meeting_link != "-" else "No especificado"
                 elif meeting_type == "presencial":
-                    place = f"Ubicación: {location}" if location != "-" else "-"
+                    place = f"Ubicación: {location}" if location != "-" else "No especificado"
                 else:
                     if meeting_link != "-":
                         place = f"Link: {meeting_link}"
                     elif location != "-":
                         place = location
                     else:
-                        place = "-"
+                        place = "No especificado" if getattr(t, "type", None) in ("calendar", "reminder") else "-"
                 created_at = _format_created_at(t)
                 lines.append(
                     f"| {title} | {fecha} | {hora} | {place} | {created_at} |"
