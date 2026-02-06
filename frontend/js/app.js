@@ -638,6 +638,8 @@ function hideModeChip() {
     if (appState.currentMode !== 'descubre') {
         setMode('descubre', { source: 'manual' });
     }
+    // Rehabilitar auto-detección para que "aprende" vuelva a activar el chip
+    appState.modeActivatedManually = false;
 }
 
 // ==================== SUGGESTION CARDS ====================
@@ -806,6 +808,13 @@ async function callAPI(message) {
 
         if (data.success) {
             if (data.aprende_ia_used) {
+                // Mantener chip Aprende activo para follow-ups
+                if (appState.currentMode !== 'aprende') {
+                    setMode('aprende', { source: 'auto' });
+                }
+                // Evitar que el auto-detect lo desactive en el siguiente mensaje
+                appState.modeActivatedManually = true;
+
                 if (data.url_video) {
                     appState.lastAprendeResource = {
                         url: data.url_video,
